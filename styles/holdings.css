@@ -1,0 +1,477 @@
+/* ══════════════════════════════════════════════════════════════
+   Holdings Page — Category Tabs + Table Styles
+══════════════════════════════════════════════════════════════ */
+
+/* ─── Summary Strip ──────────────────────────────────────────── */
+.summary-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px 28px;
+  box-shadow: var(--shadow-card);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.summary__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.summary__value {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.summary-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+  margin: 0 28px;
+  flex-shrink: 0;
+}
+
+/* ─── Category Tab Nav ───────────────────────────────────────── */
+.category-nav {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  box-shadow: var(--shadow-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.category-nav::-webkit-scrollbar { display: none; }
+
+.cat-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cat-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cat-tab--active {
+  background: var(--accent-dim);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: var(--accent-light);
+}
+
+.cat-tab__icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.cat-tab__label {
+  font-size: 13px;
+}
+
+/* ─── Tab Panels ─────────────────────────────────────────────── */
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tab-panel.hidden { display: none; }
+
+/* ─── Holdings Panel ─────────────────────────────────────────── */
+.holdings-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.holdings-panel .panel__header {
+  padding: 20px 24px 0;
+  margin-bottom: 16px;
+}
+
+.panel-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.holdings-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 10px;
+}
+
+/* ─── Wider Table Cells ──────────────────────────────────────── */
+.holdings-table th:first-child,
+.holdings-table td:first-child {
+  padding-left: 24px;
+}
+
+.holdings-table th:last-child,
+.holdings-table td:last-child {
+  padding-right: 24px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STOCKS DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+/* ─── KPI grid ───────────────────────────────────────────────── */
+.stocks-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Line chart panel ───────────────────────────────────────── */
+.stocks-chart-line {
+  /* inherits .panel */
+}
+
+/* ─── Canvas wrappers ────────────────────────────────────────── */
+.stocks-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.stocks-canvas-wrap--sm {
+  height: 210px;
+}
+
+/* ─── Donut + Bar row ────────────────────────────────────────── */
+.stocks-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Table header actions ───────────────────────────────────── */
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Status indicator dot ───────────────────────────────────── */
+.s-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.s-indicator--up   { background: var(--up);   box-shadow: 0 0 6px rgba(52,211,153,0.5); }
+.s-indicator--down { background: var(--down);  box-shadow: 0 0 6px rgba(248,113,113,0.5); }
+
+/* ─── Company name cell ──────────────────────────────────────── */
+.s-td-company {
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+/* ─── Row action buttons ─────────────────────────────────────── */
+.s-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.s-btn-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.s-btn-edit:hover {
+  border-color: var(--accent);
+  color: var(--accent-light);
+  background: var(--accent-dim);
+}
+
+/* ─── Sortable Table Headers ─────────────────────────────────── */
+.th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.th-sort:hover { color: var(--text-primary); }
+
+.th-sort--active { color: var(--accent-light) !important; }
+
+.sort-icon {
+  font-size: 10px;
+  opacity: 0.4;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.th-sort--active .sort-icon { opacity: 1; }
+
+/* ══════════════════════════════════════════════════════════════
+   BONOS GUBERNAMENTALES DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.bonos-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.bonos-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.bonos-canvas-wrap--sm {
+  height: 210px;
+}
+
+.bonos-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FONDOS DE INVERSIÓN DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.fondos-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.fondos-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.fondos-canvas-wrap--sm {
+  height: 210px;
+}
+
+.fondos-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIBRAS DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.fibras-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.fibras-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.fibras-canvas-wrap--sm {
+  height: 210px;
+}
+
+.fibras-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FONDOS PARA EL RETIRO DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.retiro-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.retiro-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.retiro-canvas-wrap--sm {
+  height: 210px;
+}
+
+.retiro-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BIENES Y RAÍCES DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.bienes-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.bienes-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.bienes-canvas-wrap--sm {
+  height: 210px;
+}
+
+.bienes-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Wide modal for the gastos breakdown ────────────────────── */
+.modal--wide {
+  width: min(820px, 94vw);
+}
+
+.modal__section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 16px 0 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CRYPTOS DASHBOARD
+══════════════════════════════════════════════════════════════ */
+
+.crypto-kpi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.crypto-canvas-wrap {
+  position: relative;
+  height: 230px;
+}
+
+.crypto-canvas-wrap--sm {
+  height: 210px;
+}
+
+.crypto-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .stocks-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .stocks-charts-row { grid-template-columns: 1fr; }
+  .bonos-kpi-grid    { grid-template-columns: 1fr 1fr; }
+  .bonos-charts-row  { grid-template-columns: 1fr; }
+  .fondos-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .fondos-charts-row { grid-template-columns: 1fr; }
+  .fibras-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .fibras-charts-row { grid-template-columns: 1fr; }
+  .retiro-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .retiro-charts-row { grid-template-columns: 1fr; }
+  .crypto-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .crypto-charts-row { grid-template-columns: 1fr; }
+  .bienes-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .bienes-charts-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .stocks-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .stocks-charts-row { grid-template-columns: 1fr; }
+  .bonos-kpi-grid    { grid-template-columns: 1fr 1fr; }
+  .bonos-charts-row  { grid-template-columns: 1fr; }
+  .fondos-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .fondos-charts-row { grid-template-columns: 1fr; }
+  .fibras-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .fibras-charts-row { grid-template-columns: 1fr; }
+  .retiro-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .retiro-charts-row { grid-template-columns: 1fr; }
+  .crypto-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .crypto-charts-row { grid-template-columns: 1fr; }
+  .bienes-kpi-grid   { grid-template-columns: 1fr 1fr; }
+  .bienes-charts-row { grid-template-columns: 1fr; }
+  .table-actions     { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .category-nav      { justify-content: flex-start; }
+
+  /* Summary strip: 2-column grid on mobile */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 18px 20px;
+  }
+  .summary-divider { display: none; }
+  .summary-item    { flex: unset; }
+}
+
+@media (max-width: 480px) {
+  .stocks-kpi-grid,
+  .bonos-kpi-grid,
+  .fondos-kpi-grid,
+  .fibras-kpi-grid,
+  .retiro-kpi-grid,
+  .crypto-kpi-grid,
+  .bienes-kpi-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Summary strip: single column on very small phones */
+  .summary-strip { grid-template-columns: 1fr; }
+}

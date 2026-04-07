@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WealthOS — Settings</title>
+  <script src="scripts/i18n.js"></script>
+  <link rel="stylesheet" href="styles/style.css" />
+  <link rel="stylesheet" href="styles/settings.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="app-content">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__logo">
+      <span class="logo__mark">W</span>
+      <span class="logo__name">WealthOS</span>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="index.html" class="nav__item">
+        <span class="nav__icon">◈</span> <span data-i18n="nav_dashboard">Dashboard</span>
+      </a>
+      <a href="holdings.html" class="nav__item">
+        <span class="nav__icon">◇</span> <span data-i18n="nav_holdings">Financial Instruments</span>
+      </a>
+      <a href="accounts.html" class="nav__item">
+        <span class="nav__icon">△</span> <span data-i18n="nav_accounts">Bank Accounts</span>
+      </a>
+      <a href="history.html" class="nav__item">
+        <span class="nav__icon">○</span> <span data-i18n="nav_history">History</span>
+      </a>
+      <a href="settings.html" class="nav__item nav__item--active">
+        <span class="nav__icon">□</span> <span data-i18n="nav_settings">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar__footer">
+      <div class="user__avatar">JS</div>
+      <div class="user__info">
+        <span class="user__name">Javier Sepulveda</span>
+        <span class="user__plan" data-i18n="user_plan">Pro Investor</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="btn-hamburger" id="hamburger-btn" data-i18n-aria="aria_open_menu" aria-label="Open menu">☰</button>
+        <div class="topbar__title-group">
+          <h1 class="page__title" data-i18n="page_settings">Settings</h1>
+          <span class="page__date" id="current-date"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- IN-PAGE NAV -->
+    <nav class="settings-nav">
+      <a href="#" class="settings-nav__item settings-nav__item--active" data-tab="profile">
+        <span class="settings-nav__icon">◉</span> <span data-i18n="settings_profile">Profile</span>
+      </a>
+      <a href="#" class="settings-nav__item" data-tab="portfolio">
+        <span class="settings-nav__icon">◈</span> <span data-i18n="settings_portfolio">Portfolio</span>
+      </a>
+      <a href="#" class="settings-nav__item" data-tab="display">
+        <span class="settings-nav__icon">◫</span> <span data-i18n="settings_display">Display</span>
+      </a>
+      <div class="settings-nav__divider"></div>
+      <a href="#" class="settings-nav__item" data-tab="notifications">
+        <span class="settings-nav__icon">◌</span> <span data-i18n="settings_notifications">Notifications</span>
+      </a>
+      <a href="#" class="settings-nav__item" data-tab="privacy">
+        <span class="settings-nav__icon">◻</span> <span data-i18n="settings_privacy">Privacy</span>
+      </a>
+      <a href="#" class="settings-nav__item" data-tab="integrations">
+        <span class="settings-nav__icon">◎</span> <span data-i18n="settings_integrations">Integrations</span>
+      </a>
+    </nav>
+
+    <!-- SETTINGS STACK -->
+    <div class="settings-layout">
+      <div class="settings-stack">
+
+        <!-- ══════════════════════════════════════
+             1. PROFILE & ACCOUNT
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="profile">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_profile">Profile &amp; Account</span>
+          </div>
+          <p class="settings-section__subtitle" data-i18n="section_profile_sub">Manage your personal information and account credentials.</p>
+
+          <div class="settings-body">
+
+            <!-- Profile Photo -->
+            <div class="avatar-area">
+              <div class="avatar-large">JS</div>
+              <div class="avatar-actions">
+                <span class="avatar-actions__name">Javier Sepulveda</span>
+                <span class="avatar-actions__hint" data-i18n="avatar_hint">JPG, PNG or GIF — max 2 MB</span>
+                <button class="btn btn--ghost btn--sm" data-i18n="btn_upload_photo">Upload Photo</button>
+              </div>
+            </div>
+
+            <!-- Display Name -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_display_name">Display Name</span>
+                <span class="settings-row__desc" data-i18n="desc_display_name">Shown in the sidebar and across the app.</span>
+              </div>
+              <div class="settings-row__control">
+                <input type="text" class="settings-input" value="Javier Sepulveda" data-i18n-placeholder="ph_your_name" placeholder="Your name" />
+                <button class="btn btn--ghost btn--sm" data-i18n="btn_save">Save</button>
+              </div>
+            </div>
+
+            <!-- Email -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_email">Email Address</span>
+                <span class="settings-row__desc" data-i18n="desc_email">Used for account recovery and future notifications.</span>
+              </div>
+              <div class="settings-row__control">
+                <input type="email" class="settings-input" data-i18n-placeholder="ph_email" placeholder="you@example.com" />
+                <button class="btn btn--ghost btn--sm" data-i18n="btn_save">Save</button>
+              </div>
+            </div>
+
+            <!-- Change Password -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_password">Password</span>
+                <span class="settings-row__desc" data-i18n="desc_password">Set a strong password to secure your account.</span>
+              </div>
+              <div class="settings-row__control">
+                <button class="btn btn--ghost btn--sm" data-i18n="btn_change_password">Change Password</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════
+             2. PORTFOLIO SETTINGS
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="portfolio">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_portfolio_s">Portfolio Settings</span>
+          </div>
+          <p class="settings-section__subtitle" data-i18n="section_portfolio_sub">Configure how your portfolio data is tracked and displayed.</p>
+
+          <div class="settings-body">
+
+            <!-- Base Currency -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_base_currency">Base Currency</span>
+                <span class="settings-row__desc" data-i18n="desc_base_currency">All values across the dashboard will be shown in this currency.</span>
+              </div>
+              <div class="settings-row__control">
+                <select class="settings-select">
+                  <option value="MXN">MXN — Mexican Peso</option>
+                  <option value="USD" selected>USD — US Dollar</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="GBP">GBP — British Pound</option>
+                  <option value="CAD">CAD — Canadian Dollar</option>
+                  <option value="JPY">JPY — Japanese Yen</option>
+                  <option value="BRL">BRL — Brazilian Real</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════
+             3. DISPLAY & PREFERENCES
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="display">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_display_s">Display &amp; Preferences</span>
+          </div>
+          <p class="settings-section__subtitle" data-i18n="section_display_sub">Customize the look and feel of the interface.</p>
+
+          <div class="settings-body">
+
+            <!-- Language -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_language">Language</span>
+                <span class="settings-row__desc" data-i18n="desc_language">Sets the display language for labels, menus, and messages.</span>
+              </div>
+              <div class="settings-row__control">
+                <select class="settings-select" id="lang-select" onchange="changeLanguage(this.value)">
+                  <option value="en" data-i18n="opt_english">English</option>
+                  <option value="es" data-i18n="opt_espanol">Español</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Theme -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_theme">Theme</span>
+                <span class="settings-row__desc" data-i18n="desc_theme">Switch between dark and light mode.</span>
+              </div>
+              <div class="settings-row__control">
+                <select class="settings-select">
+                  <option value="dark" selected data-i18n="opt_dark">Dark</option>
+                  <option value="light" data-i18n="opt_light">Light</option>
+                  <option value="system" data-i18n="opt_system">System Default</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Date Format -->
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_date_format">Date Format</span>
+                <span class="settings-row__desc" data-i18n="desc_date_format">Controls how dates appear throughout the app.</span>
+              </div>
+              <div class="settings-row__control">
+                <select class="settings-select">
+                  <option value="DD/MM/YYYY" selected>DD/MM/YYYY</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════
+             4. NOTIFICATIONS  (future)
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="notifications">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_notif">Notifications</span>
+            <span class="coming-soon-badge" data-i18n="coming_soon">Coming Soon</span>
+          </div>
+          <p class="future-note" data-i18n="future_note">These features are planned for a future update and are not yet functional.</p>
+
+          <div class="settings-future-body">
+            <div class="settings-body">
+
+              <!-- Significant gains/losses alert -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_gain_alert">Significant Gains / Loss Alerts</span>
+                  <span class="settings-row__desc" data-i18n="desc_gain_alert">Receive an email when a position moves more than a set threshold (e.g. −5% in a day).</span>
+                </div>
+                <div class="settings-row__control">
+                  <label class="toggle">
+                    <input type="checkbox" class="toggle__input" disabled />
+                    <span class="toggle__track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Weekly / monthly summary -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_perf_summary">Performance Summary Email</span>
+                  <span class="settings-row__desc" data-i18n="desc_perf_summary">Weekly or monthly digest of your portfolio performance sent to your inbox.</span>
+                </div>
+                <div class="settings-row__control">
+                  <select class="settings-select" disabled>
+                    <option data-i18n="opt_weekly">Weekly</option>
+                    <option data-i18n="opt_monthly">Monthly</option>
+                    <option data-i18n="opt_off">Off</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Price target alerts -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_price_alert">Price Target Alerts</span>
+                  <span class="settings-row__desc" data-i18n="desc_price_alert">Set a custom price target per holding and get notified when it is reached.</span>
+                </div>
+                <div class="settings-row__control">
+                  <label class="toggle">
+                    <input type="checkbox" class="toggle__input" disabled />
+                    <span class="toggle__track"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Dividend reminders -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_dividend">Dividend Payment Reminders</span>
+                  <span class="settings-row__desc" data-i18n="desc_dividend">Get notified ahead of upcoming dividend ex-dates for holdings in your portfolio.</span>
+                </div>
+                <div class="settings-row__control">
+                  <label class="toggle">
+                    <input type="checkbox" class="toggle__input" disabled />
+                    <span class="toggle__track"></span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════
+             5. PRIVACY & SECURITY  (future)
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="privacy">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_privacy">Privacy &amp; Security</span>
+            <span class="coming-soon-badge" data-i18n="coming_soon">Coming Soon</span>
+          </div>
+          <p class="future-note" data-i18n="future_note">These features are planned for a future update and are not yet functional.</p>
+
+          <div class="settings-future-body">
+            <div class="settings-body">
+
+              <!-- 2FA -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_2fa">Two-Factor Authentication (2FA)</span>
+                  <span class="settings-row__desc" data-i18n="desc_2fa">Add an extra layer of security by requiring a verification code at login.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_enable_2fa">Enable 2FA</button>
+                </div>
+              </div>
+
+              <!-- Active sessions -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_sessions">Active Sessions</span>
+                  <span class="settings-row__desc" data-i18n="desc_sessions">View all devices currently logged into your account and revoke access remotely.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_manage_sessions">Manage Sessions</button>
+                </div>
+              </div>
+
+              <!-- Login history -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_login_history">Login History</span>
+                  <span class="settings-row__desc" data-i18n="desc_login_history">Review a log of recent sign-ins including location, device, and timestamp.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_view_history">View History</button>
+                </div>
+              </div>
+
+              <!-- Data export -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_data_export">Data Export</span>
+                  <span class="settings-row__desc" data-i18n="desc_data_export">Download a full copy of your portfolio data, transaction history, and account information as CSV or PDF.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_export_data">Export Data</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════
+             6. INTEGRATIONS  (future)
+        ══════════════════════════════════════ -->
+        <section class="settings-section panel" id="integrations">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_integrations">Integrations</span>
+            <span class="coming-soon-badge" data-i18n="coming_soon">Coming Soon</span>
+          </div>
+          <p class="future-note" data-i18n="future_note">These features are planned for a future update and are not yet functional.</p>
+
+          <div class="settings-future-body">
+            <div class="settings-body">
+
+              <!-- Brokerage accounts -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_connect_broker">Connect Brokerage Account</span>
+                  <span class="settings-row__desc" data-i18n="desc_connect_broker">Sync holdings and transactions automatically from GBM+, ACTINVER, and other supported brokers.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_connect_broker">Connect Broker</button>
+                </div>
+              </div>
+
+              <!-- API key management -->
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <span class="settings-row__label" data-i18n="lbl_api_keys">API Key Management</span>
+                  <span class="settings-row__desc" data-i18n="desc_api_keys">Generate and manage API keys to access your WealthOS data programmatically.</span>
+                </div>
+                <div class="settings-row__control">
+                  <button class="btn btn--ghost btn--sm" disabled data-i18n="btn_manage_api">Manage API Keys</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- Danger Zone — Delete Account -->
+        <section class="settings-section panel settings-section--danger" id="delete-account">
+          <div class="panel__header">
+            <span class="panel__title" data-i18n="section_danger">Danger Zone</span>
+          </div>
+          <p class="settings-section__subtitle" data-i18n="section_danger_sub">Irreversible actions — proceed with caution.</p>
+
+          <div class="settings-body">
+            <div class="settings-row">
+              <div class="settings-row__info">
+                <span class="settings-row__label" data-i18n="lbl_delete_account">Delete Account</span>
+                <span class="settings-row__desc" data-i18n="desc_delete_account">Permanently deletes your account and all associated data. This cannot be undone.</span>
+              </div>
+              <div class="settings-row__control">
+                <button class="btn--danger" data-i18n="btn_delete_account">Delete Account</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- end .settings-stack -->
+    </div><!-- end .settings-layout (wrapper) -->
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+  document.getElementById('current-date').textContent =
+    new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Set language selector to current language
+  const langSel = document.getElementById('lang-select');
+  if (langSel) langSel.value = window.WOS_LANG || 'en';
+
+  function changeLanguage(lang) {
+    localStorage.setItem('wos-lang', lang);
+    location.reload();
+  }
+
+  // ─── Tab switching ───────────────────────────────────────────
+  // Maps each tab name → section IDs to show
+  const TAB_MAP = {
+    profile:       ['profile', 'delete-account'],
+    portfolio:     ['portfolio'],
+    display:       ['display'],
+    notifications: ['notifications'],
+    privacy:       ['privacy'],
+    integrations:  ['integrations'],
+  };
+
+  const tabs     = document.querySelectorAll('.settings-nav__item[data-tab]');
+  const sections = document.querySelectorAll('.settings-section[id]');
+
+  function showTab(tabName) {
+    const toShow = TAB_MAP[tabName] || [];
+
+    tabs.forEach(t =>
+      t.classList.toggle('settings-nav__item--active', t.dataset.tab === tabName)
+    );
+    sections.forEach(s =>
+      s.classList.toggle('settings-section--hidden', !toShow.includes(s.id))
+    );
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      showTab(tab.dataset.tab);
+    });
+  });
+
+  // Start on profile tab
+  showTab('profile');
+</script>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<nav class="mobile-nav">
+  <a href="index.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◈</span>
+    <span class="mobile-nav__label" data-i18n="nav_home">Home</span>
+  </a>
+  <a href="holdings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◇</span>
+    <span class="mobile-nav__label" data-i18n="nav_portfolio">Portfolio</span>
+  </a>
+  <a href="accounts.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">△</span>
+    <span class="mobile-nav__label" data-i18n="nav_accounts">Accounts</span>
+  </a>
+  <a href="history.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">○</span>
+    <span class="mobile-nav__label" data-i18n="nav_history">History</span>
+  </a>
+  <a href="settings.html" class="mobile-nav__item mobile-nav__item--active">
+    <span class="mobile-nav__icon">□</span>
+    <span class="mobile-nav__label" data-i18n="nav_settings">Settings</span>
+  </a>
+</nav>
+<script src="scripts/mobile.js"></script>
+
+</body>
+</html>

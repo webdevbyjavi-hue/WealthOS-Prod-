@@ -1,0 +1,240 @@
+/* ══════════════════════════════════════════════════════════════
+   WealthOS — History Page Styles
+══════════════════════════════════════════════════════════════ */
+
+/* ─── Stats Strip ────────────────────────────────────────────── */
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+/* ─── Controls Bar ───────────────────────────────────────────── */
+.history-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 3px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+
+.filter-tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.filter-tab--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.filter-tab:hover:not(.filter-tab--active) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-search {
+  flex: 1;
+  min-width: 160px;
+  max-width: 300px;
+}
+
+.date-select {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 7px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.date-select:focus {
+  border-color: var(--accent);
+}
+
+.clear-history-btn {
+  margin-left: auto;
+}
+
+/* ─── Timeline Container ─────────────────────────────────────── */
+.history-panel {
+  min-height: 300px;
+}
+
+.timeline {
+  padding: 4px 0;
+}
+
+/* ─── Date Group ─────────────────────────────────────────────── */
+.timeline-date-group {
+  margin-bottom: 28px;
+}
+
+.timeline-date-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0 0 10px 56px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 2px;
+}
+
+/* ─── Timeline Entry ─────────────────────────────────────────── */
+.timeline-entry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+  cursor: default;
+}
+
+.timeline-entry:hover {
+  background: var(--bg-hover);
+}
+
+/* Icon circle */
+.entry__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.entry__icon--Investment   { background: rgba(99,102,241,0.13); }
+.entry__icon--Account      { background: rgba(163,230,53,0.10); }
+.entry__icon--Transaction  { background: rgba(6,182,212,0.10);  }
+.entry__icon--default      { background: var(--bg-panel-alt);   }
+
+/* Body */
+.entry__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry__title {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry__detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right column */
+.entry__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.entry__amount {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.entry__amount--positive { color: var(--up); }
+.entry__amount--negative { color: var(--down); }
+.entry__amount--neutral  { color: var(--text-secondary); }
+
+.entry__time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.entry__badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.entry__badge--Investment  { background: rgba(99,102,241,0.15); color: var(--accent-light); }
+.entry__badge--Account     { background: rgba(163,230,53,0.12); color: #a3e635; }
+.entry__badge--Transaction { background: rgba(6,182,212,0.12);  color: #06b6d4; }
+
+/* ─── Empty State ────────────────────────────────────────────── */
+.history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  text-align: center;
+}
+
+.history-empty__icon {
+  font-size: 42px;
+  margin-bottom: 14px;
+  opacity: 0.35;
+}
+
+.history-empty__text {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.history-empty__sub {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .history-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .history-stats { grid-template-columns: 1fr; }
+  .history-controls { flex-direction: column; align-items: stretch; }
+  .history-search { max-width: 100%; }
+  .clear-history-btn { margin-left: 0; }
+}

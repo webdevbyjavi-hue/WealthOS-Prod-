@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WealthOS — Bank Accounts</title>
+  <script src="scripts/i18n.js"></script>
+  <link rel="stylesheet" href="styles/style.css" />
+  <link rel="stylesheet" href="styles/accounts.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="scripts/logger.js"></script>
+</head>
+<body>
+
+<div id="app-content">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__logo">
+      <span class="logo__mark">W</span>
+      <span class="logo__name">WealthOS</span>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="index.html" class="nav__item">
+        <span class="nav__icon">◈</span> <span data-i18n="nav_dashboard">Dashboard</span>
+      </a>
+      <a href="holdings.html" class="nav__item">
+        <span class="nav__icon">◇</span> <span data-i18n="nav_holdings">Financial Instruments</span>
+      </a>
+      <a href="accounts.html" class="nav__item nav__item--active">
+        <span class="nav__icon">△</span> <span data-i18n="nav_accounts">Bank Accounts</span>
+      </a>
+      <a href="history.html" class="nav__item">
+        <span class="nav__icon">○</span> <span data-i18n="nav_history">History</span>
+      </a>
+      <a href="settings.html" class="nav__item">
+        <span class="nav__icon">□</span> <span data-i18n="nav_settings">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar__footer">
+      <div class="user__avatar">JS</div>
+      <div class="user__info">
+        <span class="user__name">Javier Sepulveda</span>
+        <span class="user__plan" data-i18n="user_plan">Pro Investor</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="btn-hamburger" id="hamburger-btn" data-i18n-aria="aria_open_menu" aria-label="Open menu">☰</button>
+        <div class="topbar__title-group">
+          <h1 class="page__title" data-i18n="page_accounts">Bank Accounts</h1>
+          <span class="page__date" id="current-date"></span>
+        </div>
+      </div>
+      <div class="topbar__right">
+        <button class="btn btn--ghost" id="export-btn" data-i18n="btn_export">↓ Export</button>
+        <button class="btn btn--primary btn--large" onclick="openAddModal()" data-i18n="btn_add_account">+ Add Account</button>
+      </div>
+    </header>
+
+    <!-- SUMMARY STRIP -->
+    <section class="summary-strip">
+      <div class="summary-item">
+        <span class="summary__label" data-i18n="sum_total_balance">Total Balance (MXN)</span>
+        <span class="summary__value" id="sum-total">—</span>
+      </div>
+      <div class="summary-divider"></div>
+      <div class="summary-item">
+        <span class="summary__label" data-i18n="sum_active_accounts">Active Accounts</span>
+        <span class="summary__value" id="sum-accounts">—</span>
+      </div>
+      <div class="summary-divider"></div>
+      <div class="summary-item">
+        <span class="summary__label" data-i18n="sum_currencies">Currencies</span>
+        <span class="summary__value" id="sum-currencies">—</span>
+      </div>
+      <div class="summary-divider"></div>
+      <div class="summary-item">
+        <span class="summary__label" data-i18n="sum_countries">Countries</span>
+        <span class="summary__value" id="sum-countries">—</span>
+      </div>
+    </section>
+
+    <!-- KPI GRID -->
+    <div class="accounts-kpi-grid">
+      <div class="kpi-card kpi-card--primary">
+        <span class="kpi__label" data-i18n="kpi_total_cash">Total Cash (MXN equiv.)</span>
+        <span class="kpi__value" id="k-total">MX$0.00</span>
+        <span class="kpi__change kpi__change--up" id="k-accounts-label">0 accounts</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_largest_account">Largest Account</span>
+        <span class="kpi__value kpi__value--sm" id="k-largest">$0.00</span>
+        <span class="kpi__sub" id="k-largest-name">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_currencies_lbl">Currencies Tracked</span>
+        <span class="kpi__value kpi__value--sm" id="k-currencies">0</span>
+        <span class="kpi__sub" data-i18n="kpi_currencies_sub">unique currencies</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_countries_lbl">Countries</span>
+        <span class="kpi__value kpi__value--sm" id="k-countries">0</span>
+        <span class="kpi__sub" data-i18n="kpi_countries_sub">geographic spread</span>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="accounts-charts-row">
+      <div class="panel">
+        <div class="panel__header">
+          <span class="panel__title" data-i18n="panel_balance_curr">Balance by Currency</span>
+          <span class="panel__badge" data-i18n="badge_mxn_equiv">MXN equiv.</span>
+        </div>
+        <div class="accounts-canvas-wrap">
+          <canvas id="chart-currency"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel__header">
+          <span class="panel__title" data-i18n="panel_cash_flow">Cash Flow</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="panel__badge" data-i18n="badge_cash_flow">last 6 months · MXN</span>
+            <button class="btn btn--ghost" style="font-size:11px;padding:4px 10px" onclick="openAddTransactionModal()" data-i18n="btn_add_transaction">+ Transaction</button>
+          </div>
+        </div>
+        <div class="accounts-canvas-wrap">
+          <canvas id="chart-cashflow"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTS TABLE -->
+    <div class="panel accounts-panel">
+      <div class="panel__header">
+        <div class="panel-title-group">
+          <span class="panel__title" data-i18n="panel_accounts_tbl">Accounts</span>
+          <span class="accounts-count" id="table-count">0 accounts</span>
+        </div>
+        <div class="table-actions">
+          <input class="search-input" type="text" data-i18n-placeholder="ph_search_account" placeholder="Search account or bank…" oninput="filterTable(this.value)" />
+          <select class="search-input" id="filter-currency" style="width:130px" onchange="filterTable(document.querySelector('.search-input').value)">
+            <option value="" data-i18n="opt_all_currencies">All currencies</option>
+          </select>
+          <select class="search-input" id="filter-country" style="width:130px" onchange="filterTable(document.querySelector('.search-input').value)">
+            <option value="" data-i18n="opt_all_countries">All countries</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="holdings-table accounts-table" id="table-accounts">
+          <thead>
+            <tr>
+              <th></th>
+              <th class="th-sort" data-col="name" onclick="sortBy('name')"><span data-i18n="th_account_name">Account Name</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="bank" onclick="sortBy('bank')"><span data-i18n="th_bank">Bank / Institution</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="country" onclick="sortBy('country')"><span data-i18n="th_country">Country</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="type" onclick="sortBy('type')"><span data-i18n="th_type">Type</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="currency" onclick="sortBy('currency')"><span data-i18n="th_currency">Currency</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="balance" onclick="sortBy('balance')"><span data-i18n="th_balance_local">Balance (local)</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="balanceMXN" onclick="sortBy('balanceMXN')"><span data-i18n="th_balance_mxn">Balance (MXN)</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="fxRate" onclick="sortBy('fxRate')"><span data-i18n="th_fx_rate">FX Rate</span> <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="updatedAt" onclick="sortBy('updatedAt')"><span data-i18n="th_last_updated">Last Updated</span> <span class="sort-icon">↕</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="body-accounts">
+            <tr><td colspan="11" class="table__empty">No accounts yet. Add your first bank account.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ADD / EDIT ACCOUNT MODAL -->
+<div class="modal-overlay" id="acct-modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" id="modal-title" data-i18n="modal_add_account">Add Account</h2>
+      <button class="modal__close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal__body">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_account_name">Account Name</label>
+          <input class="form-input" id="ai-name" type="text" data-i18n-placeholder="ph_account_name" placeholder="e.g. Main Checking" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_bank">Bank / Institution</label>
+          <input class="form-input" id="ai-bank" type="text" data-i18n-placeholder="ph_bank" placeholder="e.g. BBVA" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_country">Country</label>
+          <select class="form-input" id="ai-country">
+            <option value="Mexico 🇲🇽">Mexico 🇲🇽</option>
+            <option value="United States 🇺🇸">United States 🇺🇸</option>
+            <option value="United Kingdom 🇬🇧">United Kingdom 🇬🇧</option>
+            <option value="European Union 🇪🇺">European Union 🇪🇺</option>
+            <option value="Canada 🇨🇦">Canada 🇨🇦</option>
+            <option value="Switzerland 🇨🇭">Switzerland 🇨🇭</option>
+            <option value="Japan 🇯🇵">Japan 🇯🇵</option>
+            <option value="China 🇨🇳">China 🇨🇳</option>
+            <option value="Brazil 🇧🇷">Brazil 🇧🇷</option>
+            <option value="Colombia 🇨🇴">Colombia 🇨🇴</option>
+            <option value="Argentina 🇦🇷">Argentina 🇦🇷</option>
+            <option value="Chile 🇨🇱">Chile 🇨🇱</option>
+            <option value="Other 🌐">Other 🌐</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_account_type">Account Type</label>
+          <select class="form-input" id="ai-type">
+            <option value="Checking">Checking</option>
+            <option value="Savings">Savings</option>
+            <option value="Money Market">Money Market</option>
+            <option value="High-Yield Savings">High-Yield Savings</option>
+            <option value="Cash">Cash</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_currency">Currency</label>
+          <select class="form-input" id="ai-currency" onchange="updateFXHint()">
+            <option value="MXN">MXN — Mexican Peso</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="CAD">CAD — Canadian Dollar</option>
+            <option value="CHF">CHF — Swiss Franc</option>
+            <option value="JPY">JPY — Japanese Yen</option>
+            <option value="CNY">CNY — Chinese Yuan</option>
+            <option value="BRL">BRL — Brazilian Real</option>
+            <option value="COP">COP — Colombian Peso</option>
+            <option value="ARS">ARS — Argentine Peso</option>
+            <option value="CLP">CLP — Chilean Peso</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_balance_local">Balance (local currency)</label>
+          <input class="form-input" id="ai-balance" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" id="fx-label">FX Rate (1 local = ? MXN)</label>
+          <input class="form-input" id="ai-fxrate" type="number" placeholder="1.00000" min="0" step="0.00001" value="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_last_updated">Last Updated</label>
+          <input class="form-input" id="ai-updated" type="date" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" data-i18n="lbl_notes">Notes (optional)</label>
+        <input class="form-input" id="ai-notes" type="text" data-i18n-placeholder="ph_notes" placeholder="e.g. Emergency fund, joint account…" />
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--ghost" onclick="closeModal()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn--primary" id="modal-save-btn" onclick="saveAccount()" data-i18n="btn_save_account">Save Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TRANSACTION MODAL -->
+<div class="modal-overlay" id="txn-modal-overlay" onclick="closeTxnModal(event)">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" data-i18n="modal_add_txn">Add Transaction</h2>
+      <button class="modal__close" onclick="closeTxnModal()">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_account">Account</label>
+          <select class="form-input" id="ti-account"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_txn_type">Type</label>
+          <select class="form-input" id="ti-type">
+            <option value="in" data-i18n="opt_cash_in">Cash In ↑</option>
+            <option value="out" data-i18n="opt_cash_out">Cash Out ↓</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_amount">Amount (local currency)</label>
+          <input class="form-input" id="ti-amount" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_date">Date</label>
+          <input class="form-input" id="ti-date" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="lbl_description">Description (optional)</label>
+        <input class="form-input" id="ti-description" type="text" data-i18n-placeholder="ph_description" placeholder="e.g. Salary, Rent payment…" />
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" onclick="closeTxnModal()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn--primary" onclick="saveTransaction()" data-i18n="btn_save_txn">Save Transaction</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   WealthOS — Bank Accounts Page
+══════════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY  = 'wealthos_accounts';
+const CASHFLOW_KEY = 'wealthos_transactions';
+
+/* ─── State ──────────────────────────────────────────────────── */
+let accounts      = [];
+let transactions  = [];
+let editingId     = null;
+let sortCol       = 'name';
+let sortDir       = 1;
+let filterText    = '';
+let filterCurrency = '';
+let filterCountry  = '';
+
+/* ─── Chart instances ─────────────────────────────────────────── */
+let chartCurrency = null;
+let chartCashflow = null;
+
+/* ─── Palette ────────────────────────────────────────────────── */
+const PALETTE = [
+  '#6366f1', // indigo   — app accent
+  '#34d399', // emerald
+  '#f87171', // coral
+  '#fbbf24', // amber
+  '#60a5fa', // sky blue
+  '#f472b6', // pink
+  '#fb923c', // orange
+  '#2dd4bf', // teal
+  '#a78bfa', // lavender
+  '#facc15', // yellow
+  '#4ade80', // lime
+  '#38bdf8', // light blue
+  '#e879f9', // magenta
+  '#c084fc', // violet
+  '#94a3b8', // slate
+];
+
+/* ─── Init ───────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('current-date').textContent =
+    new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // Set today as default date in modal
+  document.getElementById('ai-updated').valueAsDate = new Date();
+
+  load();
+  loadTransactions();
+  render();
+});
+
+/* ─── Persistence ─────────────────────────────────────────────── */
+function load() {
+  try { accounts = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { accounts = []; }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+}
+
+function loadTransactions() {
+  try { transactions = JSON.parse(localStorage.getItem(CASHFLOW_KEY)) || []; }
+  catch { transactions = []; }
+}
+
+function saveTransactions() {
+  localStorage.setItem(CASHFLOW_KEY, JSON.stringify(transactions));
+}
+
+/* ─── Modal ───────────────────────────────────────────────────── */
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent    = typeof t === 'function' ? t('modal_add_account') : 'Add Account';
+  document.getElementById('modal-save-btn').textContent = typeof t === 'function' ? t('btn_save_account') : 'Save Account';
+  clearForm();
+  document.getElementById('ai-updated').valueAsDate = new Date();
+  document.getElementById('acct-modal-overlay').classList.add('modal-overlay--visible');
+}
+
+function openEditModal(id) {
+  const acct = accounts.find(a => a.id === id);
+  if (!acct) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent    = typeof t === 'function' ? t('modal_edit_account') : 'Edit Account';
+  document.getElementById('modal-save-btn').textContent = typeof t === 'function' ? t('btn_update_account') : 'Update Account';
+  document.getElementById('ai-name').value     = acct.name;
+  document.getElementById('ai-bank').value     = acct.bank;
+  document.getElementById('ai-country').value  = acct.country;
+  document.getElementById('ai-type').value     = acct.type;
+  document.getElementById('ai-currency').value = acct.currency;
+  document.getElementById('ai-balance').value  = acct.balance;
+  document.getElementById('ai-fxrate').value   = acct.fxRate;
+  document.getElementById('ai-updated').value  = acct.updatedAt;
+  document.getElementById('ai-notes').value    = acct.notes || '';
+  updateFXHint();
+  document.getElementById('acct-modal-overlay').classList.add('modal-overlay--visible');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('acct-modal-overlay')) return;
+  document.getElementById('acct-modal-overlay').classList.remove('modal-overlay--visible');
+}
+
+function clearForm() {
+  ['ai-name','ai-bank','ai-balance','ai-notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ai-country').value  = 'Mexico 🇲🇽';
+  document.getElementById('ai-type').value     = 'Checking';
+  document.getElementById('ai-currency').value = 'MXN';
+  document.getElementById('ai-fxrate').value   = '1';
+  updateFXHint();
+}
+
+function updateFXHint() {
+  const cur = document.getElementById('ai-currency').value;
+  const lbl = document.getElementById('fx-label');
+  if (cur === 'MXN') {
+    lbl.textContent = typeof t === 'function' ? t('fx_rate_mxn') : 'FX Rate (MXN = 1.00)';
+    document.getElementById('ai-fxrate').value = '1';
+  } else {
+    const isES = window.WOS_LANG === 'es';
+    lbl.textContent = isES ? `Tipo de Cambio (1 ${cur} = ? MXN)` : `FX Rate (1 ${cur} = ? MXN)`;
+  }
+}
+
+/* ─── Save / Delete ──────────────────────────────────────────── */
+function saveAccount() {
+  const name    = document.getElementById('ai-name').value.trim();
+  const bank    = document.getElementById('ai-bank').value.trim();
+  const country = document.getElementById('ai-country').value;
+  const type    = document.getElementById('ai-type').value;
+  const currency = document.getElementById('ai-currency').value;
+  const balance = parseFloat(document.getElementById('ai-balance').value);
+  const fxRate  = parseFloat(document.getElementById('ai-fxrate').value) || 1;
+  const updatedAt = document.getElementById('ai-updated').value;
+  const notes   = document.getElementById('ai-notes').value.trim();
+
+  if (!name || !bank || isNaN(balance)) {
+    toast(typeof t === 'function' ? t('err_fill_account') : 'Please fill in account name, bank, and balance.', 'error');
+    return;
+  }
+
+  const record = { name, bank, country, type, currency, balance, fxRate,
+                   balanceMXN: balance * fxRate, updatedAt, notes };
+
+  if (editingId) {
+    const idx = accounts.findIndex(a => a.id === editingId);
+    accounts[idx] = { ...accounts[idx], ...record };
+    toast(typeof t === 'function' ? t('toast_account_updated') : 'Account updated.', 'success');
+    logEvent({ type: 'account_updated', category: 'Account', icon: '🏦', title: `Updated Account: ${name}`, detail: `${bank} · ${currency} · Balance ${currency} ${balance.toLocaleString()}`, amount: balance * (record.fxRate || 1) });
+  } else {
+    record.id = Date.now().toString();
+    accounts.push(record);
+    toast(typeof t === 'function' ? t('toast_account_added') : 'Account added.', 'success');
+    logEvent({ type: 'account_added', category: 'Account', icon: '🏦', title: `Added Account: ${name}`, detail: `${bank} · ${type} · ${currency} · ${country}`, amount: balance * (record.fxRate || 1) });
+  }
+
+  save();
+  render();
+  document.getElementById('acct-modal-overlay').classList.remove('modal-overlay--visible');
+}
+
+function deleteAccount(id) {
+  const acct = accounts.find(a => a.id === id);
+  if (acct) logEvent({ type: 'account_removed', category: 'Account', icon: '🗑️', title: `Removed Account: ${acct.name}`, detail: `${acct.bank} · ${acct.currency} · Balance ${acct.currency} ${acct.balance.toLocaleString()}`, amount: acct.balanceMXN || 0 });
+  accounts = accounts.filter(a => a.id !== id);
+  save();
+  render();
+  toast(typeof t === 'function' ? t('toast_account_removed') : 'Account removed.', 'warning');
+}
+
+/* ─── Transaction Modal ──────────────────────────────────────── */
+function openAddTransactionModal() {
+  if (accounts.length === 0) { toast(typeof t === 'function' ? t('err_add_account_first') : 'Add at least one account first.', 'warning'); return; }
+  const sel = document.getElementById('ti-account');
+  sel.innerHTML = accounts.map(a =>
+    `<option value="${escHtml(a.id)}">${escHtml(a.name)} (${escHtml(a.currency)})</option>`
+  ).join('');
+  document.getElementById('ti-type').value = 'in';
+  document.getElementById('ti-amount').value = '';
+  document.getElementById('ti-date').valueAsDate = new Date();
+  document.getElementById('ti-description').value = '';
+  document.getElementById('txn-modal-overlay').classList.add('modal-overlay--visible');
+}
+
+function closeTxnModal(e) {
+  if (e && e.target !== document.getElementById('txn-modal-overlay')) return;
+  document.getElementById('txn-modal-overlay').classList.remove('modal-overlay--visible');
+}
+
+function saveTransaction() {
+  const accountId   = document.getElementById('ti-account').value;
+  const type        = document.getElementById('ti-type').value;
+  const amount      = parseFloat(document.getElementById('ti-amount').value);
+  const date        = document.getElementById('ti-date').value;
+  const description = document.getElementById('ti-description').value.trim();
+
+  if (!accountId || isNaN(amount) || amount <= 0 || !date) {
+    toast(typeof t === 'function' ? t('err_fill_transaction') : 'Please fill in account, amount, and date.', 'error');
+    return;
+  }
+
+  const acct = accounts.find(a => a.id === accountId);
+  const fxRate = acct ? (acct.fxRate || 1) : 1;
+
+  transactions.push({
+    id: Date.now().toString(),
+    accountId, type, amount, fxRate,
+    amountMXN: amount * fxRate,
+    date, description
+  });
+
+  const acctName = acct ? acct.name : accountId;
+  const currency = acct ? acct.currency : '';
+  if (type === 'in') {
+    logEvent({ type: 'transaction_in', category: 'Transaction', icon: '↓', title: `Cash In: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: amount * fxRate });
+  } else {
+    logEvent({ type: 'transaction_out', category: 'Transaction', icon: '↑', title: `Cash Out: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: -(amount * fxRate) });
+  }
+  saveTransactions();
+  renderCashFlowChart();
+  document.getElementById('txn-modal-overlay').classList.remove('modal-overlay--visible');
+  toast(typeof t === 'function' ? t('toast_transaction_saved') : 'Transaction saved.', 'success');
+}
+
+/* ─── Filter / Sort ──────────────────────────────────────────── */
+function filterTable(text) {
+  filterText     = text.toLowerCase();
+  filterCurrency = document.getElementById('filter-currency').value;
+  filterCountry  = document.getElementById('filter-country').value;
+  renderTable();
+}
+
+function sortBy(col) {
+  if (sortCol === col) { sortDir *= -1; }
+  else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('.th-sort').forEach(th => th.classList.remove('th-sort--active'));
+  const active = document.querySelector(`.th-sort[data-col="${col}"]`);
+  if (active) active.classList.add('th-sort--active');
+  renderTable();
+}
+
+function getFiltered() {
+  return accounts.filter(a => {
+    const matchText = !filterText ||
+      a.name.toLowerCase().includes(filterText) ||
+      a.bank.toLowerCase().includes(filterText) ||
+      a.currency.toLowerCase().includes(filterText) ||
+      a.country.toLowerCase().includes(filterText);
+    const matchCur  = !filterCurrency || a.currency === filterCurrency;
+    const matchCtr  = !filterCountry  || a.country  === filterCountry;
+    return matchText && matchCur && matchCtr;
+  });
+}
+
+function getSorted(list) {
+  return [...list].sort((a, b) => {
+    let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+}
+
+/* ─── Render ─────────────────────────────────────────────────── */
+function render() {
+  updateSummary();
+  updateKPIs();
+  updateFilterDropdowns();
+  renderCharts();
+  renderTable();
+}
+
+function updateSummary() {
+  const total      = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+  const currencies = new Set(accounts.map(a => a.currency)).size;
+  const countries  = new Set(accounts.map(a => a.country)).size;
+
+  document.getElementById('sum-total').textContent      = fmtMXN(total);
+  document.getElementById('sum-accounts').textContent   = accounts.length;
+  document.getElementById('sum-currencies').textContent = currencies;
+  document.getElementById('sum-countries').textContent  = countries;
+}
+
+function updateKPIs() {
+  const total      = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+  const currencies = new Set(accounts.map(a => a.currency)).size;
+  const countries  = new Set(accounts.map(a => a.country)).size;
+
+  document.getElementById('k-total').textContent           = fmtMXN(total);
+  const isES2 = window.WOS_LANG === 'es';
+  document.getElementById('k-accounts-label').textContent = isES2
+    ? `${accounts.length} ${accounts.length !== 1 ? 'cuentas' : 'cuenta'}`
+    : `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`;
+  document.getElementById('k-currencies').textContent      = currencies;
+  document.getElementById('k-countries').textContent       = countries;
+
+  if (accounts.length > 0) {
+    const largest = accounts.reduce((best, a) => (a.balanceMXN > best.balanceMXN ? a : best), accounts[0]);
+    document.getElementById('k-largest').textContent      = fmtMXN(largest.balanceMXN);
+    document.getElementById('k-largest-name').textContent = `${largest.name} · ${largest.bank}`;
+  } else {
+    document.getElementById('k-largest').textContent      = 'MX$0.00';
+    document.getElementById('k-largest-name').textContent = '—';
+  }
+}
+
+function updateFilterDropdowns() {
+  const currencies = [...new Set(accounts.map(a => a.currency))].sort();
+  const countries  = [...new Set(accounts.map(a => a.country))].sort();
+
+  const curSel = document.getElementById('filter-currency');
+  const ctrSel = document.getElementById('filter-country');
+  const savedCur = curSel.value;
+  const savedCtr = ctrSel.value;
+
+  const allCurrLabel = typeof t === 'function' ? t('opt_all_currencies') : 'All currencies';
+  const allCtrLabel  = typeof t === 'function' ? t('opt_all_countries') : 'All countries';
+  curSel.innerHTML = `<option value="">${allCurrLabel}</option>` +
+    currencies.map(c => `<option value="${c}">${c}</option>`).join('');
+  ctrSel.innerHTML = `<option value="">${allCtrLabel}</option>` +
+    countries.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  if (currencies.includes(savedCur)) curSel.value = savedCur;
+  if (countries.includes(savedCtr))  ctrSel.value = savedCtr;
+}
+
+function renderTable() {
+  const tbody   = document.getElementById('body-accounts');
+  const counter = document.getElementById('table-count');
+  const list    = getSorted(getFiltered());
+
+  const isES = window.WOS_LANG === 'es';
+  counter.textContent = isES
+    ? `${list.length} ${list.length !== 1 ? 'cuentas' : 'cuenta'}`
+    : `${list.length} account${list.length !== 1 ? 's' : ''}`;
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="table__empty">${
+      accounts.length === 0
+        ? (typeof t === 'function' ? t('empty_no_accounts') : 'No accounts yet. Add your first bank account.')
+        : (typeof t === 'function' ? t('empty_no_filter_accts') : 'No accounts match the current filter.')
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map((a, i) => {
+    const color     = PALETTE[i % PALETTE.length];
+    const pct       = totalMXN() > 0 ? ((a.balanceMXN / totalMXN()) * 100).toFixed(1) : '0.0';
+    const updLabel  = a.updatedAt ? new Date(a.updatedAt + 'T00:00:00').toLocaleDateString(window.WOS_LOCALE || 'en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+    return `
+    <tr class="table-row">
+      <td><span class="asset__dot" style="background:${color};box-shadow:0 0 6px ${color}55"></span></td>
+      <td class="td--name s-td-company">${escHtml(a.name)}</td>
+      <td class="td--ticker">${escHtml(a.bank)}</td>
+      <td><span class="td-country">${escHtml(a.country)}</span></td>
+      <td><span class="type-badge">${escHtml(a.type)}</span></td>
+      <td><span class="currency-badge">${escHtml(a.currency)}</span></td>
+      <td class="td--price">${fmtLocal(a.balance, a.currency)}</td>
+      <td class="td--price">${fmtMXN(a.balanceMXN)} <span style="font-size:10px;color:var(--text-tertiary)">(${pct}%)</span></td>
+      <td class="td--muted">${fmtRate(a.fxRate, a.currency)}</td>
+      <td class="td--muted">${updLabel}</td>
+      <td>
+        <div class="acct-row-actions">
+          <button class="acct-btn-edit s-btn-edit" onclick="openEditModal('${a.id}')" title="Edit">✎</button>
+          <button class="btn-remove" onclick="deleteAccount('${a.id}')" title="Remove">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function totalMXN() {
+  return accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+}
+
+/* ─── Charts ─────────────────────────────────────────────────── */
+function renderCharts() {
+  renderCurrencyChart();
+  renderCashFlowChart();
+}
+
+function buildDonut(canvasId, labels, data, instance) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (instance) instance.destroy();
+
+  const colors = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+  const cfg = {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderColor: 'transparent',
+                   hoverBorderColor: colors, borderWidth: 0,
+                   hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '66%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#8892a4',
+            font: { family: "'DM Mono'", size: 11 },
+            padding: 14,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            boxWidth: 8,
+            boxHeight: 8,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#111525',
+          borderColor: '#1e2640',
+          borderWidth: 1,
+          titleColor: '#eef0ff',
+          bodyColor: '#8892a4',
+          titleFont: { family: "'DM Sans'", size: 13 },
+          bodyFont:  { family: "'DM Mono'",  size: 11 },
+          callbacks: {
+            label: ctx => ` ${fmtMXN(ctx.parsed)} (${((ctx.parsed / data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`
+          }
+        }
+      }
+    }
+  };
+  return new Chart(ctx, cfg);
+}
+
+function renderCurrencyChart() {
+  const groups = {};
+  accounts.forEach(a => {
+    groups[a.currency] = (groups[a.currency] || 0) + (a.balanceMXN || 0);
+  });
+  const labels = Object.keys(groups);
+  const data   = Object.values(groups);
+
+  if (labels.length === 0) {
+    const ctx = document.getElementById('chart-currency').getContext('2d');
+    if (chartCurrency) chartCurrency.destroy();
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    chartCurrency = null;
+    return;
+  }
+  chartCurrency = buildDonut('chart-currency', labels, data, chartCurrency);
+}
+
+function renderCashFlowChart() {
+  // Build last 6 months
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    });
+  }
+
+  const inData  = months.map(m => transactions
+    .filter(t => t.type === 'in'  && t.date.startsWith(m.key))
+    .reduce((s, t) => s + (t.amountMXN || 0), 0));
+  const outData = months.map(m => transactions
+    .filter(t => t.type === 'out' && t.date.startsWith(m.key))
+    .reduce((s, t) => s + (t.amountMXN || 0), 0));
+
+  const ctx = document.getElementById('chart-cashflow').getContext('2d');
+  if (chartCashflow) chartCashflow.destroy();
+
+  chartCashflow = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [
+        {
+          label: 'Cash In',
+          data: inData,
+          backgroundColor: 'rgba(52, 211, 153, 0.65)',
+          borderColor: '#34d399',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Cash Out',
+          data: outData,
+          backgroundColor: 'rgba(248, 113, 113, 0.65)',
+          borderColor: '#f87171',
+          borderWidth: 1,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#8892a4',
+            font: { family: "'DM Mono'", size: 11 },
+            usePointStyle: true,
+            pointStyle: 'circle',
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 16,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#111525',
+          borderColor: '#1e2640',
+          borderWidth: 1,
+          titleColor: '#eef0ff',
+          bodyColor: '#8892a4',
+          titleFont: { family: "'DM Sans'", size: 13 },
+          bodyFont:  { family: "'DM Mono'",  size: 11 },
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid:  { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 } }
+        },
+        y: {
+          grid:  { color: 'rgba(255,255,255,0.04)' },
+          border: { dash: [3, 3] },
+          ticks: {
+            color: '#8892a4',
+            font:  { family: "'DM Mono'", size: 10 },
+            callback: v => v === 0 ? '0' : fmtMXN(v)
+          }
+        }
+      }
+    }
+  });
+}
+
+/* ─── Formatting helpers ─────────────────────────────────────── */
+function fmtMXN(n) {
+  return new Intl.NumberFormat('es-MX', { style:'currency', currency:'MXN', minimumFractionDigits:2 }).format(n || 0);
+}
+
+function fmtLocal(n, currency) {
+  try {
+    return new Intl.NumberFormat('es-MX', { style:'currency', currency, minimumFractionDigits:2, maximumFractionDigits:2 }).format(n || 0);
+  } catch {
+    return `${currency} ${(n || 0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 })}`;
+  }
+}
+
+function fmtRate(rate, currency) {
+  if (currency === 'MXN') return '1.00000';
+  return Number(rate).toFixed(5);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ─── Export ─────────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (accounts.length === 0) { toast('No accounts to export.', 'warning'); return; }
+  const header = ['Name','Bank','Country','Type','Currency','Balance (local)','Balance (MXN)','FX Rate','Last Updated','Notes'];
+  const rows   = accounts.map(a =>
+    [a.name, a.bank, a.country, a.type, a.currency, a.balance, (a.balanceMXN || 0).toFixed(2), a.fxRate, a.updatedAt, a.notes || '']
+    .map(v => `"${String(v).replace(/"/g,'""')}"`)
+    .join(',')
+  );
+  const csv  = [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `wealthos-accounts-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported to CSV.', 'success');
+});
+
+/* ─── Toast ──────────────────────────────────────────────────── */
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast--${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast--visible'));
+  setTimeout(() => {
+    el.classList.remove('toast--visible');
+    setTimeout(() => el.remove(), 350);
+  }, 3000);
+}
+</script>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<nav class="mobile-nav">
+  <a href="index.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◈</span>
+    <span class="mobile-nav__label" data-i18n="nav_home">Home</span>
+  </a>
+  <a href="holdings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◇</span>
+    <span class="mobile-nav__label" data-i18n="nav_portfolio">Portfolio</span>
+  </a>
+  <a href="accounts.html" class="mobile-nav__item mobile-nav__item--active">
+    <span class="mobile-nav__icon">△</span>
+    <span class="mobile-nav__label" data-i18n="nav_accounts">Accounts</span>
+  </a>
+  <a href="history.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">○</span>
+    <span class="mobile-nav__label" data-i18n="nav_history">History</span>
+  </a>
+  <a href="settings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">□</span>
+    <span class="mobile-nav__label" data-i18n="nav_settings">Settings</span>
+  </a>
+</nav>
+<script src="scripts/mobile.js"></script>
+
+</body>
+</html>

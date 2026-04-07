@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WealthOS</title>
+  <script src="scripts/i18n.js"></script>
+  <link rel="stylesheet" href="styles/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- Potential Name: Fintrek -->
+  <div id="app-content">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__logo">
+      <span class="logo__mark">W</span>
+      <span class="logo__name">WealthOS</span>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="index.html" class="nav__item nav__item--active">
+        <span class="nav__icon">◈</span> <span data-i18n="nav_dashboard">Dashboard</span>
+      </a>
+      <a href="holdings.html" class="nav__item">
+        <span class="nav__icon">◇</span> <span data-i18n="nav_holdings">Financial Instruments</span>
+      </a>
+      <a href="accounts.html" class="nav__item">
+        <span class="nav__icon">△</span> <span data-i18n="nav_accounts">Bank Accounts</span>
+      </a>
+      <a href="history.html" class="nav__item">
+        <span class="nav__icon">○</span> <span data-i18n="nav_history">History</span>
+      </a>
+      <a href="settings.html" class="nav__item">
+        <span class="nav__icon">□</span> <span data-i18n="nav_settings">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar__footer">
+      <div class="user__avatar">JD</div>
+      <div class="user__info">
+        <span class="user__name">Javier Sepulveda</span>
+        <span class="user__plan" data-i18n="user_plan">Pro Investor</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="btn-hamburger" id="hamburger-btn" data-i18n-aria="aria_open_menu" aria-label="Open menu">☰</button>
+        <div class="topbar__title-group">
+          <h1 class="page__title" data-i18n="page_dashboard">Dashboard</h1>
+          <span class="page__date" id="current-date"></span>
+        </div>
+      </div>
+      <div class="topbar__right">
+<button class="btn btn--primary btn--large" onclick="openModal()" data-i18n="btn_add_asset">+ Add Asset</button>
+        <button class="btn btn--ghost" id="refresh-btn" onclick="refreshPrices()" data-i18n-title="btn_refresh_prices" title="Refresh live prices" data-i18n="btn_refresh_prices">⟳ Refresh Prices</button>
+      </div>
+    </header>
+
+    <!-- KPI CARDS -->
+    <section class="kpi-grid">
+      <div class="kpi-card kpi-card--primary">
+        <span class="kpi__label" data-i18n="kpi_net_worth">Total Net Worth</span>
+        <span class="kpi__value" id="total-value">$0.00</span>
+        <span class="kpi__change kpi__change--up" id="total-change">+0.00%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_daily">Today's Gain / Loss</span>
+        <span class="kpi__value kpi__value--sm" id="daily-change">$0.00</span>
+        <span class="kpi__sub" data-i18n="kpi_daily_sub">vs. yesterday's close</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_invested">Total Invested</span>
+        <span class="kpi__value kpi__value--sm" id="total-invested">$0.00</span>
+        <span class="kpi__sub" data-i18n="kpi_invested_sub">cost basis</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_pnl">Unrealized P&amp;L</span>
+        <span class="kpi__value kpi__value--sm" id="unrealized-pnl">$0.00</span>
+        <span class="kpi__sub" id="pnl-pct">0.00%</span>
+      </div>
+    </section>
+
+    <!-- ALLOCATION + CHART -->
+    <section class="mid-grid">
+      <div class="panel panel--allocation">
+        <div class="panel__header">
+          <span class="panel__title" data-i18n="panel_allocation">Allocation</span>
+          <span class="panel__badge" data-i18n="badge_by_value">by value</span>
+        </div>
+        <div class="donut-wrapper">
+          <svg class="donut-svg" viewBox="0 0 200 200" id="donut-svg"></svg>
+          <div class="donut-center" id="donut-center">
+            <span class="donut__pct">—</span>
+            <span class="donut__label" data-i18n="donut_hover">hover slice</span>
+          </div>
+        </div>
+        <ul class="legend" id="legend"></ul>
+      </div>
+
+      <div class="panel panel--performance">
+        <div class="panel__header">
+          <span class="panel__title" data-i18n="panel_net_worth_growth">Net Worth Growth</span>
+          <div class="tab-group">
+            <button class="tab tab--active" onclick="setRange('1W', this)">1W</button>
+            <button class="tab" onclick="setRange('1M', this)">1M</button>
+            <button class="tab" onclick="setRange('3M', this)">3M</button>
+            <button class="tab" onclick="setRange('YTD', this)">YTD</button>
+            <button class="tab" onclick="setRange('custom', this)" data-i18n="btn_custom">Custom</button>
+          </div>
+        </div>
+        <div class="date-range-row" id="date-range-row">
+          <input type="date" id="date-start" class="date-input" />
+          <span class="date-range-sep">→</span>
+          <input type="date" id="date-end" class="date-input" />
+          <button class="btn btn--ghost date-range-apply" onclick="applyCustomRange()" data-i18n="btn_apply">Apply</button>
+        </div>
+        <div class="chart-area">
+          <canvas id="line-canvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOLDINGS TABLE -->
+    <section class="panel panel--table">
+      <div class="panel__header">
+        <span class="panel__title" data-i18n="panel_holdings">Holdings</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="holdings-table" id="holdings-table">
+          <thead>
+            <tr>
+              <th data-i18n="th_instrument">Financial Instrument</th>
+              <th data-i18n="th_market_value">Market Value</th>
+              <th data-i18n="th_invested">Invested</th>
+              <th data-i18n="th_pnl">P&amp;L</th>
+              <th data-i18n="th_return">Return</th>
+            </tr>
+          </thead>
+          <tbody id="holdings-body">
+            <!-- Rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ADD ASSET MODAL -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 class="modal__title">Add Asset</h2>
+        <button class="modal__close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal__body modal__body--scrollable">
+
+        <!-- Step 1: select asset type -->
+        <div class="form-group">
+          <label class="form-label">Tipo de Activo</label>
+          <select class="form-input" id="m-asset-type" onchange="onAssetTypeChange(this.value)">
+            <option value="">Select type…</option>
+            <option value="stocks">Stocks</option>
+            <option value="bonos">Bonos Gubernamentales</option>
+            <option value="fondos">Fondos de Inversión</option>
+            <option value="fibras">Fibras</option>
+            <option value="retiro">Fondos para el Retiro</option>
+            <option value="crypto">Cryptos</option>
+            <option value="bienes">Bienes y Raíces</option>
+          </select>
+        </div>
+
+        <!-- ── STOCKS ────────────────────────────────────────────── -->
+        <div id="fields-stocks" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Ticker</label>
+              <input class="form-input" id="m-s-ticker" type="text" placeholder="e.g. AAPL" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input class="form-input" id="m-s-name" type="text" placeholder="e.g. Apple Inc." />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Shares</label>
+              <input class="form-input" id="m-s-shares" type="number" placeholder="0" min="0" step="0.001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Avg Cost ($)</label>
+              <input class="form-input" id="m-s-cost" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Price ($)</label>
+              <input class="form-input" id="m-s-price" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BONOS GUBERNAMENTALES ─────────────────────────────── -->
+        <div id="fields-bonos" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Instrumento</label>
+              <select class="form-input" id="m-b-instrumento">
+                <option value="CETES">CETES</option>
+                <option value="BONDIA">BONDIA</option>
+                <option value="BONOS">BONOS</option>
+                <option value="UDIBONOS">UDIBONOS</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Serie</label>
+              <input class="form-input" id="m-b-serie" type="text" placeholder="e.g. 241128" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Títulos</label>
+              <input class="form-input" id="m-b-titulos" type="number" placeholder="0" min="1" step="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor Nominal (MXN)</label>
+              <input class="form-input" id="m-b-nominal" type="number" placeholder="100.00" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Precio Compra (MXN)</label>
+              <input class="form-input" id="m-b-compra" type="number" placeholder="0.00" min="0" step="0.0001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Actual (MXN)</label>
+              <input class="form-input" id="m-b-actual" type="number" placeholder="0.00" min="0" step="0.0001" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tasa Cupón (%)</label>
+              <input class="form-input" id="m-b-cupon" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rendimiento (%)</label>
+              <input class="form-input" id="m-b-rendimiento" type="number" placeholder="0.00" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vencimiento</label>
+              <input class="form-input" id="m-b-vencimiento" type="date" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── FONDOS DE INVERSIÓN ───────────────────────────────── -->
+        <div id="fields-fondos" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Clave</label>
+              <input class="form-input" id="m-f-clave" type="text" placeholder="e.g. GBM+" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombre</label>
+              <input class="form-input" id="m-f-nombre" type="text" placeholder="e.g. GBM Crecimiento" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Operadora</label>
+              <input class="form-input" id="m-f-operadora" type="text" placeholder="e.g. GBM" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo de Fondo</label>
+              <select class="form-input" id="m-f-tipo">
+                <option value="Renta Variable">Renta Variable</option>
+                <option value="Renta Fija">Renta Fija</option>
+                <option value="Patrimonial">Patrimonial</option>
+                <option value="Internacional">Internacional</option>
+                <option value="Especializado">Especializado</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Unidades</label>
+              <input class="form-input" id="m-f-unidades" type="number" placeholder="0" min="0" step="0.001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Compra (MXN)</label>
+              <input class="form-input" id="m-f-compra" type="number" placeholder="0.0000" min="0" step="0.0001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">NAV Actual (MXN)</label>
+              <input class="form-input" id="m-f-nav" type="number" placeholder="0.0000" min="0" step="0.0001" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Rendimiento (%)</label>
+              <input class="form-input" id="m-f-rendimiento" type="number" placeholder="0.00" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── FIBRAS ─────────────────────────────────────────────── -->
+        <div id="fields-fibras" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Ticker</label>
+              <input class="form-input" id="m-fb-ticker" type="text" placeholder="e.g. FUNO11" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombre</label>
+              <input class="form-input" id="m-fb-nombre" type="text" placeholder="e.g. FUNO" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Sector</label>
+              <select class="form-input" id="m-fb-sector">
+                <option value="Diversificado">Diversificado</option>
+                <option value="Industrial">Industrial</option>
+                <option value="Comercial">Comercial</option>
+                <option value="Oficinas">Oficinas</option>
+                <option value="Hotelero">Hotelero</option>
+                <option value="Residencial">Residencial</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Certificados (CBFIs)</label>
+              <input class="form-input" id="m-fb-certificados" type="number" placeholder="0" min="1" step="1" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Precio Compra (MXN)</label>
+              <input class="form-input" id="m-fb-compra" type="number" placeholder="0.0000" min="0" step="0.0001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Actual (MXN)</label>
+              <input class="form-input" id="m-fb-actual" type="number" placeholder="0.0000" min="0" step="0.0001" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Distribución (%)</label>
+              <input class="form-input" id="m-fb-distribucion" type="number" placeholder="0.00" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rendimiento (%)</label>
+              <input class="form-input" id="m-fb-rendimiento" type="number" placeholder="0.00" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── FONDOS PARA EL RETIRO ─────────────────────────────── -->
+        <div id="fields-retiro" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tipo</label>
+              <select class="form-input" id="m-r-tipo">
+                <option value="PPR">PPR</option>
+                <option value="Afore">Afore</option>
+                <option value="Plan Empresarial">Plan Empresarial</option>
+                <option value="Pensión IMSS">Pensión IMSS</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombre / Fondo</label>
+              <input class="form-input" id="m-r-nombre" type="text" placeholder="e.g. PPR GBM Crecimiento" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Institución</label>
+              <input class="form-input" id="m-r-institucion" type="text" placeholder="e.g. GBM, Profuturo" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subcuenta</label>
+              <select class="form-input" id="m-r-subcuenta">
+                <option value="Retiro">Retiro</option>
+                <option value="Cesantía y Vejez">Cesantía y Vejez</option>
+                <option value="Voluntario">Voluntario</option>
+                <option value="Empresarial">Empresarial</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Saldo Actual (MXN)</label>
+              <input class="form-input" id="m-r-saldo" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rendimiento (%)</label>
+              <input class="form-input" id="m-r-rendimiento" type="number" placeholder="0.00" step="0.01" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Aportación YTD (MXN)</label>
+              <input class="form-input" id="m-r-aportacion" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Aportación Patronal (MXN)</label>
+              <input class="form-input" id="m-r-patronal" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Proyección (MXN)</label>
+              <input class="form-input" id="m-r-proyeccion" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CRYPTOS ────────────────────────────────────────────── -->
+        <div id="fields-crypto" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Symbol</label>
+              <input class="form-input" id="m-c-symbol" type="text" placeholder="e.g. BTC" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input class="form-input" id="m-c-name" type="text" placeholder="e.g. Bitcoin" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Amount</label>
+              <input class="form-input" id="m-c-amount" type="number" placeholder="0" min="0" step="0.00000001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Avg Cost ($)</label>
+              <input class="form-input" id="m-c-cost" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Price ($)</label>
+              <input class="form-input" id="m-c-price" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BIENES Y RAÍCES ───────────────────────────────────── -->
+        <div id="fields-bienes" class="asset-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nombre</label>
+              <input class="form-input" id="m-br-nombre" type="text" placeholder="e.g. Casa Pedregal" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo</label>
+              <select class="form-input" id="m-br-tipo">
+                <option value="Casa">Casa</option>
+                <option value="Departamento">Departamento</option>
+                <option value="Local Comercial">Local Comercial</option>
+                <option value="Terreno">Terreno</option>
+                <option value="Bodega">Bodega</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Ubicación</label>
+              <input class="form-input" id="m-br-ubicacion" type="text" placeholder="e.g. CDMX – Polanco" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Precio Compra (MXN)</label>
+              <input class="form-input" id="m-br-precio" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor Actual (MXN)</label>
+              <input class="form-input" id="m-br-valor" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="modal__section-label">Gastos de Adquisición (opcionales)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Gastos Notariales</label>
+              <input class="form-input" id="m-br-notariales" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Escrituración</label>
+              <input class="form-input" id="m-br-escrituracion" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">ISABI</label>
+              <input class="form-input" id="m-br-isabi" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Otros Gastos</label>
+              <input class="form-input" id="m-br-otros" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Saldo Hipoteca</label>
+              <input class="form-input" id="m-br-hipoteca" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Renta Mensual (MXN)</label>
+              <input class="form-input" id="m-br-renta" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions (shown after type selection) -->
+        <div class="modal__actions" id="modal-actions" style="display:none">
+          <button class="btn btn--ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn--primary" onclick="addAsset()">Add to Portfolio</button>
+        </div>
+
+      </div>
+    </div>
+  </div> <!-- end modal-overlay -->
+
+</div> <!-- end app-content -->
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="scripts/logger.js"></script>
+  <script src="scripts/index.js"></script>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<nav class="mobile-nav">
+  <a href="index.html" class="mobile-nav__item mobile-nav__item--active">
+    <span class="mobile-nav__icon">◈</span>
+    <span class="mobile-nav__label" data-i18n="nav_home">Home</span>
+  </a>
+  <a href="holdings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◇</span>
+    <span class="mobile-nav__label" data-i18n="nav_portfolio">Portfolio</span>
+  </a>
+  <a href="accounts.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">△</span>
+    <span class="mobile-nav__label" data-i18n="nav_accounts">Accounts</span>
+  </a>
+  <a href="history.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">○</span>
+    <span class="mobile-nav__label" data-i18n="nav_history">History</span>
+  </a>
+  <a href="settings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">□</span>
+    <span class="mobile-nav__label" data-i18n="nav_settings">Settings</span>
+  </a>
+</nav>
+<script src="scripts/mobile.js"></script>
+</body>
+</html>
