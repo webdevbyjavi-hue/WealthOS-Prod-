@@ -19,7 +19,7 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
-  min-width: 0;
+  min-width: 0; /* required for text-overflow to work inside flex/grid */
 }
 
 .summary__label {
@@ -36,6 +36,7 @@
   font-weight: 300;
   color: var(--text-primary);
   letter-spacing: -0.5px;
+  /* Prevent long values from breaking the flex/grid layout */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -458,8 +459,17 @@
 
   /* Category nav: left-aligned, smaller tabs so more fit */
   .category-nav { justify-content: flex-start; gap: 4px; padding: 4px; }
-  .cat-tab      { padding: 8px 12px; font-size: 12px; gap: 6px; }
+  .cat-tab      { padding: 8px 12px; font-size: 12px; gap: 6px; min-height: 44px; }
   .cat-tab__icon { font-size: 14px; }
+
+  /* Row action buttons: meet 44px touch target */
+  .s-btn-edit {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* Summary strip: 2-column grid on mobile */
   .summary-strip {
@@ -469,7 +479,10 @@
     padding: 18px 20px;
   }
   .summary-divider { display: none; }
-  .summary-item    { flex: unset; min-width: 0; }
+  /* flex: unset so items don't stretch beyond their grid cell;
+     min-width: 0 is still required for text-overflow to work in grid */
+  .summary-item    { flex: unset; min-width: 0; width: 100%; }
+  /* Shrink font at 2-col — each cell is ~half the panel width */
   .summary__value  { font-size: 18px; }
 }
 
@@ -484,10 +497,17 @@
 
   /* Category nav: icon-only so all 7 tabs fit on screen without scrolling */
   .cat-tab__label  { display: none; }
-  .cat-tab         { padding: 8px 10px; gap: 0; }
+  .cat-tab         { padding: 8px 10px; gap: 0; min-height: 44px; }
   .category-nav    { gap: 3px; }
 
-  /* Summary strip: single column on very small phones */
+  /* Summary strip: single column — each item has full panel width */
   .summary-strip { grid-template-columns: 1fr; }
-  .summary__value { font-size: 20px; }
+  /* Correct scale-down: 16px not 20px (never larger than the 768px value) */
+  .summary__value {
+    font-size: 16px;
+    /* At full width we can let long values wrap rather than silently truncate */
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
 }

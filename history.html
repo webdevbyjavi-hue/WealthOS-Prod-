@@ -82,7 +82,7 @@
       <div class="kpi-card">
         <span class="kpi__label" data-i18n="kpi_transactions">Transactions</span>
         <span class="kpi__value kpi__value--sm" id="stat-transactions">0</span>
-        <span class="kpi__sub" data-i18n="kpi_txn_sub">cash in &amp; out</span>
+        <span class="kpi__sub" id="stat-txn-flow">cash in &amp; out</span>
       </div>
     </section>
 
@@ -199,10 +199,21 @@ function updateStats(events) {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
+  const txnEvents = events.filter(e => e.category === 'Transaction');
+  const cashIn  = txnEvents.filter(e => e.type === 'transaction_in')
+    .reduce((s, e) => s + Math.abs(parseFloat(e.amount) || 0), 0);
+  const cashOut = txnEvents.filter(e => e.type === 'transaction_out')
+    .reduce((s, e) => s + Math.abs(parseFloat(e.amount) || 0), 0);
+
+  const fmt2 = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   document.getElementById('stat-total').textContent        = events.length;
   document.getElementById('stat-month').textContent        = thisMonth.length;
   document.getElementById('stat-investments').textContent  = events.filter(e => e.category === 'Investment').length;
-  document.getElementById('stat-transactions').textContent = events.filter(e => e.category === 'Transaction').length;
+  document.getElementById('stat-transactions').textContent = txnEvents.length;
+  document.getElementById('stat-txn-flow').textContent     = txnEvents.length
+    ? `+$${fmt2(cashIn)} in · −$${fmt2(cashOut)} out`
+    : 'cash in & out';
 }
 
 function renderTimeline(events) {

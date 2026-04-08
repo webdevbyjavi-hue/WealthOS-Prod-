@@ -374,6 +374,7 @@ body {
   display: grid;
   grid-template-columns: 290px 1fr;
   gap: 16px;
+  /* default align-items: stretch — both cells grow to the same row height */
 }
 
 /* ─── Panels ─────────────────────────────────────────────────── */
@@ -566,9 +567,9 @@ body {
 }
 
 .chart-area {
-  flex: 1;
+  flex: 1;          /* fills remaining height inside the performance panel */
   position: relative;
-  min-height: 200px;
+  min-height: 280px; /* floor so the chart is never too short when panels stack */
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
@@ -1031,6 +1032,37 @@ body {
 
   /* ── Page title ────────────────────────────────────────────── */
   .page__title { font-size: 24px; }
+
+  /* ── Touch targets: all interactive elements ≥ 44px ───────── */
+  .btn-hamburger {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+  .modal__close {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Sidebar nav items (in the drawer) */
+  .nav__item { min-height: 44px; padding: 12px 14px; }
+
+  /* Chart period tab buttons — increase vertical padding */
+  .tab { min-height: 36px; padding: 8px 10px; }
+
+  /* Remove buttons in table rows */
+  .btn-remove {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Toast: lift above mobile nav (62px tall) ──────────────── */
+  .toast-container { bottom: 80px; }
 }
 
 @media (max-width: 480px) {
@@ -1048,4 +1080,18 @@ body {
 
   /* ── Donut: cap size so it never wider than available area ── */
   .donut-wrapper { width: min(200px, 100%); height: min(200px, 100%); }
+
+  /* ── Date range row: wrap inputs onto separate lines ────────── */
+  .date-range-row--visible { flex-wrap: wrap; }
+  .date-input { flex: 1; min-width: 120px; }
+
+  /* ── Tab group: allow wrapping if too many tabs ────────────── */
+  .tab-group { flex-wrap: wrap; }
+
+  /* ── Mobile nav labels: ensure readable text size ────────────── */
+  .mobile-nav__label { font-size: 10px; }
+
+  /* ── Modal body padding: tighter on smallest screens ─────────── */
+  .modal__body { padding: 16px 18px 18px; }
+  .modal__header { padding: 16px 18px 14px; }
 }
