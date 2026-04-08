@@ -19,6 +19,7 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  min-width: 0;
 }
 
 .summary__label {
@@ -35,6 +36,10 @@
   font-weight: 300;
   color: var(--text-primary);
   letter-spacing: -0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .summary-divider {
@@ -450,7 +455,11 @@
   .bienes-kpi-grid   { grid-template-columns: 1fr 1fr; }
   .bienes-charts-row { grid-template-columns: 1fr; }
   .table-actions     { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .category-nav      { justify-content: flex-start; }
+
+  /* Category nav: left-aligned, smaller tabs so more fit */
+  .category-nav { justify-content: flex-start; gap: 4px; padding: 4px; }
+  .cat-tab      { padding: 8px 12px; font-size: 12px; gap: 6px; }
+  .cat-tab__icon { font-size: 14px; }
 
   /* Summary strip: 2-column grid on mobile */
   .summary-strip {
@@ -460,7 +469,8 @@
     padding: 18px 20px;
   }
   .summary-divider { display: none; }
-  .summary-item    { flex: unset; }
+  .summary-item    { flex: unset; min-width: 0; }
+  .summary__value  { font-size: 18px; }
 }
 
 @media (max-width: 480px) {
@@ -472,6 +482,12 @@
   .crypto-kpi-grid,
   .bienes-kpi-grid { grid-template-columns: 1fr 1fr; }
 
+  /* Category nav: icon-only so all 7 tabs fit on screen without scrolling */
+  .cat-tab__label  { display: none; }
+  .cat-tab         { padding: 8px 10px; gap: 0; }
+  .category-nav    { gap: 3px; }
+
   /* Summary strip: single column on very small phones */
   .summary-strip { grid-template-columns: 1fr; }
+  .summary__value { font-size: 20px; }
 }

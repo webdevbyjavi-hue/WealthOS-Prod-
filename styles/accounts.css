@@ -19,6 +19,7 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  min-width: 0;
 }
 
 .summary__label {
@@ -35,6 +36,10 @@
   font-weight: 300;
   color: var(--text-primary);
   letter-spacing: -0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .summary-divider {
@@ -220,12 +225,14 @@
     padding: 18px 20px;
   }
   .summary-divider { display: none; }
-  .summary-item    { flex: unset; }
+  .summary-item    { flex: unset; min-width: 0; }
+  .summary__value  { font-size: 18px; }
 }
 
 @media (max-width: 480px) {
   .accounts-kpi-grid { grid-template-columns: 1fr 1fr; }
 
   /* Summary strip: single column on very small phones */
-  .summary-strip { grid-template-columns: 1fr; }
+  .summary-strip  { grid-template-columns: 1fr; }
+  .summary__value { font-size: 20px; }
 }
