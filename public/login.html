@@ -28,16 +28,19 @@
         linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
       background-size: 48px 48px;
       pointer-events: none;
-      animation: gridMove 120s linear infinite;
+      transform-origin: center;
+      animation: gridZoom 40s linear infinite;
     }
-    @keyframes gridMove {
+    @keyframes gridZoom {
       from {
+        transform: scale(1);
         background-position: 0 0;
       }
       to {
+        transform: scale(1.2);
         background-position: 48px 48px;
-      } 
-}
+      }
+    }
 
     .auth-wrapper {
       width: 100%;
