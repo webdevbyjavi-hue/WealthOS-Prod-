@@ -6,15 +6,20 @@ const express = require('express');
 const cors    = require('cors');
 const helmet  = require('helmet');
 const morgan  = require('morgan');
+const cron    = require('node-cron');
 
 const config = require('./src/config');
 const authMiddleware = require('./src/middlewares/authMiddleware');
 const { errorMiddleware, notFoundMiddleware } = require('./src/middlewares/errorMiddleware');
 
 // ─── Route imports ────────────────────────────────────────────────────────────
-const authRoutes    = require('./src/routes/authRoutes');
-const accountsRoutes = require('./src/routes/accountsRoutes');
-const historyRoutes  = require('./src/routes/historyRoutes');
+const authRoutes       = require('./src/routes/authRoutes');
+const accountsRoutes   = require('./src/routes/accountsRoutes');
+const historyRoutes    = require('./src/routes/historyRoutes');
+const assetsRoutes     = require('./src/routes/assetsRoutes');
+const snapshotsRoutes  = require('./src/routes/snapshotsRoutes');
+const portfoliosRoutes = require('./src/routes/portfoliosRoutes');
+const lookupRoutes     = require('./src/routes/lookupRoutes');
 const {
   stocksRouter,
   bonosRouter,
@@ -59,19 +64,48 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 
 // ─── Protected routes (require valid Supabase JWT) ────────────────────────────
-app.use('/api/accounts',  authMiddleware, accountsRoutes);
-app.use('/api/history',   authMiddleware, historyRoutes);
-app.use('/api/stocks',    authMiddleware, stocksRouter);
-app.use('/api/bonos',     authMiddleware, bonosRouter);
-app.use('/api/fondos',    authMiddleware, fondosRouter);
-app.use('/api/fibras',    authMiddleware, fibrasRouter);
-app.use('/api/retiro',    authMiddleware, retiroRouter);
-app.use('/api/bienes',    authMiddleware, bienesRouter);
-app.use('/api/crypto',    authMiddleware, cryptoRouter);
+app.use('/api/lookup',     authMiddleware, lookupRoutes);
+app.use('/api/accounts',   authMiddleware, accountsRoutes);
+app.use('/api/history',    authMiddleware, historyRoutes);
+app.use('/api/assets',     authMiddleware, assetsRoutes);
+app.use('/api/snapshots',  authMiddleware, snapshotsRoutes);
+app.use('/api/portfolios', authMiddleware, portfoliosRoutes);
+app.use('/api/stocks',     authMiddleware, stocksRouter);
+app.use('/api/bonos',      authMiddleware, bonosRouter);
+app.use('/api/fondos',     authMiddleware, fondosRouter);
+app.use('/api/fibras',     authMiddleware, fibrasRouter);
+app.use('/api/retiro',     authMiddleware, retiroRouter);
+app.use('/api/bienes',     authMiddleware, bienesRouter);
+app.use('/api/crypto',     authMiddleware, cryptoRouter);
 
 // ─── 404 & global error handler ───────────────────────────────────────────────
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
+
+// ─── Daily snapshot cron job ──────────────────────────────────────────────────
+// Runs at 23:00 UTC (6:00 PM EST / 7:00 PM EDT) Monday–Friday.
+// This gives ~2 hours after US market close (4 PM EST) for post-close data
+// to be published by the price API before we snapshot.
+//
+// Cron format: minute hour dom month dow
+//   "0 23 * * 1-5" = top of 11 PM UTC, Mon–Fri
+if (config.nodeEnv !== 'test') {
+  const { runSnapshots } = require('./src/services/snapshotService');
+
+  cron.schedule('0 23 * * 1-5', async () => {
+    console.log('[cron] Starting scheduled daily snapshot run...');
+    try {
+      const result = await runSnapshots();
+      console.log(
+        `[cron] Snapshot run complete — ${result.succeeded}/${result.total} succeeded.`
+      );
+    } catch (err) {
+      console.error('[cron] Snapshot run failed:', err.message);
+    }
+  }, { timezone: 'UTC' });
+
+  console.log('[WealthOS API] Daily snapshot cron scheduled: 23:00 UTC Mon–Fri');
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(config.port, () => {

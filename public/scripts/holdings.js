@@ -38,6 +38,29 @@ function showToast(msg) {
   setTimeout(() => { t.classList.remove('toast--visible'); setTimeout(() => t.remove(), 300); }, 3000);
 }
 
+// ─── Stock ticker lookup ───────────────────────────────────────────────────────
+async function lookupStockTicker() {
+  const ticker = document.getElementById('si-ticker').value.trim().toUpperCase();
+  if (!ticker) { showToast('Enter a ticker symbol first.'); return; }
+
+  const btn = document.getElementById('si-lookup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Looking up…';
+
+  try {
+    const info = await WOS_API.lookup.ticker(ticker);
+    document.getElementById('si-ticker').value = info.ticker;
+    document.getElementById('si-name').value   = info.name;
+    document.getElementById('si-price').value  = info.price.toFixed(2);
+    showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)}`);
+  } catch (err) {
+    showToast(err.message || 'Lookup failed. Check the ticker and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Lookup';
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  STOCKS DASHBOARD
 // ══════════════════════════════════════════════════════════════

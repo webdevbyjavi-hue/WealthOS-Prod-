@@ -25,6 +25,10 @@ const config = {
       .split(',')
       .map((o) => o.trim()),
   },
+
+  // Optional: Alpha Vantage API key for live price fetching.
+  // If absent, the snapshot service will skip fetching and log a warning.
+  alphaVantageKey: process.env.ALPHA_VANTAGE_API_KEY || null,
 };
 
 module.exports = config;

@@ -124,6 +124,11 @@
       clear:  ()            => request('DELETE', '/api/history'),
     },
 
+    // ── Lookup ────────────────────────────────────────────────────────────────
+    lookup: {
+      ticker: (symbol) => request('GET', `/api/lookup/ticker/${encodeURIComponent(symbol)}`).then(r => r.data),
+    },
+
     // Expose mappers for sync.js
     _mappers: mappers,
     _fakeHistory: _fakeHistory,

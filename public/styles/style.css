@@ -795,8 +795,8 @@ button.nav__item {
 
 .asset-fields { display: flex; flex-direction: column; gap: 16px; }
 
-.form-group  { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.form-row    { display: flex; gap: 14px; }
+.form-group  { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.form-row    { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 
 .form-label {
   font-family: var(--font-mono);
@@ -805,6 +805,21 @@ button.nav__item {
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
+
+/* Ticker input + inline lookup button */
+.input-lookup-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.input-lookup-row .form-input { flex: 1; min-width: 0; }
+.btn--lookup {
+  flex-shrink: 0;
+  padding: 0 14px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.btn--lookup:disabled { opacity: 0.5; cursor: default; }
 
 .form-input {
   background: var(--bg-base);
@@ -1025,6 +1040,8 @@ button.nav__item {
 
   /* ── Forms ─────────────────────────────────────────────────── */
   .form-row { flex-direction: column; }
+  .modal .form-row { flex-direction: row; }
+  .modal .form-group { min-width: calc(50% - 7px); }
 
   /* ── Modal → bottom sheet ──────────────────────────────────── */
   .modal-overlay { align-items: flex-end; }
