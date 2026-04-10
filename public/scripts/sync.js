@@ -18,6 +18,7 @@
     crypto:   'wos-crypto',
     bienes:   'wos-bienes',
     accounts: 'wealthos_accounts',
+    history:  'wealthos_history',
   };
 
   // ─── Read / write localStorage ──────────────────────────────────────────────
@@ -64,6 +65,16 @@
     }
   }
 
+  async function syncHistory() {
+    if (!WOS_API.isAuthenticated()) return;
+    try {
+      const items = await WOS_API.history.list({ limit: 500 });
+      if (Array.isArray(items)) lsSet(LS_KEYS.history, items);
+    } catch (err) {
+      if (err.status === 401) WOS_AUTH.signout();
+    }
+  }
+
   // ─── Full sync (all categories) then re-render ──────────────────────────────
   async function run() {
     if (!WOS_API.isAuthenticated()) return;
@@ -76,6 +87,7 @@
       syncCategory('crypto'),
       syncCategory('bienes'),
       syncAccounts(),
+      syncHistory(),
     ]);
     refresh();
   }
