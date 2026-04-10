@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WealthOS — Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #080a14;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Sans', sans-serif;
+      color: #eef0ff;
+    }
+
+    /* Subtle background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .auth-wrapper {
+      width: 100%;
+      max-width: 420px;
+      padding: 24px;
+      position: relative;
+    }
+
+    .auth-card {
+      background: #111525;
+      border: 1px solid #1e2640;
+      border-radius: 20px;
+      padding: 40px 36px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.06);
+    }
+
+    /* Logo */
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      justify-content: center;
+    }
+    .auth-logo__icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .auth-logo__text {
+      font-size: 22px;
+      font-weight: 700;
+      color: #eef0ff;
+      letter-spacing: -0.4px;
+    }
+
+    .auth-tagline {
+      text-align: center;
+      font-size: 13px;
+      color: #4a5568;
+      margin-bottom: 32px;
+      letter-spacing: 0.2px;
+    }
+
+    /* Tabs */
+    .auth-tabs {
+      display: flex;
+      gap: 4px;
+      background: #0d1226;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: #8892a4;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .auth-tab--active {
+      background: #1e2640;
+      color: #eef0ff;
+    }
+
+    /* Form */
+    .auth-field {
+      margin-bottom: 18px;
+    }
+    .auth-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: #8892a4;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+    .auth-input {
+      width: 100%;
+      padding: 11px 14px;
+      background: #0d1226;
+      border: 1px solid #1e2640;
+      border-radius: 9px;
+      color: #eef0ff;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .auth-input:focus { border-color: #6366f1; }
+    .auth-input::placeholder { color: #3a4155; }
+
+    /* Error / success banner */
+    .auth-banner {
+      border-radius: 9px;
+      font-size: 13px;
+      padding: 11px 14px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .auth-banner--error {
+      background: rgba(248,113,113,0.10);
+      border: 1px solid rgba(248,113,113,0.28);
+      color: #f87171;
+    }
+    .auth-banner--success {
+      background: rgba(52,211,153,0.10);
+      border: 1px solid rgba(52,211,153,0.28);
+      color: #34d399;
+    }
+
+    /* Submit button */
+    .auth-btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #6366f1, #7c3aed);
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      margin-top: 4px;
+    }
+    .auth-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+    .auth-btn:active:not(:disabled) { transform: translateY(0); }
+    .auth-btn:disabled {
+      background: #1e2640;
+      color: #8892a4;
+      cursor: not-allowed;
+    }
+
+    /* Footer */
+    .auth-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: #3a4155;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-wrapper">
+    <div class="auth-card">
+
+      <div class="auth-logo">
+        <div class="auth-logo__icon">W</div>
+        <span class="auth-logo__text">WealthOS</span>
+      </div>
+      <p class="auth-tagline">Your personal portfolio, organized.</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab auth-tab--active" id="tab-signin" onclick="showTab('signin')">Sign In</button>
+        <button class="auth-tab" id="tab-signup" onclick="showTab('signup')">Sign Up</button>
+      </div>
+
+      <form id="auth-form" onsubmit="submit(event)">
+        <div class="auth-field">
+          <label class="auth-label">Email</label>
+          <input id="auth-email" class="auth-input" type="email" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Password</label>
+          <input id="auth-password" class="auth-input" type="password" placeholder="Min. 8 characters" required autocomplete="current-password" />
+        </div>
+
+        <div id="auth-banner" class="auth-banner auth-banner--error"></div>
+
+        <button type="submit" id="auth-submit" class="auth-btn">Sign In</button>
+      </form>
+
+      <p class="auth-footer">WealthOS &copy; 2025 &mdash; Designed for Mexican investors</p>
+    </div>
+  </div>
+
+  <script src="scripts/api.js"></script>
+  <script>
+    // If already authenticated, skip login and go straight to the app
+    if (WOS_API.isAuthenticated()) {
+      WOS_API.auth.me()
+        .then(() => {
+          const dest = sessionStorage.getItem('wos_redirect') || 'index.html';
+          sessionStorage.removeItem('wos_redirect');
+          window.location.replace(dest);
+        })
+        .catch(() => WOS_API.clearToken()); // token expired — stay on login
+    }
+
+    let currentTab = 'signin';
+
+    function showTab(tab) {
+      currentTab = tab;
+      document.getElementById('tab-signin').classList.toggle('auth-tab--active', tab === 'signin');
+      document.getElementById('tab-signup').classList.toggle('auth-tab--active', tab === 'signup');
+      document.getElementById('auth-submit').textContent = tab === 'signin' ? 'Sign In' : 'Create Account';
+      hideBanner();
+    }
+
+    function showBanner(msg, type) {
+      const el = document.getElementById('auth-banner');
+      el.textContent = msg;
+      el.className = 'auth-banner auth-banner--' + type;
+      el.style.display = 'block';
+    }
+
+    function hideBanner() {
+      document.getElementById('auth-banner').style.display = 'none';
+    }
+
+    async function submit(e) {
+      e.preventDefault();
+      const email    = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const btn      = document.getElementById('auth-submit');
+
+      hideBanner();
+      btn.disabled    = true;
+      btn.textContent = currentTab === 'signin' ? 'Signing in…' : 'Creating account…';
+
+      try {
+        let session;
+        if (currentTab === 'signin') {
+          const res = await WOS_API.auth.signin(email, password);
+          session   = res.data.session;
+        } else {
+          const res = await WOS_API.auth.signup(email, password);
+          session   = res.data.session;
+        }
+
+        if (session?.access_token) {
+          WOS_API.setToken(session.access_token);
+          const dest = sessionStorage.getItem('wos_redirect') || 'index.html';
+          sessionStorage.removeItem('wos_redirect');
+          window.location.replace(dest);
+        } else {
+          // Email confirmation required
+          showBanner('Account created! Check your email to confirm, then sign in.', 'success');
+          showTab('signin');
+        }
+      } catch (err) {
+        showBanner(err.message || 'Something went wrong.', 'error');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = currentTab === 'signin' ? 'Sign In' : 'Create Account';
+      }
+    }
+  </script>
+
+</body>
+</html>
