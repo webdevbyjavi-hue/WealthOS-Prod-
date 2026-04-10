@@ -1,6 +1,6 @@
 'use strict';
 
-const { supabase } = require('../services/supabaseClient');
+const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 

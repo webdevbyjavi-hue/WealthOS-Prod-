@@ -1,6 +1,6 @@
 'use strict';
 
-const { supabase } = require('../services/supabaseClient');
+const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 
 // GET /api/history?limit=50&offset=0&category=Investment
 async function listEvents(req, res, next) {

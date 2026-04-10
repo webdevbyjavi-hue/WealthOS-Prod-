@@ -34,7 +34,7 @@
  * to avoid misleading dips in the chart.
  */
 
-const { supabase } = require('../services/supabaseClient');
+const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

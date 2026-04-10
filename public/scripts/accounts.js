@@ -57,7 +57,7 @@ function load() {
   catch { accounts = []; }
 }
 
-function save() {
+function saveAccounts() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
 }
 
@@ -153,13 +153,13 @@ function saveAccount() {
     toast(typeof t === 'function' ? t('toast_account_updated') : 'Account updated.', 'success');
     logEvent({ type: 'account_updated', category: 'Account', icon: '🏦', title: `Updated Account: ${name}`, detail: `${bank} · ${currency} · Balance ${currency} ${balance.toLocaleString()}`, amount: balance * (record.fxRate || 1) });
   } else {
-    record.id = Date.now().toString();
+    record.id = Date.now();
     accounts.push(record);
     toast(typeof t === 'function' ? t('toast_account_added') : 'Account added.', 'success');
     logEvent({ type: 'account_added', category: 'Account', icon: '🏦', title: `Added Account: ${name}`, detail: `${bank} · ${type} · ${currency} · ${country}`, amount: balance * (record.fxRate || 1) });
   }
 
-  save();
+  saveAccounts();
   render();
   document.getElementById('acct-modal-overlay').classList.remove('modal-overlay--visible');
 }
@@ -168,7 +168,7 @@ function deleteAccount(id) {
   const acct = accounts.find(a => a.id === id);
   if (acct) logEvent({ type: 'account_removed', category: 'Account', icon: '🗑️', title: `Removed Account: ${acct.name}`, detail: `${acct.bank} · ${acct.currency} · Balance ${acct.currency} ${acct.balance.toLocaleString()}`, amount: acct.balanceMXN || 0 });
   accounts = accounts.filter(a => a.id !== id);
-  save();
+  saveAccounts();
   render();
   toast(typeof t === 'function' ? t('toast_account_removed') : 'Account removed.', 'warning');
 }

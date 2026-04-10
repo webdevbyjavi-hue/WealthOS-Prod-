@@ -23,7 +23,7 @@
  * Chart.js, or Tremor without any client-side transformation.
  */
 
-const { supabase } = require('../services/supabaseClient');
+const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -11,14 +11,14 @@
  *   - updated_at  timestamptz DEFAULT now()
  *   … plus category-specific columns (see SQL schema in README or migrations)
  *
- * Row Level Security (RLS) must be enabled on every table with a policy that
- * restricts rows to the authenticated user: user_id = auth.uid()
+ * Uses the service-role admin client so RLS is bypassed. User isolation is
+ * enforced in code via user_id = req.user.id on every query.
  *
  * Usage:
  *   const { list, create, update, remove } = holdingsController('stocks');
  */
 
-const { supabase } = require('../services/supabaseClient');
+const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 
 function holdingsController(table) {
   // GET /api/:category
