@@ -369,7 +369,7 @@ function loadWosPortfolio() {
     'Fibras':               raw.fibras.reduce((s,f) => s + f.precioActual  * f.certificados, 0),
     'Fondos para el Retiro':raw.retiro.reduce((s,r) => s + r.saldo, 0),
     'Cryptos':              raw.crypto.reduce((s,c) => s + c.currentPrice  * c.amount, 0),
-    'Bienes y Raíces':      raw.bienes.reduce((s,b) => s + b.valorActual, 0),
+    'Bienes y Raíces':      raw.bienes.reduce((s,b) => { const yrs = b.fechaCompra ? (Date.now()-new Date(b.fechaCompra).getTime())/(1000*60*60*24*365.25) : 0; return s + (b.plusvaliaAnual && b.fechaCompra ? b.precioCompra * Math.pow(1+b.plusvaliaAnual/100,yrs) : b.precioCompra); }, 0),
   };
   const catCosts = {
     'Stocks':               raw.stocks.reduce((s,h) => s + h.avgCost      * h.shares, 0),
@@ -410,7 +410,7 @@ function loadWosPortfolio() {
       ...raw.fibras.map(f => ({ hist: f.history, cur: f.precioActual  * f.certificados })),
       ...raw.retiro.map(r => ({ hist: r.history, cur: r.saldo })),
       ...raw.crypto.map(c => ({ hist: c.history, cur: c.currentPrice  * c.amount })),
-      ...raw.bienes.map(b => ({ hist: b.history, cur: b.valorActual })),
+      ...raw.bienes.map(b => { const yrs = b.fechaCompra ? (Date.now()-new Date(b.fechaCompra).getTime())/(1000*60*60*24*365.25) : 0; const cur = b.plusvaliaAnual && b.fechaCompra ? b.precioCompra * Math.pow(1+b.plusvaliaAnual/100,yrs) : b.precioCompra; return { hist: b.history, cur }; }),
     ];
     return Array.from({ length: n }, (_, i) =>
       allItems.reduce((s, { hist, cur }) => {

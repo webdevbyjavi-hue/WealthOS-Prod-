@@ -49,12 +49,12 @@ const STOCK_COLORS = [
 ];
 
 const SAMPLE_STOCKS = [
-  { id: 1, ticker: 'AAPL',  name: 'Apple Inc.',      shares: 15,  avgCost: 145.20, currentPrice: 189.50 },
-  { id: 2, ticker: 'MSFT',  name: 'Microsoft Corp.', shares: 10,  avgCost: 280.00, currentPrice: 415.80 },
-  { id: 3, ticker: 'NVDA',  name: 'NVIDIA Corp.',    shares: 5,   avgCost: 220.00, currentPrice: 875.40 },
-  { id: 4, ticker: 'GOOGL', name: 'Alphabet Inc.',   shares: 8,   avgCost: 125.50, currentPrice: 172.30 },
-  { id: 5, ticker: 'JPM',   name: 'JPMorgan Chase',  shares: 20,  avgCost: 138.00, currentPrice: 197.80 },
-  { id: 6, ticker: 'TSLA',  name: 'Tesla Inc.',      shares: 12,  avgCost: 220.00, currentPrice: 175.20 },
+  { id: 1, ticker: 'AAPL',  name: 'Apple Inc.',      shares: 15,  avgCost: 145.20, currentPrice: 189.50, fechaCompra: '2023-03-15' },
+  { id: 2, ticker: 'MSFT',  name: 'Microsoft Corp.', shares: 10,  avgCost: 280.00, currentPrice: 415.80, fechaCompra: '2022-11-08' },
+  { id: 3, ticker: 'NVDA',  name: 'NVIDIA Corp.',    shares: 5,   avgCost: 220.00, currentPrice: 875.40, fechaCompra: '2023-06-20' },
+  { id: 4, ticker: 'GOOGL', name: 'Alphabet Inc.',   shares: 8,   avgCost: 125.50, currentPrice: 172.30, fechaCompra: '2023-01-10' },
+  { id: 5, ticker: 'JPM',   name: 'JPMorgan Chase',  shares: 20,  avgCost: 138.00, currentPrice: 197.80, fechaCompra: '2022-08-22' },
+  { id: 6, ticker: 'TSLA',  name: 'Tesla Inc.',      shares: 12,  avgCost: 220.00, currentPrice: 175.20, fechaCompra: '2024-02-05' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ function renderSummaryStrip() {
   const retiroInvested = retiro.reduce((s, r) => s + r.saldo - (r.aportacionYTD || 0), 0);
   const cryptoValue    = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0);
   const cryptoInvested = cryptos.reduce((s, c) => s + c.avgCost * c.amount, 0);
-  const bienesValue    = bienes.reduce((s, b) => s + b.valorActual, 0);
+  const bienesValue    = bienes.reduce((s, b) => s + computeValorActual(b), 0);
   const bienesInvested = bienes.reduce((s, b) => s + costoTotal(b), 0);
 
   const totalValue    = stocksValue + bonosValue + fondosValue + fibrasValue + retiroValue + cryptoValue + bienesValue;
@@ -479,8 +479,9 @@ function openStockModal(id = null) {
     document.getElementById('si-shares').value = s.shares;
     document.getElementById('si-cost').value   = s.avgCost;
     document.getElementById('si-price').value  = s.currentPrice;
+    document.getElementById('si-fecha').value  = s.fechaCompra || '';
   } else {
-    ['si-ticker','si-name','si-shares','si-cost','si-price']
+    ['si-ticker','si-name','si-shares','si-cost','si-price','si-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
   }
   document.getElementById('stock-modal-overlay').classList.add('modal-overlay--visible');
@@ -494,11 +495,12 @@ function closeStockModal(e) {
 }
 
 function saveStock() {
-  const ticker = document.getElementById('si-ticker').value.trim().toUpperCase();
-  const name   = document.getElementById('si-name').value.trim();
-  const shares = parseFloat(document.getElementById('si-shares').value);
-  const cost   = parseFloat(document.getElementById('si-cost').value);
-  const price  = parseFloat(document.getElementById('si-price').value);
+  const ticker      = document.getElementById('si-ticker').value.trim().toUpperCase();
+  const name        = document.getElementById('si-name').value.trim();
+  const shares      = parseFloat(document.getElementById('si-shares').value);
+  const cost        = parseFloat(document.getElementById('si-cost').value);
+  const price       = parseFloat(document.getElementById('si-price').value);
+  const fechaCompra = document.getElementById('si-fecha').value || null;
 
   if (!ticker || !name || isNaN(shares) || isNaN(cost) || isNaN(price)) {
     alert('Please fill in all fields.');
@@ -507,7 +509,7 @@ function saveStock() {
 
   if (editingStockId) {
     const s = stocks.find(h => h.id === editingStockId);
-    if (s) Object.assign(s, { ticker, name, shares, avgCost: cost, currentPrice: price });
+    if (s) Object.assign(s, { ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra });
   } else {
     const existing = stocks.find(h => h.ticker === ticker);
     if (existing) {
@@ -516,9 +518,10 @@ function saveStock() {
       existing.shares        = totalShares;
       existing.currentPrice  = price;
       existing.name          = name;
+      if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Merged with existing ${ticker} position.`);
     } else {
-      stocks.push({ id: Date.now(), ticker, name, shares, avgCost: cost, currentPrice: price, history: generateHistory(price) });
+      stocks.push({ id: Date.now(), ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra, history: generateHistory(price) });
     }
   }
 
@@ -564,12 +567,12 @@ function instrColor(instr) { return INSTRUMENTO_COLORS[instr] || '#8b5cf6'; }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_BONOS = [
-  { id:1, instrumento:'CETES',    serie:'BI 250130', titulos:5000,  valorNominal:10,  precioCompra:9.4500, precioActual:9.7200, tasaCupon:0,    rendimiento:11.60, vencimiento:'2025-01-30' },
-  { id:2, instrumento:'CETES',    serie:'BI 250424', titulos:3000,  valorNominal:10,  precioCompra:9.1200, precioActual:9.5500, tasaCupon:0,    rendimiento:11.40, vencimiento:'2025-04-24' },
-  { id:3, instrumento:'BONOS',    serie:'M 281115',  titulos:200,   valorNominal:100, precioCompra:98.50,  precioActual:101.20, tasaCupon:8.50, rendimiento:9.80,  vencimiento:'2028-11-15' },
-  { id:4, instrumento:'UDIBONOS', serie:'S 291206',  titulos:150,   valorNominal:100, precioCompra:99.20,  precioActual:102.50, tasaCupon:4.00, rendimiento:4.20,  vencimiento:'2029-12-06' },
-  { id:5, instrumento:'BONDIA',   serie:'BI 250106', titulos:10000, valorNominal:10,  precioCompra:9.9800, precioActual:10.000, tasaCupon:0,    rendimiento:11.75, vencimiento:'2025-01-06' },
-  { id:6, instrumento:'BONOS',    serie:'M 461119',  titulos:100,   valorNominal:100, precioCompra:95.80,  precioActual:98.30,  tasaCupon:10.0, rendimiento:10.25, vencimiento:'2046-11-19' },
+  { id:1, instrumento:'CETES',    serie:'BI 250130', titulos:5000,  valorNominal:10,  precioCompra:9.4500, precioActual:9.7200, tasaCupon:0,    rendimiento:11.60, vencimiento:'2025-01-30', fechaCompra:'2024-07-15' },
+  { id:2, instrumento:'CETES',    serie:'BI 250424', titulos:3000,  valorNominal:10,  precioCompra:9.1200, precioActual:9.5500, tasaCupon:0,    rendimiento:11.40, vencimiento:'2025-04-24', fechaCompra:'2024-10-20' },
+  { id:3, instrumento:'BONOS',    serie:'M 281115',  titulos:200,   valorNominal:100, precioCompra:98.50,  precioActual:101.20, tasaCupon:8.50, rendimiento:9.80,  vencimiento:'2028-11-15', fechaCompra:'2023-05-08' },
+  { id:4, instrumento:'UDIBONOS', serie:'S 291206',  titulos:150,   valorNominal:100, precioCompra:99.20,  precioActual:102.50, tasaCupon:4.00, rendimiento:4.20,  vencimiento:'2029-12-06', fechaCompra:'2022-12-12' },
+  { id:5, instrumento:'BONDIA',   serie:'BI 250106', titulos:10000, valorNominal:10,  precioCompra:9.9800, precioActual:10.000, tasaCupon:0,    rendimiento:11.75, vencimiento:'2025-01-06', fechaCompra:'2024-12-01' },
+  { id:6, instrumento:'BONOS',    serie:'M 461119',  titulos:100,   valorNominal:100, precioCompra:95.80,  precioActual:98.30,  tasaCupon:10.0, rendimiento:10.25, vencimiento:'2046-11-19', fechaCompra:'2024-03-22' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -848,8 +851,9 @@ function openBonoModal(id = null) {
     document.getElementById('bi-cupon').value       = b.tasaCupon;
     document.getElementById('bi-rendimiento').value = b.rendimiento;
     document.getElementById('bi-vencimiento').value = b.vencimiento;
+    document.getElementById('bi-fecha').value       = b.fechaCompra || '';
   } else {
-    ['bi-serie','bi-titulos','bi-nominal','bi-compra','bi-actual','bi-cupon','bi-rendimiento','bi-vencimiento']
+    ['bi-serie','bi-titulos','bi-nominal','bi-compra','bi-actual','bi-cupon','bi-rendimiento','bi-vencimiento','bi-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('bi-instrumento').value = 'CETES';
   }
@@ -873,6 +877,7 @@ function saveBono() {
   const tasaCupon    = parseFloat(document.getElementById('bi-cupon').value) || 0;
   const rendimiento  = parseFloat(document.getElementById('bi-rendimiento').value);
   const vencimiento  = document.getElementById('bi-vencimiento').value;
+  const fechaCompra  = document.getElementById('bi-fecha').value || null;
 
   if (!serie || isNaN(titulos) || isNaN(valorNominal) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(rendimiento) || !vencimiento) {
     alert('Por favor completa todos los campos.');
@@ -881,7 +886,7 @@ function saveBono() {
 
   if (editingBonoId) {
     const b = bonos.find(x => x.id === editingBonoId);
-    if (b) Object.assign(b, { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento });
+    if (b) Object.assign(b, { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra });
   } else {
     const existing = bonos.find(x => x.instrumento === instrumento && x.serie === serie);
     if (existing) {
@@ -890,9 +895,10 @@ function saveBono() {
       existing.titulos       = totalTitulos;
       existing.precioActual  = precioActual;
       existing.rendimiento   = rendimiento;
+      if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${instrumento} ${serie}.`);
     } else {
-      bonos.push({ id: Date.now(), instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, history: generateHistory(precioActual * titulos) });
+      bonos.push({ id: Date.now(), instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra, history: generateHistory(precioActual * titulos) });
     }
   }
 
@@ -937,11 +943,11 @@ function fondoColor(tipo) { return FONDO_TIPO_COLORS[tipo] || '#06b6d4'; }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_FONDOS = [
-  { id:1, clave:'GBMRV1',   nombre:'GBM Renta Variable',  operadora:'GBM',     unidades:500,  precioCompra:45.20, navActual:52.80, rendimiento:16.8, tipo:'Renta Variable' },
-  { id:2, clave:'GBMRF1',   nombre:'GBM Renta Fija',      operadora:'GBM',     unidades:1000, precioCompra:22.10, navActual:23.90, rendimiento:8.2,  tipo:'Renta Fija' },
-  { id:3, clave:'NAFINB1',  nombre:'NAFINSA Renta Fija',  operadora:'NAFINSA', unidades:2000, precioCompra:10.50, navActual:11.20, rendimiento:7.5,  tipo:'Renta Fija' },
-  { id:4, clave:'BNMACC1',  nombre:'Banamex Acciones',    operadora:'Banamex', unidades:300,  precioCompra:85.00, navActual:97.40, rendimiento:14.6, tipo:'Renta Variable' },
-  { id:5, clave:'BBVAPAT1', nombre:'BBVA Patrimonial',    operadora:'BBVA',    unidades:800,  precioCompra:18.90, navActual:20.10, rendimiento:6.3,  tipo:'Patrimonial' },
+  { id:1, clave:'GBMRV1',   nombre:'GBM Renta Variable',  operadora:'GBM',     unidades:500,  precioCompra:45.20, navActual:52.80, rendimiento:16.8, tipo:'Renta Variable', fechaCompra:'2023-02-10' },
+  { id:2, clave:'GBMRF1',   nombre:'GBM Renta Fija',      operadora:'GBM',     unidades:1000, precioCompra:22.10, navActual:23.90, rendimiento:8.2,  tipo:'Renta Fija',     fechaCompra:'2023-06-15' },
+  { id:3, clave:'NAFINB1',  nombre:'NAFINSA Renta Fija',  operadora:'NAFINSA', unidades:2000, precioCompra:10.50, navActual:11.20, rendimiento:7.5,  tipo:'Renta Fija',     fechaCompra:'2024-01-08' },
+  { id:4, clave:'BNMACC1',  nombre:'Banamex Acciones',    operadora:'Banamex', unidades:300,  precioCompra:85.00, navActual:97.40, rendimiento:14.6, tipo:'Renta Variable', fechaCompra:'2022-09-20' },
+  { id:5, clave:'BBVAPAT1', nombre:'BBVA Patrimonial',    operadora:'BBVA',    unidades:800,  precioCompra:18.90, navActual:20.10, rendimiento:6.3,  tipo:'Patrimonial',    fechaCompra:'2023-11-30' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -1218,8 +1224,9 @@ function openFondoModal(id = null) {
     document.getElementById('fi-compra').value      = x.precioCompra;
     document.getElementById('fi-nav').value         = x.navActual;
     document.getElementById('fi-rendimiento').value = x.rendimiento;
+    document.getElementById('fi-fecha').value       = x.fechaCompra || '';
   } else {
-    ['fi-clave','fi-nombre','fi-operadora','fi-unidades','fi-compra','fi-nav','fi-rendimiento']
+    ['fi-clave','fi-nombre','fi-operadora','fi-unidades','fi-compra','fi-nav','fi-rendimiento','fi-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('fi-tipo').value = 'Renta Variable';
   }
@@ -1234,14 +1241,15 @@ function closeFondoModal(e) {
 }
 
 function saveFondo() {
-  const clave       = document.getElementById('fi-clave').value.trim().toUpperCase();
-  const nombre      = document.getElementById('fi-nombre').value.trim();
-  const operadora   = document.getElementById('fi-operadora').value.trim();
-  const tipo        = document.getElementById('fi-tipo').value;
-  const unidades    = parseFloat(document.getElementById('fi-unidades').value);
+  const clave        = document.getElementById('fi-clave').value.trim().toUpperCase();
+  const nombre       = document.getElementById('fi-nombre').value.trim();
+  const operadora    = document.getElementById('fi-operadora').value.trim();
+  const tipo         = document.getElementById('fi-tipo').value;
+  const unidades     = parseFloat(document.getElementById('fi-unidades').value);
   const precioCompra = parseFloat(document.getElementById('fi-compra').value);
-  const navActual   = parseFloat(document.getElementById('fi-nav').value);
-  const rendimiento = parseFloat(document.getElementById('fi-rendimiento').value);
+  const navActual    = parseFloat(document.getElementById('fi-nav').value);
+  const rendimiento  = parseFloat(document.getElementById('fi-rendimiento').value);
+  const fechaCompra  = document.getElementById('fi-fecha').value || null;
 
   if (!clave || !nombre || !operadora || isNaN(unidades) || isNaN(precioCompra) || isNaN(navActual) || isNaN(rendimiento)) {
     alert('Por favor completa todos los campos.');
@@ -1250,7 +1258,7 @@ function saveFondo() {
 
   if (editingFondoId) {
     const x = fondos.find(f => f.id === editingFondoId);
-    if (x) Object.assign(x, { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento });
+    if (x) Object.assign(x, { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra });
   } else {
     const existing = fondos.find(f => f.clave === clave);
     if (existing) {
@@ -1259,9 +1267,10 @@ function saveFondo() {
       existing.unidades      = totalUnidades;
       existing.navActual     = navActual;
       existing.rendimiento   = rendimiento;
+      if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${clave}.`);
     } else {
-      fondos.push({ id: Date.now(), clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, history: generateHistory(navActual * unidades) });
+      fondos.push({ id: Date.now(), clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra, history: generateHistory(navActual * unidades) });
     }
   }
 
@@ -1307,11 +1316,11 @@ function fibraColor(sector) { return FIBRA_SECTOR_COLORS[sector] || '#ec4899'; }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_FIBRAS = [
-  { id:1, ticker:'FUNO11',    nombre:'Fibra Uno',       sector:'Diversificado', certificados:2000, precioCompra:22.50, precioActual:24.80, distribucion:1.85, rendimiento:10.2 },
-  { id:2, ticker:'TERRA13',   nombre:'Terrafina',       sector:'Industrial',    certificados:3000, precioCompra:16.10, precioActual:18.40, distribucion:1.60, rendimiento:11.8 },
-  { id:3, ticker:'FIBRAMQ12', nombre:'Fibra Macquarie', sector:'Industrial',    certificados:1500, precioCompra:20.30, precioActual:21.90, distribucion:1.72, rendimiento:9.5  },
-  { id:4, ticker:'DANHOS13',  nombre:'Fibra Danhos',    sector:'Comercial',     certificados:1000, precioCompra:18.70, precioActual:17.20, distribucion:1.40, rendimiento:7.8  },
-  { id:5, ticker:'FIBRAPL14', nombre:'Fibra PL',        sector:'Industrial',    certificados:4000, precioCompra:11.20, precioActual:13.10, distribucion:1.15, rendimiento:12.4 },
+  { id:1, ticker:'FUNO11',    nombre:'Fibra Uno',       sector:'Diversificado', certificados:2000, precioCompra:22.50, precioActual:24.80, distribucion:1.85, rendimiento:10.2, fechaCompra:'2023-04-18' },
+  { id:2, ticker:'TERRA13',   nombre:'Terrafina',       sector:'Industrial',    certificados:3000, precioCompra:16.10, precioActual:18.40, distribucion:1.60, rendimiento:11.8, fechaCompra:'2022-10-05' },
+  { id:3, ticker:'FIBRAMQ12', nombre:'Fibra Macquarie', sector:'Industrial',    certificados:1500, precioCompra:20.30, precioActual:21.90, distribucion:1.72, rendimiento:9.5,  fechaCompra:'2024-03-12' },
+  { id:4, ticker:'DANHOS13',  nombre:'Fibra Danhos',    sector:'Comercial',     certificados:1000, precioCompra:18.70, precioActual:17.20, distribucion:1.40, rendimiento:7.8,  fechaCompra:'2023-08-28' },
+  { id:5, ticker:'FIBRAPL14', nombre:'Fibra PL',        sector:'Industrial',    certificados:4000, precioCompra:11.20, precioActual:13.10, distribucion:1.15, rendimiento:12.4, fechaCompra:'2024-01-22' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -1589,8 +1598,9 @@ function openFibraModal(id = null) {
     document.getElementById('fbi-actual').value       = x.precioActual;
     document.getElementById('fbi-distribucion').value = x.distribucion;
     document.getElementById('fbi-rendimiento').value  = x.rendimiento;
+    document.getElementById('fbi-fecha').value        = x.fechaCompra || '';
   } else {
-    ['fbi-ticker','fbi-nombre','fbi-certificados','fbi-compra','fbi-actual','fbi-distribucion','fbi-rendimiento']
+    ['fbi-ticker','fbi-nombre','fbi-certificados','fbi-compra','fbi-actual','fbi-distribucion','fbi-rendimiento','fbi-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('fbi-sector').value = 'Diversificado';
   }
@@ -1605,14 +1615,15 @@ function closeFibraModal(e) {
 }
 
 function saveFibra() {
-  const ticker        = document.getElementById('fbi-ticker').value.trim().toUpperCase();
-  const nombre        = document.getElementById('fbi-nombre').value.trim();
-  const sector        = document.getElementById('fbi-sector').value;
-  const certificados  = parseInt(document.getElementById('fbi-certificados').value);
-  const precioCompra  = parseFloat(document.getElementById('fbi-compra').value);
-  const precioActual  = parseFloat(document.getElementById('fbi-actual').value);
-  const distribucion  = parseFloat(document.getElementById('fbi-distribucion').value);
-  const rendimiento   = parseFloat(document.getElementById('fbi-rendimiento').value);
+  const ticker       = document.getElementById('fbi-ticker').value.trim().toUpperCase();
+  const nombre       = document.getElementById('fbi-nombre').value.trim();
+  const sector       = document.getElementById('fbi-sector').value;
+  const certificados = parseInt(document.getElementById('fbi-certificados').value);
+  const precioCompra = parseFloat(document.getElementById('fbi-compra').value);
+  const precioActual = parseFloat(document.getElementById('fbi-actual').value);
+  const distribucion = parseFloat(document.getElementById('fbi-distribucion').value);
+  const rendimiento  = parseFloat(document.getElementById('fbi-rendimiento').value);
+  const fechaCompra  = document.getElementById('fbi-fecha').value || null;
 
   if (!ticker || !nombre || isNaN(certificados) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(distribucion) || isNaN(rendimiento)) {
     alert('Por favor completa todos los campos.');
@@ -1621,7 +1632,7 @@ function saveFibra() {
 
   if (editingFibraId) {
     const x = fibras.find(f => f.id === editingFibraId);
-    if (x) Object.assign(x, { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento });
+    if (x) Object.assign(x, { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra });
   } else {
     const existing = fibras.find(f => f.ticker === ticker);
     if (existing) {
@@ -1631,9 +1642,10 @@ function saveFibra() {
       existing.precioActual  = precioActual;
       existing.distribucion  = distribucion;
       existing.rendimiento   = rendimiento;
+      if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${ticker}.`);
     } else {
-      fibras.push({ id: Date.now(), ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, history: generateHistory(precioActual * certificados) });
+      fibras.push({ id: Date.now(), ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra, history: generateHistory(precioActual * certificados) });
     }
   }
 
@@ -1677,11 +1689,11 @@ function retiroColor(tipo) { return RETIRO_TIPO_COLORS[tipo] || '#8b5cf6'; }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_RETIRO = [
-  { id:1, tipo:'Afore',            nombre:'Afore Profuturo Siefore Básica',   institucion:'Profuturo',  subcuenta:'Retiro',           saldo:320000, aportacionYTD:48000, aportacionPatronal:24000, rendimiento:8.2,  proyeccion:4200000 },
-  { id:2, tipo:'PPR',              nombre:'PPR GBM Crecimiento',              institucion:'GBM',        subcuenta:'Voluntario',        saldo:185000, aportacionYTD:60000, aportacionPatronal:0,     rendimiento:9.5,  proyeccion:2800000 },
-  { id:3, tipo:'PPR',              nombre:'PPR BBVA Patrimonial',             institucion:'BBVA',       subcuenta:'Voluntario',        saldo:95000,  aportacionYTD:36000, aportacionPatronal:0,     rendimiento:10.1, proyeccion:1500000 },
-  { id:4, tipo:'Plan Empresarial', nombre:'Plan de Pensiones Empresarial',    institucion:'Banamex',    subcuenta:'Empresarial',       saldo:210000, aportacionYTD:72000, aportacionPatronal:72000, rendimiento:7.8,  proyeccion:3100000 },
-  { id:5, tipo:'Afore',            nombre:'Afore Profuturo Cesantía',         institucion:'Profuturo',  subcuenta:'Cesantía y Vejez',  saldo:145000, aportacionYTD:22000, aportacionPatronal:11000, rendimiento:8.0,  proyeccion:1900000 },
+  { id:1, tipo:'Afore',            nombre:'Afore Profuturo Siefore Básica',   institucion:'Profuturo',  subcuenta:'Retiro',           saldo:320000, aportacionYTD:48000, aportacionPatronal:24000, rendimiento:8.2,  proyeccion:4200000, fechaCompra:'2018-01-15' },
+  { id:2, tipo:'PPR',              nombre:'PPR GBM Crecimiento',              institucion:'GBM',        subcuenta:'Voluntario',        saldo:185000, aportacionYTD:60000, aportacionPatronal:0,     rendimiento:9.5,  proyeccion:2800000, fechaCompra:'2021-03-10' },
+  { id:3, tipo:'PPR',              nombre:'PPR BBVA Patrimonial',             institucion:'BBVA',       subcuenta:'Voluntario',        saldo:95000,  aportacionYTD:36000, aportacionPatronal:0,     rendimiento:10.1, proyeccion:1500000, fechaCompra:'2022-07-01' },
+  { id:4, tipo:'Plan Empresarial', nombre:'Plan de Pensiones Empresarial',    institucion:'Banamex',    subcuenta:'Empresarial',       saldo:210000, aportacionYTD:72000, aportacionPatronal:72000, rendimiento:7.8,  proyeccion:3100000, fechaCompra:'2019-09-20' },
+  { id:5, tipo:'Afore',            nombre:'Afore Profuturo Cesantía',         institucion:'Profuturo',  subcuenta:'Cesantía y Vejez',  saldo:145000, aportacionYTD:22000, aportacionPatronal:11000, rendimiento:8.0,  proyeccion:1900000, fechaCompra:'2018-01-15' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -1957,8 +1969,9 @@ function openRetiroModal(id = null) {
     document.getElementById('ri-patronal').value       = r.aportacionPatronal || 0;
     document.getElementById('ri-rendimiento').value    = r.rendimiento;
     document.getElementById('ri-proyeccion').value     = r.proyeccion || 0;
+    document.getElementById('ri-fecha').value          = r.fechaCompra || '';
   } else {
-    ['ri-nombre','ri-institucion','ri-saldo','ri-aportacion-ytd','ri-patronal','ri-rendimiento','ri-proyeccion']
+    ['ri-nombre','ri-institucion','ri-saldo','ri-aportacion-ytd','ri-patronal','ri-rendimiento','ri-proyeccion','ri-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
     document.getElementById('ri-tipo').value      = 'PPR';
     document.getElementById('ri-subcuenta').value = 'Voluntario';
@@ -1983,6 +1996,7 @@ function saveRetiro() {
   const aportacionPatronal = parseFloat(document.getElementById('ri-patronal').value) || 0;
   const rendimiento        = parseFloat(document.getElementById('ri-rendimiento').value);
   const proyeccion         = parseFloat(document.getElementById('ri-proyeccion').value) || 0;
+  const fechaCompra        = document.getElementById('ri-fecha').value || null;
 
   if (!nombre || !institucion || isNaN(saldo) || isNaN(rendimiento)) {
     alert('Por favor completa todos los campos obligatorios.');
@@ -1991,9 +2005,9 @@ function saveRetiro() {
 
   if (editingRetiroId) {
     const r = retiro.find(x => x.id === editingRetiroId);
-    if (r) Object.assign(r, { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion });
+    if (r) Object.assign(r, { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra });
   } else {
-    retiro.push({ id: Date.now(), tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, history: generateHistory(saldo) });
+    retiro.push({ id: Date.now(), tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra, history: generateHistory(saldo) });
   }
 
   persistRetiro();
@@ -2041,25 +2055,29 @@ const SAMPLE_BIENES = [
     id:1, nombre:'Casa Pedregal', tipo:'Casa', ubicacion:'CDMX – Pedregal',
     precioCompra:4500000, gastosNotariales:135000, escrituracion:45000,
     impuestoAdquisicion:90000, otrosGastos:40000,
-    valorActual:6200000, saldoHipoteca:2100000, rentaMensual:0,
+    fechaCompra:'2021-03-01', plusvaliaAnual:6.5,
+    saldoHipoteca:2100000, rentaMensual:0,
   },
   {
     id:2, nombre:'Departamento Polanco', tipo:'Departamento', ubicacion:'CDMX – Polanco',
     precioCompra:3200000, gastosNotariales:96000, escrituracion:32000,
     impuestoAdquisicion:64000, otrosGastos:28000,
-    valorActual:4100000, saldoHipoteca:0, rentaMensual:22000,
+    fechaCompra:'2022-01-15', plusvaliaAnual:7.0,
+    saldoHipoteca:0, rentaMensual:22000,
   },
   {
     id:3, nombre:'Local Centro Histórico', tipo:'Local Comercial', ubicacion:'CDMX – Centro',
     precioCompra:1800000, gastosNotariales:54000, escrituracion:18000,
     impuestoAdquisicion:36000, otrosGastos:15000,
-    valorActual:2350000, saldoHipoteca:0, rentaMensual:15000,
+    fechaCompra:'2020-06-01', plusvaliaAnual:4.5,
+    saldoHipoteca:0, rentaMensual:15000,
   },
   {
     id:4, nombre:'Terreno El Marqués', tipo:'Terreno', ubicacion:'Querétaro – El Marqués',
     precioCompra:850000, gastosNotariales:25500, escrituracion:8500,
     impuestoAdquisicion:17000, otrosGastos:8000,
-    valorActual:1300000, saldoHipoteca:0, rentaMensual:0,
+    fechaCompra:'2022-09-01', plusvaliaAnual:8.0,
+    saldoHipoteca:0, rentaMensual:0,
   },
 ];
 
@@ -2077,8 +2095,30 @@ function gastosAdqTotal(b) {
 }
 function costoTotal(b) { return b.precioCompra + gastosAdqTotal(b); }
 
+// Compute current market value from purchase price + annual appreciation
+function computeValorActual(b) {
+  if (!b.fechaCompra || !b.plusvaliaAnual) return b.precioCompra;
+  const years = (Date.now() - new Date(b.fechaCompra).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  return parseFloat((b.precioCompra * Math.pow(1 + b.plusvaliaAnual / 100, years)).toFixed(0));
+}
+
+// Generate appreciation-curve history (days points back from today)
+function generateBienesHistory(b, days = 91) {
+  if (!b.fechaCompra || !b.plusvaliaAnual) return generateHistory(b.precioCompra, days);
+  const today = Date.now();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const pts = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const msAgo = i * msPerDay;
+    const years = (today - msAgo - new Date(b.fechaCompra).getTime()) / (msPerDay * 365.25);
+    const val = years <= 0 ? b.precioCompra : b.precioCompra * Math.pow(1 + b.plusvaliaAnual / 100, years);
+    pts.push(parseFloat(val.toFixed(0)));
+  }
+  return pts;
+}
+
 if (!bienes) {
-  bienes = SAMPLE_BIENES.map(b => ({ ...b, history: generateHistory(b.valorActual) }));
+  bienes = SAMPLE_BIENES.map(b => ({ ...b, history: generateBienesHistory(b) }));
   persistBienes();
 }
 
@@ -2092,26 +2132,26 @@ function sortBienes(col) {
 }
 
 function getBienSortValue(b, col) {
-  const totalValor    = bienes.reduce((s, x) => s + x.valorActual, 0);
-  const ct            = costoTotal(b);
+  const ct  = costoTotal(b);
+  const val = computeValorActual(b);
   switch (col) {
-    case 'nombre':      return b.nombre;
-    case 'tipo':        return b.tipo;
-    case 'ubicacion':   return b.ubicacion;
-    case 'precioCompra':return b.precioCompra;
-    case 'gastosAdq':   return gastosAdqTotal(b);
-    case 'costoTotal':  return ct;
-    case 'valorActual': return b.valorActual;
-    case 'plusvalia':   return b.valorActual - ct;
-    case 'equityNeto':  return b.valorActual - (b.saldoHipoteca || 0);
-    case 'rentaMensual':return b.rentaMensual || 0;
-    default:            return 0;
+    case 'nombre':       return b.nombre;
+    case 'tipo':         return b.tipo;
+    case 'ubicacion':    return b.ubicacion;
+    case 'precioCompra': return b.precioCompra;
+    case 'gastosAdq':    return gastosAdqTotal(b);
+    case 'costoTotal':   return ct;
+    case 'valorActual':  return val;
+    case 'plusvalia':    return val - ct;
+    case 'equityNeto':   return val - (b.saldoHipoteca || 0);
+    case 'rentaMensual': return b.rentaMensual || 0;
+    default:             return 0;
   }
 }
 
 // ─── KPI Rendering ────────────────────────────────────────────────────────────
 function renderBienesKPIs() {
-  const totalValor    = bienes.reduce((s, b) => s + b.valorActual, 0);
+  const totalValor    = bienes.reduce((s, b) => s + computeValorActual(b), 0);
   const totalCosto    = bienes.reduce((s, b) => s + costoTotal(b), 0);
   const plusvalia     = totalValor - totalCosto;
   const plusvaliaPct  = totalCosto ? (plusvalia / totalCosto) * 100 : 0;
@@ -2169,17 +2209,19 @@ function renderBienesTable(filter = '') {
     `${bienes.length} propiedad${bienes.length !== 1 ? 'es' : ''}`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="13" class="table__empty">Sin propiedades aún — agrega la primera.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="table__empty">Sin propiedades aún — agrega la primera.</td></tr>`;
     return;
   }
 
   filtered.forEach(b => {
-    const color     = bienColor(b.tipo);
-    const ct        = costoTotal(b);
-    const gastosAdq = gastosAdqTotal(b);
-    const plusvalia = b.valorActual - ct;
-    const equity    = b.valorActual - (b.saldoHipoteca || 0);
-    const up        = plusvalia >= 0;
+    const color      = bienColor(b.tipo);
+    const ct         = costoTotal(b);
+    const gastosAdq  = gastosAdqTotal(b);
+    const valorActual = computeValorActual(b);
+    const plusvalia  = valorActual - ct;
+    const equity     = valorActual - (b.saldoHipoteca || 0);
+    const up         = plusvalia >= 0;
+    const pctAnual   = b.plusvaliaAnual ? b.plusvaliaAnual.toFixed(1) + '%/yr' : '—';
 
     const tr = document.createElement('tr');
     tr.className = 'table-row';
@@ -2191,9 +2233,10 @@ function renderBienesTable(filter = '') {
       <td>${fmt(b.precioCompra)}</td>
       <td class="td--muted">${fmt(gastosAdq)}</td>
       <td>${fmt(ct)}</td>
-      <td class="td--price">${fmt(b.valorActual)}</td>
+      <td class="td--price">${fmt(valorActual)}</td>
       <td class="${up ? 'td--up' : 'td--down'}">${(up ? '+' : '') + fmt(plusvalia)}</td>
       <td>${fmt(equity)}</td>
+      <td style="color:var(--text-secondary)">${pctAnual}</td>
       <td>${b.rentaMensual ? fmt(b.rentaMensual) : '<span style="color:var(--text-tertiary)">—</span>'}</td>
       <td>
         <div class="s-row-actions">
@@ -2213,7 +2256,7 @@ function getBienesPortfolioHistory(n) {
     bienes.reduce((s, b) => {
       const hist = b.history || [];
       const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || b.valorActual);
+      return s + (hist[idx] || computeValorActual(b));
     }, 0)
   );
 }
@@ -2258,7 +2301,7 @@ function initBienesCharts() {
 
   // Donut — distribution by tipo
   const grouped = {};
-  bienes.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + b.valorActual; });
+  bienes.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + computeValorActual(b); });
   const dLabels = Object.keys(grouped);
   bienesDonutChart = new Chart(document.getElementById('chart-bienes-donut'), {
     type: 'doughnut',
@@ -2282,13 +2325,13 @@ function initBienesCharts() {
       labels: bienes.map(b => b.nombre.length > 18 ? b.nombre.slice(0, 16) + '…' : b.nombre),
       datasets: [{
         label: 'Plusvalía',
-        data: bienes.map(b => parseFloat((b.valorActual - costoTotal(b)).toFixed(2))),
+        data: bienes.map(b => parseFloat((computeValorActual(b) - costoTotal(b)).toFixed(2))),
         backgroundColor: bienes.map(b => {
-          const up = b.valorActual - costoTotal(b) >= 0;
+          const up = computeValorActual(b) - costoTotal(b) >= 0;
           return up ? 'rgba(99,102,241,0.75)' : 'rgba(248,113,113,0.75)';
         }),
         borderColor: bienes.map(b => {
-          const up = b.valorActual - costoTotal(b) >= 0;
+          const up = computeValorActual(b) - costoTotal(b) >= 0;
           return up ? '#6366f1' : '#f87171';
         }),
         borderWidth: 1, borderRadius: 5, borderSkipped: false,
@@ -2321,7 +2364,7 @@ function updateBienesCharts() {
   bienesLineChart.update();
 
   const grouped = {};
-  bienes.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + b.valorActual; });
+  bienes.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + computeValorActual(b); });
   const dLabels = Object.keys(grouped);
   bienesDonutChart.data.labels                         = dLabels;
   bienesDonutChart.data.datasets[0].data               = dLabels.map(k => parseFloat(grouped[k].toFixed(2)));
@@ -2329,13 +2372,13 @@ function updateBienesCharts() {
   bienesDonutChart.update();
 
   bienesBarChart.data.labels = bienes.map(b => b.nombre.length > 18 ? b.nombre.slice(0, 16) + '…' : b.nombre);
-  bienesBarChart.data.datasets[0].data = bienes.map(b => parseFloat((b.valorActual - costoTotal(b)).toFixed(2)));
+  bienesBarChart.data.datasets[0].data = bienes.map(b => parseFloat((computeValorActual(b) - costoTotal(b)).toFixed(2)));
   bienesBarChart.data.datasets[0].backgroundColor = bienes.map(b => {
-    const up = b.valorActual - costoTotal(b) >= 0;
+    const up = computeValorActual(b) - costoTotal(b) >= 0;
     return up ? 'rgba(99,102,241,0.75)' : 'rgba(248,113,113,0.75)';
   });
   bienesBarChart.data.datasets[0].borderColor = bienes.map(b => {
-    const up = b.valorActual - costoTotal(b) >= 0;
+    const up = computeValorActual(b) - costoTotal(b) >= 0;
     return up ? '#6366f1' : '#f87171';
   });
   bienesBarChart.update();
@@ -2355,19 +2398,20 @@ function openBienesModal(id = null) {
   if (id) {
     const b = bienes.find(x => x.id === id);
     if (!b) return;
-    document.getElementById('bri-nombre').value       = b.nombre;
-    document.getElementById('bri-tipo').value         = b.tipo;
-    document.getElementById('bri-ubicacion').value    = b.ubicacion;
-    document.getElementById('bri-precio').value       = b.precioCompra;
-    document.getElementById('bri-valor').value        = b.valorActual;
-    document.getElementById('bri-notariales').value   = b.gastosNotariales || 0;
-    document.getElementById('bri-escrituracion').value= b.escrituracion || 0;
-    document.getElementById('bri-isabi').value        = b.impuestoAdquisicion || 0;
-    document.getElementById('bri-otros').value        = b.otrosGastos || 0;
-    document.getElementById('bri-hipoteca').value     = b.saldoHipoteca || 0;
-    document.getElementById('bri-renta').value        = b.rentaMensual || 0;
+    document.getElementById('bri-nombre').value        = b.nombre;
+    document.getElementById('bri-tipo').value          = b.tipo;
+    document.getElementById('bri-ubicacion').value     = b.ubicacion;
+    document.getElementById('bri-precio').value        = b.precioCompra;
+    document.getElementById('bri-fecha').value         = b.fechaCompra || '';
+    document.getElementById('bri-plusvalia').value     = b.plusvaliaAnual || '';
+    document.getElementById('bri-notariales').value    = b.gastosNotariales || 0;
+    document.getElementById('bri-escrituracion').value = b.escrituracion || 0;
+    document.getElementById('bri-isabi').value         = b.impuestoAdquisicion || 0;
+    document.getElementById('bri-otros').value         = b.otrosGastos || 0;
+    document.getElementById('bri-hipoteca').value      = b.saldoHipoteca || 0;
+    document.getElementById('bri-renta').value         = b.rentaMensual || 0;
   } else {
-    ['bri-nombre','bri-ubicacion','bri-precio','bri-valor',
+    ['bri-nombre','bri-ubicacion','bri-precio','bri-fecha','bri-plusvalia',
      'bri-notariales','bri-escrituracion','bri-isabi','bri-otros',
      'bri-hipoteca','bri-renta']
       .forEach(fid => { document.getElementById(fid).value = ''; });
@@ -2384,39 +2428,46 @@ function closeBienesModal(e) {
 }
 
 function saveBien() {
-  const nombre             = document.getElementById('bri-nombre').value.trim();
-  const tipo               = document.getElementById('bri-tipo').value;
-  const ubicacion          = document.getElementById('bri-ubicacion').value.trim();
-  const precioCompra       = parseFloat(document.getElementById('bri-precio').value);
-  const valorActual        = parseFloat(document.getElementById('bri-valor').value);
-  const gastosNotariales   = parseFloat(document.getElementById('bri-notariales').value) || 0;
-  const escrituracion      = parseFloat(document.getElementById('bri-escrituracion').value) || 0;
-  const impuestoAdquisicion= parseFloat(document.getElementById('bri-isabi').value) || 0;
-  const otrosGastos        = parseFloat(document.getElementById('bri-otros').value) || 0;
-  const saldoHipoteca      = parseFloat(document.getElementById('bri-hipoteca').value) || 0;
-  const rentaMensual       = parseFloat(document.getElementById('bri-renta').value) || 0;
+  const nombre              = document.getElementById('bri-nombre').value.trim();
+  const tipo                = document.getElementById('bri-tipo').value;
+  const ubicacion           = document.getElementById('bri-ubicacion').value.trim();
+  const precioCompra        = parseFloat(document.getElementById('bri-precio').value);
+  const fechaCompra         = document.getElementById('bri-fecha').value || null;
+  const plusvaliaAnual      = parseFloat(document.getElementById('bri-plusvalia').value) || 0;
+  const gastosNotariales    = parseFloat(document.getElementById('bri-notariales').value) || 0;
+  const escrituracion       = parseFloat(document.getElementById('bri-escrituracion').value) || 0;
+  const impuestoAdquisicion = parseFloat(document.getElementById('bri-isabi').value) || 0;
+  const otrosGastos         = parseFloat(document.getElementById('bri-otros').value) || 0;
+  const saldoHipoteca       = parseFloat(document.getElementById('bri-hipoteca').value) || 0;
+  const rentaMensual        = parseFloat(document.getElementById('bri-renta').value) || 0;
 
-  if (!nombre || !ubicacion || isNaN(precioCompra) || isNaN(valorActual)) {
-    alert('Por favor completa los campos obligatorios: Nombre, Ubicación, Precio de Compra y Valor Actual.');
+  if (!nombre || !ubicacion || isNaN(precioCompra)) {
+    alert('Por favor completa los campos obligatorios: Nombre, Ubicación y Precio de Compra.');
     return;
   }
 
-  const data = { nombre, tipo, ubicacion, precioCompra, valorActual,
+  const data = { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual,
                  gastosNotariales, escrituracion, impuestoAdquisicion,
                  otrosGastos, saldoHipoteca, rentaMensual };
 
   if (editingBienId) {
     const b = bienes.find(x => x.id === editingBienId);
-    if (b) Object.assign(b, data);
+    if (b) {
+      Object.assign(b, data);
+      b.history = generateBienesHistory(b);
+    }
   } else {
-    bienes.push({ id: Date.now(), ...data, history: generateHistory(valorActual) });
+    const newBien = { id: Date.now(), ...data };
+    newBien.history = generateBienesHistory(newBien);
+    bienes.push(newBien);
   }
 
+  const valorActual = computeValorActual(bienes.find(x => x.nombre === nombre && x.ubicacion === ubicacion) || data);
   persistBienes();
   if (editingBienId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏠', title: `Updated Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Valor $${valorActual.toLocaleString()}`, amount: valorActual });
+    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏠', title: `Updated Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
   } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Valor $${valorActual.toLocaleString()}`, amount: valorActual });
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
   }
   renderAllBienes();
   closeBienesModal();
@@ -2425,7 +2476,7 @@ function saveBien() {
 function removeBien(id) {
   if (!confirm('¿Eliminar esta propiedad?')) return;
   const b = bienes.find(x => x.id === id);
-  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏠', title: `Removed Propiedad: ${b.nombre}`, detail: `${b.tipo} · ${b.ubicacion}`, amount: b.valorActual });
+  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏠', title: `Removed Propiedad: ${b.nombre}`, detail: `${b.tipo} · ${b.ubicacion}`, amount: computeValorActual(b) });
   bienes = bienes.filter(b => b.id !== id);
   persistBienes();
   renderAllBienes();
@@ -2456,11 +2507,11 @@ function cryptoColor(symbol) { return CRYPTO_COLORS[symbol.toUpperCase()] || '#0
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_CRYPTO = [
-  { id:1, symbol:'BTC',  name:'Bitcoin',  amount:0.45,  avgCost:28500.00, currentPrice:67200.00 },
-  { id:2, symbol:'ETH',  name:'Ethereum', amount:3.80,  avgCost:1820.00,  currentPrice:3480.00  },
-  { id:3, symbol:'SOL',  name:'Solana',   amount:25.00, avgCost:62.00,    currentPrice:178.50   },
-  { id:4, symbol:'BNB',  name:'BNB',      amount:8.50,  avgCost:245.00,   currentPrice:580.00   },
-  { id:5, symbol:'ADA',  name:'Cardano',  amount:1500,  avgCost:0.42,     currentPrice:0.61     },
+  { id:1, symbol:'BTC',  name:'Bitcoin',  amount:0.45,  avgCost:28500.00, currentPrice:67200.00, fechaCompra:'2023-01-20' },
+  { id:2, symbol:'ETH',  name:'Ethereum', amount:3.80,  avgCost:1820.00,  currentPrice:3480.00,  fechaCompra:'2023-03-05' },
+  { id:3, symbol:'SOL',  name:'Solana',   amount:25.00, avgCost:62.00,    currentPrice:178.50,   fechaCompra:'2023-10-14' },
+  { id:4, symbol:'BNB',  name:'BNB',      amount:8.50,  avgCost:245.00,   currentPrice:580.00,   fechaCompra:'2024-04-08' },
+  { id:5, symbol:'ADA',  name:'Cardano',  amount:1500,  avgCost:0.42,     currentPrice:0.61,     fechaCompra:'2024-07-30' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -2761,8 +2812,9 @@ function openCryptoModal(id = null) {
     document.getElementById('ci-amount').value = c.amount;
     document.getElementById('ci-cost').value   = c.avgCost;
     document.getElementById('ci-price').value  = c.currentPrice;
+    document.getElementById('ci-fecha').value  = c.fechaCompra || '';
   } else {
-    ['ci-symbol','ci-name','ci-amount','ci-cost','ci-price']
+    ['ci-symbol','ci-name','ci-amount','ci-cost','ci-price','ci-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
   }
   document.getElementById('crypto-modal-overlay').classList.add('modal-overlay--visible');
@@ -2781,6 +2833,7 @@ function saveCrypto() {
   const amount       = parseFloat(document.getElementById('ci-amount').value);
   const avgCost      = parseFloat(document.getElementById('ci-cost').value);
   const currentPrice = parseFloat(document.getElementById('ci-price').value);
+  const fechaCompra  = document.getElementById('ci-fecha').value || null;
 
   if (!symbol || !name || isNaN(amount) || isNaN(avgCost) || isNaN(currentPrice)) {
     alert('Please fill in all required fields.');
@@ -2789,9 +2842,9 @@ function saveCrypto() {
 
   if (editingCryptoId) {
     const c = cryptos.find(x => x.id === editingCryptoId);
-    if (c) Object.assign(c, { symbol, name, amount, avgCost, currentPrice });
+    if (c) Object.assign(c, { symbol, name, amount, avgCost, currentPrice, fechaCompra });
   } else {
-    cryptos.push({ id: Date.now(), symbol, name, amount, avgCost, currentPrice, history: generateHistory(currentPrice * amount) });
+    cryptos.push({ id: Date.now(), symbol, name, amount, avgCost, currentPrice, fechaCompra, history: generateHistory(currentPrice * amount) });
   }
 
   persistCrypto();

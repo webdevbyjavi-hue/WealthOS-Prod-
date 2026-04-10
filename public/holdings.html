@@ -813,6 +813,7 @@
                 <th class="th-sort" data-col="valorActual" onclick="sortBienes('valorActual')">Valor Actual <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="plusvalia" onclick="sortBienes('plusvalia')">Plusvalía <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="equityNeto" onclick="sortBienes('equityNeto')">Equity Neto <span class="sort-icon">↕</span></th>
+                <th>Plusvalía/yr</th>
                 <th class="th-sort" data-col="rentaMensual" onclick="sortBienes('rentaMensual')">Renta Mensual <span class="sort-icon">↕</span></th>
                 <th></th>
               </tr>
@@ -860,6 +861,10 @@
         <div class="form-group">
           <label class="form-label" data-i18n="lbl_current_price">Current Price ($)</label>
           <input class="form-input" id="si-price" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Purchase Date</label>
+          <input class="form-input" id="si-fecha" type="date" />
         </div>
       </div>
       <div class="modal__actions">
@@ -926,6 +931,10 @@
           <label class="form-label">Fecha de Vencimiento</label>
           <input class="form-input" id="bi-vencimiento" type="date" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Compra</label>
+          <input class="form-input" id="bi-fecha" type="date" />
+        </div>
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeBonoModal()">Cancelar</button>
@@ -989,6 +998,10 @@
           <label class="form-label">Rendimiento Total (%)</label>
           <input class="form-input" id="fbi-rendimiento" type="number" placeholder="0.00" step="0.01" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Compra</label>
+          <input class="form-input" id="fbi-fecha" type="date" />
+        </div>
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeFibraModal()">Cancelar</button>
@@ -1050,6 +1063,10 @@
         <div class="form-group">
           <label class="form-label">Rendimiento Anual (%)</label>
           <input class="form-input" id="fi-rendimiento" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Compra</label>
+          <input class="form-input" id="fi-fecha" type="date" />
         </div>
       </div>
       <div class="modal__actions">
@@ -1121,6 +1138,10 @@
           <label class="form-label">Proyección a los 65 (MXN)</label>
           <input class="form-input" id="ri-proyeccion" type="number" placeholder="0.00" min="0" step="0.01" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Inicio</label>
+          <input class="form-input" id="ri-fecha" type="date" />
+        </div>
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeRetiroModal()">Cancelar</button>
@@ -1166,8 +1187,12 @@
           <input class="form-input" id="bri-precio" type="number" placeholder="0.00" min="0" step="1" />
         </div>
         <div class="form-group">
-          <label class="form-label">Valor Actual de Mercado (MXN)</label>
-          <input class="form-input" id="bri-valor" type="number" placeholder="0.00" min="0" step="1" />
+          <label class="form-label">Fecha de Compra</label>
+          <input class="form-input" id="bri-fecha" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Plusvalía Anual (%)</label>
+          <input class="form-input" id="bri-plusvalia" type="number" placeholder="e.g. 8.0" min="0" step="0.1" />
         </div>
       </div>
 
@@ -1241,6 +1266,10 @@
         <div class="form-group">
           <label class="form-label">Current Price (USD)</label>
           <input class="form-input" id="ci-price" type="number" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Purchase Date</label>
+          <input class="form-input" id="ci-fecha" type="date" />
         </div>
       </div>
       <div class="modal__actions">
