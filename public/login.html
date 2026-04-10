@@ -29,15 +29,18 @@
       background-size: 48px 48px;
       pointer-events: none;
       transform-origin: center;
-      animation: gridZoomIn 15s linear infinite;
+      /* Fade effect */
+      mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+      animation: gridZoomOut 25s linear infinite;
     }
-    @keyframes gridZoomIn {
+    @keyframes gridZoomOut {
       from {
-        transform: scale(1);
+        background-size: 48px 48px;
         background-position: 0 0;
       }
       to {
-        transform: scale(1.5);
+        background-size: 96px 96px;
         background-position: 48px 48px;
       }
     }
