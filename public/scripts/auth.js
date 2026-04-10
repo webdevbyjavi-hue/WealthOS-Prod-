@@ -45,7 +45,7 @@
     btn.onmouseenter = () => { btn.style.color = 'var(--text-primary,#eef0ff)'; btn.style.borderColor = 'rgba(99,102,241,0.4)'; };
     btn.onmouseleave = () => { btn.style.color = 'var(--text-secondary,#8892a4)'; btn.style.borderColor = 'var(--border,#1e2640)'; };
     btn.onclick = () => WOS_AUTH.signout();
-    footer.parentNode.insertBefore(btn, footer);
+    footer.parentNode.insertBefore(btn, footer.nextSibling);
   }
 
   // ─── Public auth controller ─────────────────────────────────────────────────
