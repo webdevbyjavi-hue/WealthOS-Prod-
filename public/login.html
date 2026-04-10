@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>WealthOS — Sign In</title>
+  <title>WealthOS — Iniciar Sesion</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +28,16 @@
         linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
       background-size: 48px 48px;
       pointer-events: none;
+      animation: gridMove 120s linear infinite;
     }
+    @keyframes gridMove {
+      from {
+        background-position: 0 0;
+      }
+      to {
+        background-position: 48px 48px;
+      } 
+}
 
     .auth-wrapper {
       width: 100%;
@@ -251,12 +260,12 @@
         <div class="auth-logo__icon">W</div>
         <span class="auth-logo__text">WealthOS</span>
       </div>
-      <p class="auth-tagline">Your personal portfolio, organized.</p>
+      <p class="auth-tagline">Tu portafolio personal, organizado.</p>
 
       <!-- Tab switcher -->
       <div class="auth-tabs" id="auth-tabs">
-        <button class="auth-tab auth-tab--active" id="tab-signin" onclick="showTab('signin')">Sign In</button>
-        <button class="auth-tab" id="tab-signup" onclick="showTab('signup')">Sign Up</button>
+        <button class="auth-tab auth-tab--active" id="tab-signin" onclick="showTab('signin')">Iniciar Sesion</button>
+        <button class="auth-tab" id="tab-signup" onclick="showTab('signup')">Crear Cuenta</button>
       </div>
 
       <!-- Auth form -->
@@ -266,36 +275,36 @@
           <input id="auth-email" class="auth-input" type="email" placeholder="you@example.com" required autocomplete="email" />
         </div>
         <div class="auth-field">
-          <label class="auth-label">Password</label>
+          <label class="auth-label">Contraseña</label>
           <input id="auth-password" class="auth-input" type="password" placeholder="Min. 8 characters" required autocomplete="current-password" />
         </div>
         <!-- Confirm password — only shown on Sign Up tab -->
         <div class="auth-field" id="field-confirm">
-          <label class="auth-label">Confirm Password</label>
+          <label class="auth-label">Confirmar Contraseña</label>
           <input id="auth-confirm" class="auth-input" type="password" placeholder="Re-enter your password" autocomplete="new-password" />
         </div>
 
         <div id="auth-banner" class="auth-banner"></div>
 
-        <button type="submit" id="auth-submit" class="auth-btn">Sign In</button>
+        <button type="submit" id="auth-submit" class="auth-btn">Iniciar Sesion</button>
       </form>
 
       <!-- Confirmation screen — replaces the form after successful signup -->
       <div id="confirm-screen">
         <div class="confirm-icon">📬</div>
-        <p class="confirm-title">Check your inbox</p>
+        <p class="confirm-title">Revisa tu Bandeja de Entrada</p>
         <p class="confirm-body">
-          We sent a confirmation email to<br/>
+          Enviamos un correo de confirmación a<br/>
           <strong id="confirm-email"></strong>
         </p>
         <p class="confirm-note">
-          Click the link in the email to activate your account, then come back here to sign in.
-          If you don't see it, check your spam folder.
+            Haz clic en el enlace del correo electrónico para activar tu cuenta; luego vuelve aquí para iniciar sesión.
+            Si no lo ves, revisa tu carpeta de spam.
         </p>
         <button class="confirm-back" onclick="showSignIn()">Back to Sign In</button>
       </div>
 
-      <p class="auth-footer" id="auth-footer">WealthOS &copy; 2025 &mdash; Designed for Mexican investors</p>
+      <p class="auth-footer" id="auth-footer">WealthOS &copy; 2025 &mdash; Diseñado para Inversionistas Mexicanos</p>
     </div>
   </div>
 
