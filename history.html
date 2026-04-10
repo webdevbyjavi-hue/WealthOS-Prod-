@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WealthOS — History</title>
+  <script src="scripts/i18n.js"></script>
+  <link rel="stylesheet" href="styles/style.css" />
+  <link rel="stylesheet" href="styles/history.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+<div id="app-content">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__logo">
+      <span class="logo__mark">W</span>
+      <span class="logo__name">WealthOS</span>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="index.html" class="nav__item">
+        <span class="nav__icon">◈</span> <span data-i18n="nav_dashboard">Dashboard</span>
+      </a>
+      <a href="holdings.html" class="nav__item">
+        <span class="nav__icon">◇</span> <span data-i18n="nav_holdings">Financial Instruments</span>
+      </a>
+      <a href="accounts.html" class="nav__item">
+        <span class="nav__icon">△</span> <span data-i18n="nav_accounts">Bank Accounts</span>
+      </a>
+      <a href="history.html" class="nav__item nav__item--active">
+        <span class="nav__icon">○</span> <span data-i18n="nav_history">History</span>
+      </a>
+      <a href="settings.html" class="nav__item">
+        <span class="nav__icon">□</span> <span data-i18n="nav_settings">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar__footer">
+      <div class="user__avatar">JS</div>
+      <div class="user__info">
+        <span class="user__name">Javier Sepulveda</span>
+        <span class="user__plan" data-i18n="user_plan">Pro Investor</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="btn-hamburger" id="hamburger-btn" data-i18n-aria="aria_open_menu" aria-label="Open menu">☰</button>
+        <div class="topbar__title-group">
+          <h1 class="page__title" data-i18n="page_history">History</h1>
+          <span class="page__date" id="current-date"></span>
+        </div>
+      </div>
+      <div class="topbar__right">
+        <button class="btn btn--ghost" id="export-btn" data-i18n="btn_export_csv">↓ Export CSV</button>
+      </div>
+    </header>
+
+    <!-- STATS STRIP -->
+    <section class="history-stats">
+      <div class="kpi-card kpi-card--primary">
+        <span class="kpi__label" data-i18n="kpi_total_events">Total Events</span>
+        <span class="kpi__value" id="stat-total">0</span>
+        <span class="kpi__change kpi__change--up" id="stat-total-sub" data-i18n="kpi_all_time">all time</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_this_month">This Month</span>
+        <span class="kpi__value kpi__value--sm" id="stat-month">0</span>
+        <span class="kpi__sub" id="stat-month-sub" data-i18n="kpi_events_sub">events</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_investments">Investments</span>
+        <span class="kpi__value kpi__value--sm" id="stat-investments">0</span>
+        <span class="kpi__sub" data-i18n="kpi_inv_sub">added / updated / removed</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi__label" data-i18n="kpi_transactions">Transactions</span>
+        <span class="kpi__value kpi__value--sm" id="stat-transactions">0</span>
+        <span class="kpi__sub" id="stat-txn-flow">cash in &amp; out</span>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <div class="history-controls">
+      <div class="filter-tabs" id="filter-tabs">
+        <button class="filter-tab filter-tab--active" data-filter="All" onclick="setFilter('All', this)" data-i18n="filter_all">All</button>
+        <button class="filter-tab" data-filter="Investment" onclick="setFilter('Investment', this)" data-i18n="filter_investments">Investments</button>
+        <button class="filter-tab" data-filter="Account" onclick="setFilter('Account', this)" data-i18n="filter_accounts">Accounts</button>
+        <button class="filter-tab" data-filter="Transaction" onclick="setFilter('Transaction', this)" data-i18n="filter_transactions">Transactions</button>
+      </div>
+
+      <input
+        class="form-input history-search"
+        type="text"
+        data-i18n-placeholder="ph_search_events" placeholder="Search events…"
+        id="search-input"
+        oninput="onSearch(this.value)"
+        style="margin-left: auto;"
+      />
+
+      <select class="date-select" id="date-filter" onchange="onDateFilter(this.value)">
+        <option value="all" data-i18n="opt_all_time">All time</option>
+        <option value="today" data-i18n="opt_today">Today</option>
+        <option value="week" data-i18n="opt_this_week">This week</option>
+        <option value="month" data-i18n="opt_this_month">This month</option>
+        <option value="year" data-i18n="opt_this_year">This year</option>
+      </select>
+
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="panel history-panel">
+      <div class="panel__header">
+        <span class="panel__title" data-i18n="panel_activity_log">Activity Log</span>
+        <span class="panel__badge" id="result-count">0 events</span>
+      </div>
+      <div id="timeline-container" class="timeline"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="scripts/logger.js"></script>
+<script>
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.getElementById('current-date').textContent =
+  new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+const HISTORY_KEY = 'wealthos_history';
+
+let activeFilter = 'All';
+let searchText   = '';
+let dateRange    = 'all';
+
+// ─── Load events ──────────────────────────────────────────────────────────────
+function getEvents() {
+  return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+}
+
+// ─── Filter logic ──────────────────────────────────────────────────────────────
+function applyFilters(events) {
+  const now = new Date();
+
+  return events.filter(e => {
+    // Category filter
+    if (activeFilter !== 'All' && e.category !== activeFilter) return false;
+
+    // Search
+    if (searchText) {
+      const hay = (e.title + ' ' + e.detail).toLowerCase();
+      if (!hay.includes(searchText.toLowerCase())) return false;
+    }
+
+    // Date range
+    if (dateRange !== 'all') {
+      const d = new Date(e.timestamp);
+      if (dateRange === 'today') {
+        if (d.toDateString() !== now.toDateString()) return false;
+      } else if (dateRange === 'week') {
+        const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+        if (d < weekAgo) return false;
+      } else if (dateRange === 'month') {
+        if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+      } else if (dateRange === 'year') {
+        if (d.getFullYear() !== now.getFullYear()) return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const all      = getEvents();
+  const filtered = applyFilters(all);
+
+  updateStats(all);
+  renderTimeline(filtered);
+  const isES = window.WOS_LANG === 'es';
+  document.getElementById('result-count').textContent = isES
+    ? filtered.length + ' ' + (filtered.length !== 1 ? 'eventos' : 'evento')
+    : filtered.length + ' event' + (filtered.length !== 1 ? 's' : '');
+}
+
+function updateStats(events) {
+  const now = new Date();
+  const thisMonth = events.filter(e => {
+    const d = new Date(e.timestamp);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+
+  const txnEvents = events.filter(e => e.category === 'Transaction');
+  const cashIn  = txnEvents.filter(e => e.type === 'transaction_in')
+    .reduce((s, e) => s + Math.abs(parseFloat(e.amount) || 0), 0);
+  const cashOut = txnEvents.filter(e => e.type === 'transaction_out')
+    .reduce((s, e) => s + Math.abs(parseFloat(e.amount) || 0), 0);
+
+  const fmt2 = n => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById('stat-total').textContent        = events.length;
+  document.getElementById('stat-month').textContent        = thisMonth.length;
+  document.getElementById('stat-investments').textContent  = events.filter(e => e.category === 'Investment').length;
+  document.getElementById('stat-transactions').textContent = txnEvents.length;
+  document.getElementById('stat-txn-flow').textContent     = txnEvents.length
+    ? `+$${fmt2(cashIn)} in · −$${fmt2(cashOut)} out`
+    : 'cash in & out';
+}
+
+function renderTimeline(events) {
+  const container = document.getElementById('timeline-container');
+
+  if (!events.length) {
+    container.innerHTML = `
+      <div class="history-empty">
+        <div class="history-empty__icon">○</div>
+        <div class="history-empty__text">${(typeof t === 'function' ? t('history_empty_text') : 'No events found')}</div>
+        <div class="history-empty__sub">${(typeof t === 'function' ? t('history_empty_sub') : 'Actions you take — adding investments, managing accounts, recording transactions — will appear here.')}</div>
+      </div>`;
+    return;
+  }
+
+  // Group by calendar date
+  const groups = {};
+  events.forEach(e => {
+    const d = new Date(e.timestamp);
+    const key = d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+
+  let html = '';
+  for (const [dateLabel, entries] of Object.entries(groups)) {
+    html += `<div class="timeline-date-group">
+      <div class="timeline-date-label">${escHtml(dateLabel)}</div>`;
+
+    entries.forEach(e => {
+      const amountHtml = formatAmount(e);
+      const timeStr    = new Date(e.timestamp).toLocaleTimeString(window.WOS_LOCALE || 'en-US', { hour: '2-digit', minute: '2-digit' });
+      const iconClass  = `entry__icon--${e.category || 'default'}`;
+      const badgeClass = `entry__badge--${e.category || 'default'}`;
+
+      html += `
+      <div class="timeline-entry">
+        <div class="entry__icon ${iconClass}">${escHtml(e.icon || '•')}</div>
+        <div class="entry__body">
+          <div class="entry__title">${escHtml(e.title)}</div>
+          <div class="entry__detail">${escHtml(e.detail)}</div>
+        </div>
+        <div class="entry__right">
+          ${amountHtml}
+          <span class="entry__time">${timeStr}</span>
+          <span class="entry__badge ${badgeClass}">${escHtml(e.category || '')}</span>
+        </div>
+      </div>`;
+    });
+
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function formatAmount(e) {
+  if (e.amount === null || e.amount === undefined) return '';
+  const n = parseFloat(e.amount);
+  if (isNaN(n)) return '';
+
+  // Transactions: show +/- with colour
+  if (e.type === 'transaction_in') {
+    return `<span class="entry__amount entry__amount--positive">+$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+  }
+  if (e.type === 'transaction_out') {
+    return `<span class="entry__amount entry__amount--negative">−$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+  }
+  if (e.type === 'investment_removed' || e.type === 'account_removed') {
+    return `<span class="entry__amount entry__amount--neutral">$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+  }
+  // Added / updated
+  return `<span class="entry__amount entry__amount--positive">$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('filter-tab--active'));
+  btn.classList.add('filter-tab--active');
+  render();
+}
+
+function onSearch(val) {
+  searchText = val;
+  render();
+}
+
+function onDateFilter(val) {
+  dateRange = val;
+  render();
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  const events = applyFilters(getEvents());
+  if (!events.length) { toast(typeof t === 'function' ? t('toast_no_export_events') : 'No events to export.', 'warning'); return; }
+
+  const rows = [['Timestamp','Category','Type','Title','Detail','Amount']];
+  events.forEach(e => {
+    rows.push([
+      e.timestamp, e.category, e.type,
+      '"' + (e.title  || '').replace(/"/g,'""') + '"',
+      '"' + (e.detail || '').replace(/"/g,'""') + '"',
+      e.amount !== null ? e.amount : '',
+    ]);
+  });
+
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'wealthos-history.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type === 'error' ? ' toast--error' : type === 'warning' ? ' toast--warn' : '');
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.classList.add('toast--visible'), 10);
+  setTimeout(() => { t.classList.remove('toast--visible'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<nav class="mobile-nav">
+  <a href="index.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◈</span>
+    <span class="mobile-nav__label" data-i18n="nav_home">Home</span>
+  </a>
+  <a href="holdings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">◇</span>
+    <span class="mobile-nav__label" data-i18n="nav_portfolio">Portfolio</span>
+  </a>
+  <a href="accounts.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">△</span>
+    <span class="mobile-nav__label" data-i18n="nav_accounts">Accounts</span>
+  </a>
+  <a href="history.html" class="mobile-nav__item mobile-nav__item--active">
+    <span class="mobile-nav__icon">○</span>
+    <span class="mobile-nav__label" data-i18n="nav_history">History</span>
+  </a>
+  <a href="settings.html" class="mobile-nav__item">
+    <span class="mobile-nav__icon">□</span>
+    <span class="mobile-nav__label" data-i18n="nav_settings">Settings</span>
+  </a>
+</nav>
+<script src="scripts/mobile.js"></script>
+
+</body>
+</html>
