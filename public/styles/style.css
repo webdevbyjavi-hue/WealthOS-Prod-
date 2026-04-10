@@ -140,6 +140,13 @@ body {
   border: 1px solid transparent;
 }
 
+button.nav__item {
+  background: none;
+  width: 100%;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .nav__item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
