@@ -7,7 +7,9 @@ const config = require('../config');
  * Catches any error passed to next(err) and returns a consistent JSON shape.
  */
 function errorMiddleware(err, req, res, next) { // eslint-disable-line no-unused-vars
-  const status = err.status || err.statusCode || 500;
+  // CORS rejections arrive as plain Error objects with no status — return 403
+  const isCors = err.message && err.message.startsWith('CORS:');
+  const status = isCors ? 403 : (err.status || err.statusCode || 500);
 
   // Log full stack in development; keep it terse in production.
   if (config.nodeEnv !== 'production') {
