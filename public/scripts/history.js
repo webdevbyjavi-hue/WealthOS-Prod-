@@ -2,15 +2,15 @@
 document.getElementById('current-date').textContent =
   new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-const HISTORY_KEY = 'wealthos_history';
-
 let activeFilter = 'All';
 let searchText   = '';
 let dateRange    = 'all';
 
-// ─── Load events ──────────────────────────────────────────────────────────────
+// ─── In-memory events (populated from API on load) ────────────────────────────
+let allEvents = [];
+
 function getEvents() {
-  return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  return allEvents;
 }
 
 // ─── Filter logic ──────────────────────────────────────────────────────────────
@@ -218,5 +218,12 @@ function toast(msg, type = 'success') {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-render();
+(async function init() {
+  try {
+    allEvents = await WOS_API.history.list({ limit: 500 });
+  } catch (_) {
+    allEvents = [];
+  }
+  render();
+})();
 

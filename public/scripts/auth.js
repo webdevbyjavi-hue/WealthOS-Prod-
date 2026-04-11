@@ -53,11 +53,6 @@
     signout() {
       try { WOS_API.auth.signout(); } catch (_) {}
       WOS_API.clearToken();
-      [
-        'wos-stocks', 'wos-bonos', 'wos-fondos', 'wos-fibras',
-        'wos-retiro', 'wos-crypto', 'wos-bienes',
-        'wealthos_accounts', 'wealthos_transactions', 'wealthos_history',
-      ].forEach(k => localStorage.removeItem(k));
       window.location.replace('login.html');
     },
   };

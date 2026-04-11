@@ -81,7 +81,7 @@ const SAMPLE_STOCKS = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let stocks = JSON.parse(localStorage.getItem('wos-stocks') || 'null');
+let stocks = [];
 let lineRangeDays = 7;
 let lineChart, donutChart, barChart;
 let editingStockId = null;
@@ -107,11 +107,7 @@ function getSortValue(h, col) {
   }
 }
 
-// ─── Seed sample data ─────────────────────────────────────────────────────────
-if (!stocks) {
-  stocks = SAMPLE_STOCKS.map(s => ({ ...s, history: generateHistory(s.currentPrice) }));
-  saveStocks();
-}
+// Stocks loaded from API in initHoldings() below
 
 // ─── History generator ────────────────────────────────────────────────────────
 function generateHistory(price, days = 91) {
@@ -125,9 +121,7 @@ function generateHistory(price, days = 91) {
   return pts;
 }
 
-function saveStocks() {
-  localStorage.setItem('wos-stocks', JSON.stringify(stocks));
-}
+function saveStocks() { /* no-op — data goes directly to API */ }
 
 // ─── Stocks KPI Rendering (stocks tab only) ──────────────────────────────────
 function renderKPIs() {
@@ -517,7 +511,7 @@ function closeStockModal(e) {
   }
 }
 
-function saveStock() {
+async function saveStock() {
   const ticker      = document.getElementById('si-ticker').value.trim().toUpperCase();
   const name        = document.getElementById('si-name').value.trim();
   const shares      = parseFloat(document.getElementById('si-shares').value);
@@ -530,42 +524,64 @@ function saveStock() {
     return;
   }
 
-  if (editingStockId) {
-    const s = stocks.find(h => h.id === editingStockId);
+  const editId = editingStockId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const s = stocks.find(h => h.id === editId);
+    backup = { ...s };
     if (s) Object.assign(s, { ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
     const existing = stocks.find(h => h.ticker === ticker);
     if (existing) {
+      backup = { ...existing };
       const totalShares = existing.shares + shares;
-      existing.avgCost       = (existing.shares * existing.avgCost + shares * cost) / totalShares;
-      existing.shares        = totalShares;
-      existing.currentPrice  = price;
-      existing.name          = name;
+      existing.avgCost = (existing.shares * existing.avgCost + shares * cost) / totalShares;
+      existing.shares = totalShares; existing.currentPrice = price; existing.name = name;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Merged with existing ${ticker} position.`);
+      apiAction = 'update'; targetId = existing.id;
     } else {
-      stocks.push({ id: Date.now(), ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra, history: generateHistory(price) });
+      targetId = Date.now();
+      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra, history: generateHistory(price) });
     }
   }
 
-  saveStocks();
-  if (editingStockId) {
-    const s = stocks.find(h => h.id === editingStockId);
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '📈', title: `Updated Stock: ${ticker}`, detail: `${shares} shares @ $${cost} avg cost · ${name}`, amount: shares * price });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '📈', title: `Added Stock: ${ticker}`, detail: `${shares} shares @ $${cost} avg cost · ${name}`, amount: shares * price });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '📈', title: `${editId ? 'Updated' : 'Added'} Stock: ${ticker}`, detail: `${shares} shares @ $${cost} avg cost · ${name}`, amount: shares * price });
   renderAll();
   closeStockModal();
+
+  try {
+    const item = stocks.find(h => h.id === targetId);
+    if (apiAction === 'create' && item) {
+      const created = await WOS_API.holdings.create('stocks', item);
+      item.id = created.id;
+    } else if (apiAction === 'update' && item) {
+      await WOS_API.holdings.update('stocks', targetId, item);
+    }
+  } catch (_) {
+    if (apiAction === 'create') { stocks = stocks.filter(h => h.id !== targetId); }
+    else if (backup) { const idx = stocks.findIndex(h => h.id === targetId); if (idx !== -1) stocks[idx] = backup; }
+    renderAll();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeStock(id) {
+async function removeStock(id) {
   if (!confirm('Remove this position?')) return;
   const s = stocks.find(h => h.id === id);
-  if (s) logEvent({ type: 'investment_removed', category: 'Investment', icon: '📉', title: `Removed Stock: ${s.ticker}`, detail: `${s.shares} shares · ${s.name}`, amount: s.currentPrice * s.shares });
+  const backup = [...stocks];
   stocks = stocks.filter(h => h.id !== id);
-  saveStocks();
+  if (s) logEvent({ type: 'investment_removed', category: 'Investment', icon: '📉', title: `Removed Stock: ${s.ticker}`, detail: `${s.shares} shares · ${s.name}`, amount: s.currentPrice * s.shares });
   renderAll();
+  try {
+    await WOS_API.holdings.remove('stocks', id);
+  } catch (_) {
+    stocks = backup;
+    renderAll();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 // ─── Render all ───────────────────────────────────────────────────────────────
@@ -599,18 +615,13 @@ const SAMPLE_BONOS = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let bonos = JSON.parse(localStorage.getItem('wos-bonos') || 'null');
+let bonos = [];
 let bonosLineRangeDays = 7;
 let bonosLineChart, bonosDonutChart, bonosBarChart;
 let editingBonoId = null;
 let bonosSortCol = null, bonosSortDir = 1;
 
-if (!bonos) {
-  bonos = SAMPLE_BONOS.map(b => ({ ...b, history: generateHistory(b.precioActual * b.titulos) }));
-  saveBonos();
-}
-
-function saveBonos() { localStorage.setItem('wos-bonos', JSON.stringify(bonos)); }
+function saveBonos() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortBonos(col) {
@@ -890,7 +901,7 @@ function closeBonoModal(e) {
   }
 }
 
-function saveBono() {
+async function saveBono() {
   const instrumento  = document.getElementById('bi-instrumento').value;
   const serie        = document.getElementById('bi-serie').value.trim().toUpperCase();
   const titulos      = parseInt(document.getElementById('bi-titulos').value);
@@ -907,41 +918,60 @@ function saveBono() {
     return;
   }
 
-  if (editingBonoId) {
-    const b = bonos.find(x => x.id === editingBonoId);
+  const editId = editingBonoId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const b = bonos.find(x => x.id === editId);
+    backup = { ...b };
     if (b) Object.assign(b, { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
     const existing = bonos.find(x => x.instrumento === instrumento && x.serie === serie);
     if (existing) {
-      const totalTitulos     = existing.titulos + titulos;
-      existing.precioCompra  = (existing.titulos * existing.precioCompra + titulos * precioCompra) / totalTitulos;
-      existing.titulos       = totalTitulos;
-      existing.precioActual  = precioActual;
-      existing.rendimiento   = rendimiento;
+      backup = { ...existing };
+      const totalTitulos = existing.titulos + titulos;
+      existing.precioCompra = (existing.titulos * existing.precioCompra + titulos * precioCompra) / totalTitulos;
+      existing.titulos = totalTitulos; existing.precioActual = precioActual; existing.rendimiento = rendimiento;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${instrumento} ${serie}.`);
+      apiAction = 'update'; targetId = existing.id;
     } else {
-      bonos.push({ id: Date.now(), instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra, history: generateHistory(precioActual * titulos) });
+      targetId = Date.now();
+      bonos.push({ id: targetId, instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra, history: generateHistory(precioActual * titulos) });
     }
   }
 
-  saveBonos();
-  if (editingBonoId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏛️', title: `Updated Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏛️', title: `Added Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏛️', title: `${editId ? 'Updated' : 'Added'} Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
   renderAllBonos();
   closeBonoModal();
+
+  try {
+    const item = bonos.find(x => x.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('bonos', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('bonos', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { bonos = bonos.filter(x => x.id !== targetId); }
+    else if (backup) { const idx = bonos.findIndex(x => x.id === targetId); if (idx !== -1) bonos[idx] = backup; }
+    renderAllBonos();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeBono(id) {
+async function removeBono(id) {
   if (!confirm('¿Eliminar esta posición?')) return;
   const b = bonos.find(x => x.id === id);
-  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏛️', title: `Removed Bono: ${b.instrumento} ${b.serie}`, detail: `${b.titulos} títulos`, amount: b.precioActual * b.titulos });
+  const backup = [...bonos];
   bonos = bonos.filter(x => x.id !== id);
-  saveBonos();
+  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏛️', title: `Removed Bono: ${b.instrumento} ${b.serie}`, detail: `${b.titulos} títulos`, amount: b.precioActual * b.titulos });
   renderAllBonos();
+  try {
+    await WOS_API.holdings.remove('bonos', id);
+  } catch (_) {
+    bonos = backup;
+    renderAllBonos();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllBonos() {
@@ -974,18 +1004,13 @@ const SAMPLE_FONDOS = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let fondos = JSON.parse(localStorage.getItem('wos-fondos') || 'null');
+let fondos = [];
 let fondosLineRangeDays = 7;
 let fondosLineChart, fondosDonutChart, fondosBarChart;
 let editingFondoId = null;
 let fondosSortCol = null, fondosSortDir = 1;
 
-if (!fondos) {
-  fondos = SAMPLE_FONDOS.map(f => ({ ...f, history: generateHistory(f.navActual * f.unidades) }));
-  saveFondos();
-}
-
-function saveFondos() { localStorage.setItem('wos-fondos', JSON.stringify(fondos)); }
+function saveFondos() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortFondos(col) {
@@ -1263,7 +1288,7 @@ function closeFondoModal(e) {
   }
 }
 
-function saveFondo() {
+async function saveFondo() {
   const clave        = document.getElementById('fi-clave').value.trim().toUpperCase();
   const nombre       = document.getElementById('fi-nombre').value.trim();
   const operadora    = document.getElementById('fi-operadora').value.trim();
@@ -1279,41 +1304,60 @@ function saveFondo() {
     return;
   }
 
-  if (editingFondoId) {
-    const x = fondos.find(f => f.id === editingFondoId);
+  const editId = editingFondoId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const x = fondos.find(f => f.id === editId);
+    backup = { ...x };
     if (x) Object.assign(x, { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
     const existing = fondos.find(f => f.clave === clave);
     if (existing) {
-      const totalUnidades    = existing.unidades + unidades;
-      existing.precioCompra  = (existing.unidades * existing.precioCompra + unidades * precioCompra) / totalUnidades;
-      existing.unidades      = totalUnidades;
-      existing.navActual     = navActual;
-      existing.rendimiento   = rendimiento;
+      backup = { ...existing };
+      const totalUnidades = existing.unidades + unidades;
+      existing.precioCompra = (existing.unidades * existing.precioCompra + unidades * precioCompra) / totalUnidades;
+      existing.unidades = totalUnidades; existing.navActual = navActual; existing.rendimiento = rendimiento;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${clave}.`);
+      apiAction = 'update'; targetId = existing.id;
     } else {
-      fondos.push({ id: Date.now(), clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra, history: generateHistory(navActual * unidades) });
+      targetId = Date.now();
+      fondos.push({ id: targetId, clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra, history: generateHistory(navActual * unidades) });
     }
   }
 
-  saveFondos();
-  if (editingFondoId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '📊', title: `Updated Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '📊', title: `Added Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '📊', title: `${editId ? 'Updated' : 'Added'} Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
   renderAllFondos();
   closeFondoModal();
+
+  try {
+    const item = fondos.find(f => f.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('fondos', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('fondos', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { fondos = fondos.filter(f => f.id !== targetId); }
+    else if (backup) { const idx = fondos.findIndex(f => f.id === targetId); if (idx !== -1) fondos[idx] = backup; }
+    renderAllFondos();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeFondo(id) {
+async function removeFondo(id) {
   if (!confirm('¿Eliminar esta posición?')) return;
   const f = fondos.find(x => x.id === id);
+  const backup = [...fondos];
+  fondos = fondos.filter(x => x.id !== id);
   if (f) logEvent({ type: 'investment_removed', category: 'Investment', icon: '📊', title: `Removed Fondo: ${f.clave}`, detail: `${f.unidades} unidades · ${f.nombre}`, amount: f.navActual * f.unidades });
-  fondos = fondos.filter(f => f.id !== id);
-  saveFondos();
   renderAllFondos();
+  try {
+    await WOS_API.holdings.remove('fondos', id);
+  } catch (_) {
+    fondos = backup;
+    renderAllFondos();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllFondos() {
@@ -1347,18 +1391,13 @@ const SAMPLE_FIBRAS = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let fibras = JSON.parse(localStorage.getItem('wos-fibras') || 'null');
+let fibras = [];
 let fibrasLineRangeDays = 7;
 let fibrasLineChart, fibrasDonutChart, fibrasBarChart;
 let editingFibraId = null;
 let fibrasSortCol = null, fibrasSortDir = 1;
 
-if (!fibras) {
-  fibras = SAMPLE_FIBRAS.map(f => ({ ...f, history: generateHistory(f.precioActual * f.certificados) }));
-  saveFibras();
-}
-
-function saveFibras() { localStorage.setItem('wos-fibras', JSON.stringify(fibras)); }
+function saveFibras() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortFibras(col) {
@@ -1637,7 +1676,7 @@ function closeFibraModal(e) {
   }
 }
 
-function saveFibra() {
+async function saveFibra() {
   const ticker       = document.getElementById('fbi-ticker').value.trim().toUpperCase();
   const nombre       = document.getElementById('fbi-nombre').value.trim();
   const sector       = document.getElementById('fbi-sector').value;
@@ -1653,42 +1692,60 @@ function saveFibra() {
     return;
   }
 
-  if (editingFibraId) {
-    const x = fibras.find(f => f.id === editingFibraId);
+  const editId = editingFibraId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const x = fibras.find(f => f.id === editId);
+    backup = { ...x };
     if (x) Object.assign(x, { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
     const existing = fibras.find(f => f.ticker === ticker);
     if (existing) {
-      const totalCerts       = existing.certificados + certificados;
-      existing.precioCompra  = (existing.certificados * existing.precioCompra + certificados * precioCompra) / totalCerts;
-      existing.certificados  = totalCerts;
-      existing.precioActual  = precioActual;
-      existing.distribucion  = distribucion;
-      existing.rendimiento   = rendimiento;
+      backup = { ...existing };
+      const totalCerts = existing.certificados + certificados;
+      existing.precioCompra = (existing.certificados * existing.precioCompra + certificados * precioCompra) / totalCerts;
+      existing.certificados = totalCerts; existing.precioActual = precioActual; existing.distribucion = distribucion; existing.rendimiento = rendimiento;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Posición consolidada con ${ticker}.`);
+      apiAction = 'update'; targetId = existing.id;
     } else {
-      fibras.push({ id: Date.now(), ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra, history: generateHistory(precioActual * certificados) });
+      targetId = Date.now();
+      fibras.push({ id: targetId, ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra, history: generateHistory(precioActual * certificados) });
     }
   }
 
-  saveFibras();
-  if (editingFibraId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏢', title: `Updated Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏢', title: `Added Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏢', title: `${editId ? 'Updated' : 'Added'} Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
   renderAllFibras();
   closeFibraModal();
+
+  try {
+    const item = fibras.find(f => f.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('fibras', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('fibras', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { fibras = fibras.filter(f => f.id !== targetId); }
+    else if (backup) { const idx = fibras.findIndex(f => f.id === targetId); if (idx !== -1) fibras[idx] = backup; }
+    renderAllFibras();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeFibra(id) {
+async function removeFibra(id) {
   if (!confirm('¿Eliminar esta posición?')) return;
   const f = fibras.find(x => x.id === id);
+  const backup = [...fibras];
+  fibras = fibras.filter(x => x.id !== id);
   if (f) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏢', title: `Removed Fibra: ${f.ticker}`, detail: `${f.certificados} certificados · ${f.nombre}`, amount: f.precioActual * f.certificados });
-  fibras = fibras.filter(f => f.id !== id);
-  saveFibras();
   renderAllFibras();
+  try {
+    await WOS_API.holdings.remove('fibras', id);
+  } catch (_) {
+    fibras = backup;
+    renderAllFibras();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllFibras() {
@@ -1720,18 +1777,13 @@ const SAMPLE_RETIRO = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let retiro = JSON.parse(localStorage.getItem('wos-retiro') || 'null');
+let retiro = [];
 let retiroLineRangeDays = 7;
 let retiroLineChart, retiroDonutChart, retiroBarChart;
 let editingRetiroId = null;
 let retiroSortCol = null, retiroSortDir = 1;
 
-if (!retiro) {
-  retiro = SAMPLE_RETIRO.map(r => ({ ...r, history: generateHistory(r.saldo) }));
-  persistRetiro();
-}
-
-function persistRetiro() { localStorage.setItem('wos-retiro', JSON.stringify(retiro)); }
+function persistRetiro() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortRetiro(col) {
@@ -2009,7 +2061,7 @@ function closeRetiroModal(e) {
   }
 }
 
-function saveRetiro() {
+async function saveRetiro() {
   const tipo               = document.getElementById('ri-tipo').value;
   const nombre             = document.getElementById('ri-nombre').value.trim();
   const institucion        = document.getElementById('ri-institucion').value.trim();
@@ -2026,30 +2078,49 @@ function saveRetiro() {
     return;
   }
 
-  if (editingRetiroId) {
-    const r = retiro.find(x => x.id === editingRetiroId);
+  const editId = editingRetiroId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const r = retiro.find(x => x.id === editId);
+    backup = { ...r };
     if (r) Object.assign(r, { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
-    retiro.push({ id: Date.now(), tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra, history: generateHistory(saldo) });
+    targetId = Date.now();
+    retiro.push({ id: targetId, tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra, history: generateHistory(saldo) });
   }
 
-  persistRetiro();
-  if (editingRetiroId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏦', title: `Updated Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏦', title: `Added Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏦', title: `${editId ? 'Updated' : 'Added'} Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
   renderAllRetiro();
   closeRetiroModal();
+
+  try {
+    const item = retiro.find(x => x.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('retiro', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('retiro', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { retiro = retiro.filter(x => x.id !== targetId); }
+    else if (backup) { const idx = retiro.findIndex(x => x.id === targetId); if (idx !== -1) retiro[idx] = backup; }
+    renderAllRetiro();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeRetiro(id) {
+async function removeRetiro(id) {
   if (!confirm('¿Eliminar esta posición?')) return;
   const r = retiro.find(x => x.id === id);
+  const backup = [...retiro];
+  retiro = retiro.filter(x => x.id !== id);
   if (r) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏦', title: `Removed Retiro: ${r.nombre}`, detail: `Saldo $${r.saldo.toLocaleString()} · ${r.tipo}`, amount: r.saldo });
-  retiro = retiro.filter(r => r.id !== id);
-  persistRetiro();
   renderAllRetiro();
+  try {
+    await WOS_API.holdings.remove('retiro', id);
+  } catch (_) {
+    retiro = backup;
+    renderAllRetiro();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllRetiro() {
@@ -2105,7 +2176,7 @@ const SAMPLE_BIENES = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let bienes = JSON.parse(localStorage.getItem('wos-bienes') || 'null');
+let bienes = [];
 let bienesLineRangeDays = 7;
 let bienesLineChart, bienesDonutChart, bienesBarChart;
 let editingBienId = null;
@@ -2140,12 +2211,7 @@ function generateBienesHistory(b, days = 91) {
   return pts;
 }
 
-if (!bienes) {
-  bienes = SAMPLE_BIENES.map(b => ({ ...b, history: generateBienesHistory(b) }));
-  persistBienes();
-}
-
-function persistBienes() { localStorage.setItem('wos-bienes', JSON.stringify(bienes)); }
+function persistBienes() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortBienes(col) {
@@ -2450,7 +2516,7 @@ function closeBienesModal(e) {
   }
 }
 
-function saveBien() {
+async function saveBien() {
   const nombre              = document.getElementById('bri-nombre').value.trim();
   const tipo                = document.getElementById('bri-tipo').value;
   const ubicacion           = document.getElementById('bri-ubicacion').value.trim();
@@ -2473,36 +2539,52 @@ function saveBien() {
                  gastosNotariales, escrituracion, impuestoAdquisicion,
                  otrosGastos, saldoHipoteca, rentaMensual };
 
-  if (editingBienId) {
-    const b = bienes.find(x => x.id === editingBienId);
-    if (b) {
-      Object.assign(b, data);
-      b.history = generateBienesHistory(b);
-    }
+  const editId = editingBienId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const b = bienes.find(x => x.id === editId);
+    backup = { ...b };
+    if (b) { Object.assign(b, data); b.history = generateBienesHistory(b); }
+    apiAction = 'update'; targetId = editId;
   } else {
-    const newBien = { id: Date.now(), ...data };
+    targetId = Date.now();
+    const newBien = { id: targetId, ...data };
     newBien.history = generateBienesHistory(newBien);
     bienes.push(newBien);
   }
 
-  const valorActual = computeValorActual(bienes.find(x => x.nombre === nombre && x.ubicacion === ubicacion) || data);
-  persistBienes();
-  if (editingBienId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🏠', title: `Updated Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
-  }
+  const valorActual = computeValorActual(bienes.find(x => x.id === targetId) || data);
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏠', title: `${editId ? 'Updated' : 'Added'} Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
   renderAllBienes();
   closeBienesModal();
+
+  try {
+    const item = bienes.find(x => x.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('bienes', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('bienes', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { bienes = bienes.filter(x => x.id !== targetId); }
+    else if (backup) { const idx = bienes.findIndex(x => x.id === targetId); if (idx !== -1) bienes[idx] = backup; }
+    renderAllBienes();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeBien(id) {
+async function removeBien(id) {
   if (!confirm('¿Eliminar esta propiedad?')) return;
   const b = bienes.find(x => x.id === id);
+  const backup = [...bienes];
+  bienes = bienes.filter(x => x.id !== id);
   if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏠', title: `Removed Propiedad: ${b.nombre}`, detail: `${b.tipo} · ${b.ubicacion}`, amount: computeValorActual(b) });
-  bienes = bienes.filter(b => b.id !== id);
-  persistBienes();
   renderAllBienes();
+  try {
+    await WOS_API.holdings.remove('bienes', id);
+  } catch (_) {
+    bienes = backup;
+    renderAllBienes();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllBienes() {
@@ -2538,18 +2620,13 @@ const SAMPLE_CRYPTO = [
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let cryptos = JSON.parse(localStorage.getItem('wos-crypto') || 'null');
+let cryptos = [];
 let cryptoLineRangeDays = 7;
 let cryptoLineChart, cryptoDonutChart, cryptoBarChart;
 let editingCryptoId = null;
 let cryptoSortCol = null, cryptoSortDir = 1;
 
-if (!cryptos) {
-  cryptos = SAMPLE_CRYPTO.map(c => ({ ...c, history: generateHistory(c.currentPrice * c.amount) }));
-  persistCrypto();
-}
-
-function persistCrypto() { localStorage.setItem('wos-crypto', JSON.stringify(cryptos)); }
+function persistCrypto() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortCrypto(col) {
@@ -2850,7 +2927,7 @@ function closeCryptoModal(e) {
   }
 }
 
-function saveCrypto() {
+async function saveCrypto() {
   const symbol       = document.getElementById('ci-symbol').value.trim().toUpperCase();
   const name         = document.getElementById('ci-name').value.trim();
   const amount       = parseFloat(document.getElementById('ci-amount').value);
@@ -2863,30 +2940,49 @@ function saveCrypto() {
     return;
   }
 
-  if (editingCryptoId) {
-    const c = cryptos.find(x => x.id === editingCryptoId);
+  const editId = editingCryptoId;
+  let apiAction = 'create', targetId = null, backup = null;
+
+  if (editId) {
+    const c = cryptos.find(x => x.id === editId);
+    backup = { ...c };
     if (c) Object.assign(c, { symbol, name, amount, avgCost, currentPrice, fechaCompra });
+    apiAction = 'update'; targetId = editId;
   } else {
-    cryptos.push({ id: Date.now(), symbol, name, amount, avgCost, currentPrice, fechaCompra, history: generateHistory(currentPrice * amount) });
+    targetId = Date.now();
+    cryptos.push({ id: targetId, symbol, name, amount, avgCost, currentPrice, fechaCompra, history: generateHistory(currentPrice * amount) });
   }
 
-  persistCrypto();
-  if (editingCryptoId) {
-    logEvent({ type: 'investment_updated', category: 'Investment', icon: '🪙', title: `Updated Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} avg cost · ${name}`, amount: currentPrice * amount });
-  } else {
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🪙', title: `Added Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} avg cost · ${name}`, amount: currentPrice * amount });
-  }
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🪙', title: `${editId ? 'Updated' : 'Added'} Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} avg cost · ${name}`, amount: currentPrice * amount });
   renderAllCrypto();
   closeCryptoModal();
+
+  try {
+    const item = cryptos.find(x => x.id === targetId);
+    if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('crypto', item); item.id = created.id; }
+    else if (apiAction === 'update' && item) { await WOS_API.holdings.update('crypto', targetId, item); }
+  } catch (_) {
+    if (apiAction === 'create') { cryptos = cryptos.filter(x => x.id !== targetId); }
+    else if (backup) { const idx = cryptos.findIndex(x => x.id === targetId); if (idx !== -1) cryptos[idx] = backup; }
+    renderAllCrypto();
+    showToast('Failed to save. Please try again.');
+  }
 }
 
-function removeCrypto(id) {
+async function removeCrypto(id) {
   if (!confirm('Remove this position?')) return;
   const c = cryptos.find(x => x.id === id);
+  const backup = [...cryptos];
+  cryptos = cryptos.filter(x => x.id !== id);
   if (c) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🪙', title: `Removed Crypto: ${c.symbol}`, detail: `${c.amount} tokens · ${c.name}`, amount: c.currentPrice * c.amount });
-  cryptos = cryptos.filter(c => c.id !== id);
-  persistCrypto();
   renderAllCrypto();
+  try {
+    await WOS_API.holdings.remove('crypto', id);
+  } catch (_) {
+    cryptos = backup;
+    renderAllCrypto();
+    showToast('Failed to remove. Please try again.');
+  }
 }
 
 function renderAllCrypto() {
@@ -2896,22 +2992,42 @@ function renderAllCrypto() {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-renderKPIs();
-renderTable();
-initCharts();
-renderBonosKPIs();
-renderBonosTable();
-renderFondosKPIs();
-renderFondosTable();
-renderFibrasKPIs();
-renderFibrasTable();
-renderRetiroKPIs();
-renderRetiroTable();
-renderCryptoKPIs();
-renderCryptoTable();
-renderBienesKPIs();
-renderBienesTable();
-// tab charts init lazily on first tab switch
+async function initHoldings() {
+  // Render empty state immediately so the page isn't blank
+  renderAll();
+  renderAllBonos();
+  renderAllFondos();
+  renderAllFibras();
+  renderAllRetiro();
+  renderAllCrypto();
+  renderAllBienes();
+  initCharts();
+
+  try {
+    const [s, b, f, fb, r, c, bi] = await Promise.all([
+      WOS_API.holdings.list('stocks'),
+      WOS_API.holdings.list('bonos'),
+      WOS_API.holdings.list('fondos'),
+      WOS_API.holdings.list('fibras'),
+      WOS_API.holdings.list('retiro'),
+      WOS_API.holdings.list('crypto'),
+      WOS_API.holdings.list('bienes'),
+    ]);
+    stocks = s; bonos = b; fondos = f; fibras = fb; retiro = r; cryptos = c; bienes = bi;
+  } catch (_) {
+    // arrays remain empty — show empty state
+  }
+
+  renderAll();
+  renderAllBonos();
+  renderAllFondos();
+  renderAllFibras();
+  renderAllRetiro();
+  renderAllCrypto();
+  renderAllBienes();
+}
+
+initHoldings();
 
 window.addEventListener('resize', () => {
   if (lineChart) lineChart.resize();

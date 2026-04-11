@@ -4,8 +4,27 @@ function setVisitorCount(){
   localStorage.setItem('folio-visit-count', visits);
 }
 
-// ─── State ───────────────────────────────────────────────────────────────────
-let holdings = JSON.parse(localStorage.getItem('folio-holdings') || '[]');
+// ─── Portfolio cache (populated from API on load) ─────────────────────────────
+let _wosRaw = { stocks: [], bonos: [], fondos: [], fibras: [], retiro: [], crypto: [], bienes: [] };
+let _cashTotal = 0;
+
+async function refreshPortfolio() {
+  const [stocks, bonos, fondos, fibras, retiro, crypto, bienes, accts] = await Promise.all([
+    WOS_API.holdings.list('stocks'),
+    WOS_API.holdings.list('bonos'),
+    WOS_API.holdings.list('fondos'),
+    WOS_API.holdings.list('fibras'),
+    WOS_API.holdings.list('retiro'),
+    WOS_API.holdings.list('crypto'),
+    WOS_API.holdings.list('bienes'),
+    WOS_API.accounts.list(),
+  ]);
+  _wosRaw   = { stocks, bonos, fondos, fibras, retiro, crypto, bienes };
+  _cashTotal = accts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+}
+
+// Legacy — no longer used for data, kept to avoid reference errors
+let holdings = [];
 
 const COLORS = [
   '#6366f1','#34d399','#f87171','#fbbf24','#8b5cf6','#06b6d4','#ec4899','#a3e635'
@@ -48,7 +67,7 @@ function onAssetTypeChange(val){
   }
 }
 
-// ─── Add Asset (routes to the right storage key) ─────────────────────────────
+// ─── Add Asset (routes to the right API category) ────────────────────────────
 function addAsset(){
   const type = document.getElementById('m-asset-type').value;
   const handlers = {
@@ -63,7 +82,25 @@ function addAsset(){
   if(handlers[type]) handlers[type]();
 }
 
-function addAsset_stocks(){
+// Helper: optimistic add to cache → close modal → render → POST to API
+async function _apiAdd(cat, data, cacheKey, logPayload) {
+  const tempId = Date.now();
+  _wosRaw[cacheKey].push({ id: tempId, ...data, history: generateHistory(data._chartVal || 0) });
+  delete _wosRaw[cacheKey][_wosRaw[cacheKey].length - 1].history; // remove temp chart val
+  closeModal(); render();
+  try {
+    const created = await WOS_API.holdings.create(cat, data);
+    const idx = _wosRaw[cacheKey].findIndex(x => x.id === tempId);
+    if (idx !== -1) _wosRaw[cacheKey][idx] = created;
+    logEvent(logPayload);
+  } catch(_) {
+    _wosRaw[cacheKey] = _wosRaw[cacheKey].filter(x => x.id !== tempId);
+    render();
+    showToast('Failed to save. Please try again.', 'error');
+  }
+}
+
+async function addAsset_stocks(){
   const ticker = document.getElementById('m-s-ticker').value.trim().toUpperCase();
   const name   = document.getElementById('m-s-name').value.trim();
   const shares = parseFloat(document.getElementById('m-s-shares').value);
@@ -72,22 +109,16 @@ function addAsset_stocks(){
   if(!ticker || !name || isNaN(shares) || isNaN(cost) || isNaN(price)){
     alert('Please fill in all fields.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-stocks') || '[]');
-  const existing = list.find(h => h.ticker === ticker);
-  if(existing){
-    const total = existing.shares + shares;
-    existing.avgCost = (existing.shares * existing.avgCost + shares * cost) / total;
-    existing.shares = total; existing.currentPrice = price; existing.name = name;
-    showToast(`Merged with existing ${ticker} position.`);
-  } else {
-    list.push({ id: Date.now(), ticker, name, shares, avgCost: cost, currentPrice: price, history: generateHistory(price) });
-  }
-  localStorage.setItem('wos-stocks', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '📈', title: `Added Stock: ${ticker}`, detail: `${shares} shares @ $${cost} · ${name}`, amount: shares * price });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('stocks', { ticker, name, shares, avgCost: cost, currentPrice: price });
+    _wosRaw.stocks.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '📈', title: `Added Stock: ${ticker}`, detail: `${shares} shares @ $${cost} · ${name}`, amount: shares * price });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_bonos(){
+async function addAsset_bonos(){
   const instrumento  = document.getElementById('m-b-instrumento').value;
   const serie        = document.getElementById('m-b-serie').value.trim().toUpperCase();
   const titulos      = parseInt(document.getElementById('m-b-titulos').value);
@@ -100,22 +131,16 @@ function addAsset_bonos(){
   if(!serie || isNaN(titulos) || isNaN(valorNominal) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(rendimiento) || !vencimiento){
     alert('Por favor completa todos los campos.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-bonos') || '[]');
-  const existing = list.find(x => x.instrumento === instrumento && x.serie === serie);
-  if(existing){
-    const total = existing.titulos + titulos;
-    existing.precioCompra = (existing.titulos * existing.precioCompra + titulos * precioCompra) / total;
-    existing.titulos = total; existing.precioActual = precioActual; existing.rendimiento = rendimiento;
-    showToast(`Posición consolidada con ${instrumento} ${serie}.`);
-  } else {
-    list.push({ id: Date.now(), instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, history: generateHistory(precioActual * titulos) });
-  }
-  localStorage.setItem('wos-bonos', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '🏛️', title: `Added Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('bonos', { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento });
+    _wosRaw.bonos.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏛️', title: `Added Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_fondos(){
+async function addAsset_fondos(){
   const clave        = document.getElementById('m-f-clave').value.trim().toUpperCase();
   const nombre       = document.getElementById('m-f-nombre').value.trim();
   const operadora    = document.getElementById('m-f-operadora').value.trim();
@@ -127,22 +152,16 @@ function addAsset_fondos(){
   if(!clave || !nombre || !operadora || isNaN(unidades) || isNaN(precioCompra) || isNaN(navActual) || isNaN(rendimiento)){
     alert('Por favor completa todos los campos.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-fondos') || '[]');
-  const existing = list.find(f => f.clave === clave);
-  if(existing){
-    const total = existing.unidades + unidades;
-    existing.precioCompra = (existing.unidades * existing.precioCompra + unidades * precioCompra) / total;
-    existing.unidades = total; existing.navActual = navActual; existing.rendimiento = rendimiento;
-    showToast(`Posición consolidada con ${clave}.`);
-  } else {
-    list.push({ id: Date.now(), clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, history: generateHistory(navActual * unidades) });
-  }
-  localStorage.setItem('wos-fondos', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '📊', title: `Added Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('fondos', { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento });
+    _wosRaw.fondos.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '📊', title: `Added Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_fibras(){
+async function addAsset_fibras(){
   const ticker       = document.getElementById('m-fb-ticker').value.trim().toUpperCase();
   const nombre       = document.getElementById('m-fb-nombre').value.trim();
   const sector       = document.getElementById('m-fb-sector').value;
@@ -154,22 +173,16 @@ function addAsset_fibras(){
   if(!ticker || !nombre || isNaN(certificados) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(distribucion) || isNaN(rendimiento)){
     alert('Por favor completa todos los campos.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-fibras') || '[]');
-  const existing = list.find(f => f.ticker === ticker);
-  if(existing){
-    const total = existing.certificados + certificados;
-    existing.precioCompra = (existing.certificados * existing.precioCompra + certificados * precioCompra) / total;
-    existing.certificados = total; existing.precioActual = precioActual; existing.distribucion = distribucion; existing.rendimiento = rendimiento;
-    showToast(`Posición consolidada con ${ticker}.`);
-  } else {
-    list.push({ id: Date.now(), ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, history: generateHistory(precioActual * certificados) });
-  }
-  localStorage.setItem('wos-fibras', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '🏢', title: `Added Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('fibras', { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento });
+    _wosRaw.fibras.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏢', title: `Added Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_retiro(){
+async function addAsset_retiro(){
   const tipo               = document.getElementById('m-r-tipo').value;
   const nombre             = document.getElementById('m-r-nombre').value.trim();
   const institucion        = document.getElementById('m-r-institucion').value.trim();
@@ -182,14 +195,16 @@ function addAsset_retiro(){
   if(!nombre || !institucion || isNaN(saldo) || isNaN(rendimiento)){
     alert('Por favor completa los campos obligatorios.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-retiro') || '[]');
-  list.push({ id: Date.now(), tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, history: generateHistory(saldo) });
-  localStorage.setItem('wos-retiro', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '🏦', title: `Added Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('retiro', { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion });
+    _wosRaw.retiro.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏦', title: `Added Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_crypto(){
+async function addAsset_crypto(){
   const symbol       = document.getElementById('m-c-symbol').value.trim().toUpperCase();
   const name         = document.getElementById('m-c-name').value.trim();
   const amount       = parseFloat(document.getElementById('m-c-amount').value);
@@ -198,22 +213,16 @@ function addAsset_crypto(){
   if(!symbol || !name || isNaN(amount) || isNaN(avgCost) || isNaN(currentPrice)){
     alert('Please fill in all required fields.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-crypto') || '[]');
-  const existing = list.find(c => c.symbol === symbol);
-  if(existing){
-    const total = existing.amount + amount;
-    existing.avgCost = (existing.amount * existing.avgCost + amount * avgCost) / total;
-    existing.amount = total; existing.currentPrice = currentPrice; existing.name = name;
-    showToast(`Merged with existing ${symbol} position.`);
-  } else {
-    list.push({ id: Date.now(), symbol, name, amount, avgCost, currentPrice, history: generateHistory(currentPrice * amount) });
-  }
-  localStorage.setItem('wos-crypto', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '🪙', title: `Added Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} · ${name}`, amount: currentPrice * amount });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('crypto', { symbol, name, amount, avgCost, currentPrice });
+    _wosRaw.crypto.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🪙', title: `Added Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} · ${name}`, amount: currentPrice * amount });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
-function addAsset_bienes(){
+async function addAsset_bienes(){
   const nombre              = document.getElementById('m-br-nombre').value.trim();
   const tipo                = document.getElementById('m-br-tipo').value;
   const ubicacion           = document.getElementById('m-br-ubicacion').value.trim();
@@ -228,11 +237,13 @@ function addAsset_bienes(){
   if(!nombre || !ubicacion || isNaN(precioCompra) || isNaN(valorActual)){
     alert('Por favor completa: Nombre, Ubicación, Precio de Compra y Valor Actual.'); return;
   }
-  const list = JSON.parse(localStorage.getItem('wos-bienes') || '[]');
-  list.push({ id: Date.now(), nombre, tipo, ubicacion, precioCompra, valorActual, gastosNotariales, escrituracion, impuestoAdquisicion, otrosGastos, saldoHipoteca, rentaMensual, history: generateHistory(valorActual) });
-  localStorage.setItem('wos-bienes', JSON.stringify(list));
-  logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Valor $${valorActual.toLocaleString()}`, amount: valorActual });
-  render(); closeModal();
+  closeModal();
+  try {
+    const created = await WOS_API.holdings.create('bienes', { nombre, tipo, ubicacion, precioCompra, plusvaliaAnual: 0, gastosNotariales, escrituracion, impuestoAdquisicion, otrosGastos, saldoHipoteca, rentaMensual });
+    _wosRaw.bienes.push(created);
+    render();
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Valor $${valorActual.toLocaleString()}`, amount: valorActual });
+  } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
 function generateHistory(price){
@@ -269,13 +280,7 @@ function render(){
 
 function renderKPIs() {
   const { totalValue: investmentValue, totalInvested, dailyChange } = loadWosPortfolio();
-
-  let cashTotal = 0;
-  try {
-    const accounts = JSON.parse(localStorage.getItem('wealthos_accounts') || '[]');
-    cashTotal = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
-  } catch(e) {}
-
+  const cashTotal  = _cashTotal;
   const totalValue = investmentValue + cashTotal;
   const pnl    = totalValue - totalInvested;
   const pnlPct = totalInvested ? (pnl / totalInvested) * 100 : 0;
@@ -295,12 +300,7 @@ function renderTable() {
 
   const { active } = loadWosPortfolio();
 
-  // Cash: sum all bank accounts (stored as MXN equivalent)
-  let cashTotal = 0;
-  try {
-    const accounts = JSON.parse(localStorage.getItem('wealthos_accounts') || '[]');
-    cashTotal = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
-  } catch(e) {}
+  const cashTotal = _cashTotal;
 
   if (!active.length && !cashTotal) {
     const emptyMsg = window.WOS_LANG === 'es' ? 'Sin posiciones aún — agrega tu primer activo.' : 'No holdings yet — add your first asset.';
@@ -349,17 +349,9 @@ const CATEGORIES = [
   { name: 'Bienes y Raíces',         color: '#ec4899', key: 'wos-bienes'  },
 ];
 
-// ─── Read & aggregate all holdings from wos-* localStorage keys ──────────────
+// ─── Aggregate portfolio from in-memory cache (populated from API) ────────────
 function loadWosPortfolio() {
-  const raw = {
-    stocks : JSON.parse(localStorage.getItem('wos-stocks')  || '[]'),
-    bonos  : JSON.parse(localStorage.getItem('wos-bonos')   || '[]'),
-    fondos : JSON.parse(localStorage.getItem('wos-fondos')  || '[]'),
-    fibras : JSON.parse(localStorage.getItem('wos-fibras')  || '[]'),
-    retiro : JSON.parse(localStorage.getItem('wos-retiro')  || '[]'),
-    crypto : JSON.parse(localStorage.getItem('wos-crypto')  || '[]'),
-    bienes : JSON.parse(localStorage.getItem('wos-bienes')  || '[]'),
-  };
+  const raw = _wosRaw;
 
   // Value & cost-basis per category
   const catValues = {
@@ -439,14 +431,7 @@ function renderDonut() {
   legend.innerHTML = '';
 
   const { active: unsorted, totalValue: investmentTotal } = loadWosPortfolio();
-
-  // Include cash from bank accounts
-  let cashTotal = 0;
-  try {
-    const accounts = JSON.parse(localStorage.getItem('wealthos_accounts') || '[]');
-    cashTotal = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
-  } catch(e) {}
-
+  const cashTotal = _cashTotal;
   const cashLabel = window.WOS_LANG === 'es' ? 'Efectivo' : 'Cash';
   const allItems = cashTotal > 0
     ? [...unsorted, { name: cashLabel, color: '#a3e635', value: cashTotal }]
@@ -747,17 +732,10 @@ async function refreshPrices(){
   }
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────────
-// Seed demo data if empty
-if(!holdings.length){
-  holdings = [
-    {id:1, name:'Apple Inc.', assetType:'Stock', ticker:'AAPL', sector:'Technology', shares:12, cost:145, price:189.50, lastUpdated: new Date().toISOString(), history: generateHistory(189.50)},
-    {id:2, name:'NVIDIA Corp.', assetType:'Stock', ticker:'NVDA', sector:'Technology', shares:5, cost:220, price:875.40, lastUpdated: new Date().toISOString(), history: generateHistory(875.40)},
-    {id:3, name:'S&P 500 ETF', assetType:'ETF', ticker:'SPY', sector:'ETF', shares:8, cost:390, price:521.30, lastUpdated: new Date().toISOString(), history: generateHistory(521.30)},
-    {id:4, name:'JPMorgan Chase', assetType:'Stock', ticker:'JPM', sector:'Finance', shares:15, cost:138, price:197.80, lastUpdated: new Date().toISOString(), history: generateHistory(197.80)},
-  ];
-  save();
-}
-
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 setVisitorCount();
-render();
+render(); // show empty state immediately while API loads
+(async () => {
+  try { await refreshPortfolio(); } catch (_) {}
+  render();
+})();

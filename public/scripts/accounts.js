@@ -39,36 +39,26 @@ const PALETTE = [
 ];
 
 /* ─── Init ───────────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('current-date').textContent =
     new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-  // Set today as default date in modal
   document.getElementById('ai-updated').valueAsDate = new Date();
 
-  load();
-  loadTransactions();
+  try {
+    accounts = await WOS_API.accounts.list();
+    if (accounts.length > 0) {
+      const txArrays = await Promise.all(
+        accounts.map(a => WOS_API.accounts.listTransactions(a.id).catch(() => []))
+      );
+      transactions = txArrays.flat();
+    }
+  } catch (_) {
+    accounts = [];
+    transactions = [];
+  }
   render();
 });
-
-/* ─── Persistence ─────────────────────────────────────────────── */
-function load() {
-  try { accounts = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { accounts = []; }
-}
-
-function saveAccounts() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
-}
-
-function loadTransactions() {
-  try { transactions = JSON.parse(localStorage.getItem(CASHFLOW_KEY)) || []; }
-  catch { transactions = []; }
-}
-
-function saveTransactions() {
-  localStorage.setItem(CASHFLOW_KEY, JSON.stringify(transactions));
-}
 
 /* ─── Modal ───────────────────────────────────────────────────── */
 function openAddModal() {
@@ -128,16 +118,16 @@ function updateFXHint() {
 }
 
 /* ─── Save / Delete ──────────────────────────────────────────── */
-function saveAccount() {
-  const name    = document.getElementById('ai-name').value.trim();
-  const bank    = document.getElementById('ai-bank').value.trim();
-  const country = document.getElementById('ai-country').value;
-  const type    = document.getElementById('ai-type').value;
+async function saveAccount() {
+  const name     = document.getElementById('ai-name').value.trim();
+  const bank     = document.getElementById('ai-bank').value.trim();
+  const country  = document.getElementById('ai-country').value;
+  const type     = document.getElementById('ai-type').value;
   const currency = document.getElementById('ai-currency').value;
-  const balance = parseFloat(document.getElementById('ai-balance').value);
-  const fxRate  = parseFloat(document.getElementById('ai-fxrate').value) || 1;
+  const balance  = parseFloat(document.getElementById('ai-balance').value);
+  const fxRate   = parseFloat(document.getElementById('ai-fxrate').value) || 1;
   const updatedAt = document.getElementById('ai-updated').value;
-  const notes   = document.getElementById('ai-notes').value.trim();
+  const notes    = document.getElementById('ai-notes').value.trim();
 
   if (!name || !bank || isNaN(balance)) {
     toast(typeof t === 'function' ? t('err_fill_account') : 'Please fill in account name, bank, and balance.', 'error');
@@ -147,30 +137,57 @@ function saveAccount() {
   const record = { name, bank, country, type, currency, balance, fxRate,
                    balanceMXN: balance * fxRate, updatedAt, notes };
 
-  if (editingId) {
-    const idx = accounts.findIndex(a => a.id === editingId);
-    accounts[idx] = { ...accounts[idx], ...record };
-    toast(typeof t === 'function' ? t('toast_account_updated') : 'Account updated.', 'success');
-    logEvent({ type: 'account_updated', category: 'Account', icon: '🏦', title: `Updated Account: ${name}`, detail: `${bank} · ${currency} · Balance ${currency} ${balance.toLocaleString()}`, amount: balance * (record.fxRate || 1) });
-  } else {
-    record.id = Date.now();
-    accounts.push(record);
-    toast(typeof t === 'function' ? t('toast_account_added') : 'Account added.', 'success');
-    logEvent({ type: 'account_added', category: 'Account', icon: '🏦', title: `Added Account: ${name}`, detail: `${bank} · ${type} · ${currency} · ${country}`, amount: balance * (record.fxRate || 1) });
-  }
-
-  saveAccounts();
-  render();
   document.getElementById('acct-modal-overlay').classList.remove('modal-overlay--visible');
+
+  if (editingId) {
+    const idx    = accounts.findIndex(a => a.id === editingId);
+    const backup = { ...accounts[idx] };
+    accounts[idx] = { ...accounts[idx], ...record };
+    render();
+    try {
+      const updated = await WOS_API.accounts.update(editingId, record);
+      accounts[idx] = updated;
+      render();
+      logEvent({ type: 'account_updated', category: 'Account', icon: '🏦', title: `Updated Account: ${name}`, detail: `${bank} · ${currency} · Balance ${currency} ${balance.toLocaleString()}`, amount: balance * fxRate });
+      toast(typeof t === 'function' ? t('toast_account_updated') : 'Account updated.', 'success');
+    } catch (_) {
+      accounts[idx] = backup;
+      render();
+      toast('Failed to update account. Please try again.', 'error');
+    }
+  } else {
+    const tempId = Date.now();
+    accounts.push({ id: tempId, ...record });
+    render();
+    try {
+      const created = await WOS_API.accounts.create(record);
+      const idx = accounts.findIndex(a => a.id === tempId);
+      if (idx !== -1) accounts[idx] = created;
+      render();
+      logEvent({ type: 'account_added', category: 'Account', icon: '🏦', title: `Added Account: ${name}`, detail: `${bank} · ${type} · ${currency} · ${country}`, amount: balance * fxRate });
+      toast(typeof t === 'function' ? t('toast_account_added') : 'Account added.', 'success');
+    } catch (_) {
+      accounts = accounts.filter(a => a.id !== tempId);
+      render();
+      toast('Failed to save account. Please try again.', 'error');
+    }
+  }
 }
 
-function deleteAccount(id) {
-  const acct = accounts.find(a => a.id === id);
-  if (acct) logEvent({ type: 'account_removed', category: 'Account', icon: '🗑️', title: `Removed Account: ${acct.name}`, detail: `${acct.bank} · ${acct.currency} · Balance ${acct.currency} ${acct.balance.toLocaleString()}`, amount: acct.balanceMXN || 0 });
+async function deleteAccount(id) {
+  const acct      = accounts.find(a => a.id === id);
+  const backup    = [...accounts];
   accounts = accounts.filter(a => a.id !== id);
-  saveAccounts();
   render();
-  toast(typeof t === 'function' ? t('toast_account_removed') : 'Account removed.', 'warning');
+  try {
+    await WOS_API.accounts.remove(id);
+    if (acct) logEvent({ type: 'account_removed', category: 'Account', icon: '🗑️', title: `Removed Account: ${acct.name}`, detail: `${acct.bank} · ${acct.currency} · Balance ${acct.currency} ${acct.balance.toLocaleString()}`, amount: acct.balanceMXN || 0 });
+    toast(typeof t === 'function' ? t('toast_account_removed') : 'Account removed.', 'warning');
+  } catch (_) {
+    accounts = backup;
+    render();
+    toast('Failed to remove account. Please try again.', 'error');
+  }
 }
 
 /* ─── Transaction Modal ──────────────────────────────────────── */
@@ -192,7 +209,7 @@ function closeTxnModal(e) {
   document.getElementById('txn-modal-overlay').classList.remove('modal-overlay--visible');
 }
 
-function saveTransaction() {
+async function saveTransaction() {
   const accountId   = document.getElementById('ti-account').value;
   const type        = document.getElementById('ti-type').value;
   const amount      = parseFloat(document.getElementById('ti-amount').value);
@@ -204,27 +221,33 @@ function saveTransaction() {
     return;
   }
 
-  const acct = accounts.find(a => a.id === accountId);
-  const fxRate = acct ? (acct.fxRate || 1) : 1;
+  const acct    = accounts.find(a => a.id === accountId);
+  const fxRate  = acct ? (acct.fxRate || 1) : 1;
+  const tempId  = Date.now().toString();
+  const txnData = { accountId, type, amount, fxRate, amountMXN: amount * fxRate, date, description };
 
-  transactions.push({
-    id: Date.now().toString(),
-    accountId, type, amount, fxRate,
-    amountMXN: amount * fxRate,
-    date, description
-  });
-
-  const acctName = acct ? acct.name : accountId;
-  const currency = acct ? acct.currency : '';
-  if (type === 'in') {
-    logEvent({ type: 'transaction_in', category: 'Transaction', icon: '↓', title: `Cash In: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: amount * fxRate });
-  } else {
-    logEvent({ type: 'transaction_out', category: 'Transaction', icon: '↑', title: `Cash Out: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: -(amount * fxRate) });
-  }
-  saveTransactions();
+  transactions.push({ id: tempId, ...txnData });
   renderCashFlowChart();
   document.getElementById('txn-modal-overlay').classList.remove('modal-overlay--visible');
-  toast(typeof t === 'function' ? t('toast_transaction_saved') : 'Transaction saved.', 'success');
+
+  try {
+    const created = await WOS_API.accounts.createTransaction(accountId, txnData);
+    const idx = transactions.findIndex(t => t.id === tempId);
+    if (idx !== -1) transactions[idx] = created;
+
+    const acctName = acct ? acct.name : accountId;
+    const currency = acct ? acct.currency : '';
+    if (type === 'in') {
+      logEvent({ type: 'transaction_in', category: 'Transaction', icon: '↓', title: `Cash In: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: amount * fxRate });
+    } else {
+      logEvent({ type: 'transaction_out', category: 'Transaction', icon: '↑', title: `Cash Out: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: -(amount * fxRate) });
+    }
+    toast(typeof t === 'function' ? t('toast_transaction_saved') : 'Transaction saved.', 'success');
+  } catch (_) {
+    transactions = transactions.filter(t => t.id !== tempId);
+    renderCashFlowChart();
+    toast('Failed to save transaction. Please try again.', 'error');
+  }
 }
 
 /* ─── Filter / Sort ──────────────────────────────────────────── */
