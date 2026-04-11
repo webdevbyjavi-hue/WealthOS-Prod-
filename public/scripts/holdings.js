@@ -243,8 +243,8 @@ function renderTable(filter = '') {
       <td class="${up ? 'td--up' : 'td--down'}">${fmtPct(ret)}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openStockModal(${h.id})" title="Edit">✎</button>
-          <button class="btn-remove" onclick="removeStock(${h.id})" title="Remove">✕</button>
+          <button class="s-btn-edit" onclick="openStockModal('${h.id}')" title="Edit">✎</button>
+          <button class="btn-remove" onclick="removeStock('${h.id}')" title="Remove">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -730,8 +730,8 @@ function renderBonosTable(filter = '') {
       <td>${venc}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openBonoModal(${b.id})" title="Editar">✎</button>
-          <button class="btn-remove" onclick="removeBono(${b.id})" title="Eliminar">✕</button>
+          <button class="s-btn-edit" onclick="openBonoModal('${b.id}')" title="Editar">✎</button>
+          <button class="btn-remove" onclick="removeBono('${b.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -1118,8 +1118,8 @@ function renderFondosTable(filter = '') {
       <td>${x.rendimiento.toFixed(2)}%</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openFondoModal(${x.id})" title="Editar">✎</button>
-          <button class="btn-remove" onclick="removeFondo(${x.id})" title="Eliminar">✕</button>
+          <button class="s-btn-edit" onclick="openFondoModal('${x.id}')" title="Editar">✎</button>
+          <button class="btn-remove" onclick="removeFondo('${x.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -1506,8 +1506,8 @@ function renderFibrasTable(filter = '') {
       <td>${divYield.toFixed(2)}%</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openFibraModal(${x.id})" title="Editar">✎</button>
-          <button class="btn-remove" onclick="removeFibra(${x.id})" title="Eliminar">✕</button>
+          <button class="s-btn-edit" onclick="openFibraModal('${x.id}')" title="Editar">✎</button>
+          <button class="btn-remove" onclick="removeFibra('${x.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -1889,8 +1889,8 @@ function renderRetiroTable(filter = '') {
       <td>${fmt(r.proyeccion || 0)}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openRetiroModal(${r.id})" title="Editar">✎</button>
-          <button class="btn-remove" onclick="removeRetiro(${r.id})" title="Eliminar">✕</button>
+          <button class="s-btn-edit" onclick="openRetiroModal('${r.id}')" title="Editar">✎</button>
+          <button class="btn-remove" onclick="removeRetiro('${r.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -2329,8 +2329,8 @@ function renderBienesTable(filter = '') {
       <td>${b.rentaMensual ? fmt(b.rentaMensual) : '<span style="color:var(--text-tertiary)">—</span>'}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openBienesModal(${b.id})" title="Editar">✎</button>
-          <button class="btn-remove" onclick="removeBien(${b.id})" title="Eliminar">✕</button>
+          <button class="s-btn-edit" onclick="openBienesModal('${b.id}')" title="Editar">✎</button>
+          <button class="btn-remove" onclick="removeBien('${b.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
@@ -2535,9 +2535,11 @@ async function saveBien() {
     return;
   }
 
-  const data = { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual,
-                 gastosNotariales, escrituracion, impuestoAdquisicion,
-                 otrosGastos, saldoHipoteca, rentaMensual };
+  const dataBase = { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual,
+                     gastosNotariales, escrituracion, impuestoAdquisicion,
+                     otrosGastos, saldoHipoteca, rentaMensual };
+  const valorActualComputed = computeValorActual(dataBase);
+  const data = { ...dataBase, valorActual: valorActualComputed };
 
   const editId = editingBienId;
   let apiAction = 'create', targetId = null, backup = null;
@@ -2554,8 +2556,7 @@ async function saveBien() {
     bienes.push(newBien);
   }
 
-  const valorActual = computeValorActual(bienes.find(x => x.id === targetId) || data);
-  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏠', title: `${editId ? 'Updated' : 'Added'} Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActual });
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏠', title: `${editId ? 'Updated' : 'Added'} Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActualComputed });
   renderAllBienes();
   closeBienesModal();
 
@@ -2751,8 +2752,8 @@ function renderCryptoTable(filter = '') {
       <td>${weight.toFixed(1)}%</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openCryptoModal(${c.id})" title="Edit">✎</button>
-          <button class="btn-remove" onclick="removeCrypto(${c.id})" title="Remove">✕</button>
+          <button class="s-btn-edit" onclick="openCryptoModal('${c.id}')" title="Edit">✎</button>
+          <button class="btn-remove" onclick="removeCrypto('${c.id}')" title="Remove">✕</button>
         </div>
       </td>`;
     tbody.appendChild(tr);
