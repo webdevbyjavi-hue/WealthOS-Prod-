@@ -573,7 +573,10 @@ async function saveStock() {
       apiAction = 'update'; targetId = existing.id;
     } else {
       targetId = Date.now();
-      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, currentPrice: priceMxn, fechaCompra, history: generateHistory(priceMxn) });
+      // avgCostUsd and currentPriceUsd must be set so toApi sends USD to the backend,
+      // which re-converts to MXN. Without them toApi falls back to avgCost/currentPrice
+      // (MXN) and the backend would multiply by the exchange rate a second time.
+      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, avgCostUsd: cost, currentPrice: priceMxn, currentPriceUsd: price, fechaCompra, history: generateHistory(priceMxn) });
     }
   }
 
@@ -585,7 +588,10 @@ async function saveStock() {
     const item = stocks.find(h => h.id === targetId);
     if (apiAction === 'create' && item) {
       const created = await WOS_API.holdings.create('stocks', item);
-      item.id = created.id;
+      const idx = stocks.findIndex(h => h.id === targetId);
+      if (idx !== -1) stocks[idx] = created;
+      else item.id = created.id;
+      renderAll();
     } else if (apiAction === 'update' && item) {
       const updated = await WOS_API.holdings.update('stocks', targetId, item);
       const idx = stocks.findIndex(h => h.id === targetId);
