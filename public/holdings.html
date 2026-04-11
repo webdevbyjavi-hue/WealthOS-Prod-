@@ -870,7 +870,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Purchase Date</label>
-          <input class="form-input" id="si-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="si-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -935,11 +938,17 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Vencimiento</label>
-          <input class="form-input" id="bi-vencimiento" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="bi-vencimiento" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Compra</label>
-          <input class="form-input" id="bi-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="bi-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -1006,7 +1015,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Compra</label>
-          <input class="form-input" id="fbi-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="fbi-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -1072,7 +1084,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Compra</label>
-          <input class="form-input" id="fi-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="fi-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -1146,7 +1161,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Inicio</label>
-          <input class="form-input" id="ri-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="ri-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -1194,7 +1212,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Compra</label>
-          <input class="form-input" id="bri-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="bri-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Plusvalía Anual (%)</label>
@@ -1275,7 +1296,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Purchase Date</label>
-          <input class="form-input" id="ci-fecha" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="ci-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="modal__actions">
@@ -1290,6 +1314,7 @@
 <script src="scripts/auth.js"></script>
 <script src="scripts/logger.js"></script>
 <script src="scripts/numberFormat.js"></script>
+<script src="scripts/datepicker.js"></script>
 <script src="scripts/holdings.js"></script>
 <script src="scripts/sync.js"></script>
 
