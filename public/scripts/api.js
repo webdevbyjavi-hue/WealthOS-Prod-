@@ -37,7 +37,7 @@
   const mappers = {
     stocks: {
       toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPrice }),
-      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), history: _fakeHistory(parseFloat(h.current_price)) }),
+      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, precioActualMxn: h.precio_actual_mxn ? parseFloat(h.precio_actual_mxn) : null, precioCompraMxn: h.precio_compra_mxn ? parseFloat(h.precio_compra_mxn) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
     },
     bonos: {
       toApi:   b => ({ instrumento: b.instrumento, serie: b.serie, titulos: b.titulos, valor_nominal: b.valorNominal, precio_compra: b.precioCompra, precio_actual: b.precioActual, tasa_cupon: b.tasaCupon || 0, rendimiento: b.rendimiento, vencimiento: b.vencimiento }),
@@ -127,6 +127,11 @@
     // ── Lookup ────────────────────────────────────────────────────────────────
     lookup: {
       ticker: (symbol) => request('GET', `/api/lookup/ticker/${encodeURIComponent(symbol)}`).then(r => r.data),
+    },
+
+    // ── Exchange rates ────────────────────────────────────────────────────────
+    exchangeRate: {
+      getUsdMxn: () => request('GET', '/api/exchange-rates/usd-mxn').then(r => r.data),
     },
 
     // Expose mappers for sync.js

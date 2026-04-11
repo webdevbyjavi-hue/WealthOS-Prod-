@@ -48,11 +48,24 @@ async function lookupStockTicker() {
   btn.textContent = 'Looking up…';
 
   try {
-    const info = await WOS_API.lookup.ticker(ticker);
+    const info    = await WOS_API.lookup.ticker(ticker);
+    const priceEl = document.getElementById('si-price');
+
     document.getElementById('si-ticker').value = info.ticker;
     document.getElementById('si-name').value   = info.name;
-    document.getElementById('si-price').value  = info.price.toFixed(2);
-    showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)}`);
+
+    // Fetch exchange rate and convert to MXN; fall back to raw USD on failure
+    try {
+      const fx       = await WOS_API.exchangeRate.getUsdMxn();
+      const mxnPrice = info.price * fx.rate;
+      priceEl.dataset.usd = info.price;
+      priceEl.value       = mxnPrice.toFixed(2);
+      showToast(`Loaded: ${info.name} @ $${mxnPrice.toFixed(2)} MXN (TC: ${fx.rate.toFixed(4)})`);
+    } catch {
+      priceEl.dataset.usd = info.price;
+      priceEl.value       = info.price.toFixed(2);
+      showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)} USD`);
+    }
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the ticker and try again.');
   } finally {
@@ -491,15 +504,20 @@ function openStockModal(id = null) {
   if (id) {
     const s = stocks.find(h => h.id === id);
     if (!s) return;
+    const priceEl = document.getElementById('si-price');
     document.getElementById('si-ticker').value = s.ticker;
     document.getElementById('si-name').value   = s.name;
     document.getElementById('si-shares').value = s.shares;
     document.getElementById('si-cost').value   = s.avgCost;
-    document.getElementById('si-price').value  = s.currentPrice;
+    priceEl.dataset.usd = s.currentPrice;
+    priceEl.value       = s.precioActualMxn != null ? s.precioActualMxn.toFixed(2) : s.currentPrice.toFixed(2);
     document.getElementById('si-fecha').value  = s.fechaCompra || '';
   } else {
-    ['si-ticker','si-name','si-shares','si-cost','si-price','si-fecha']
+    const priceEl = document.getElementById('si-price');
+    ['si-ticker','si-name','si-shares','si-cost','si-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
+    priceEl.value       = '';
+    delete priceEl.dataset.usd;
   }
   document.getElementById('stock-modal-overlay').classList.add('modal-overlay--visible');
 }
@@ -516,7 +534,9 @@ async function saveStock() {
   const name        = document.getElementById('si-name').value.trim();
   const shares      = parseFloat(document.getElementById('si-shares').value);
   const cost        = parseFloat(document.getElementById('si-cost').value);
-  const price       = parseFloat(document.getElementById('si-price').value);
+  const priceEl     = document.getElementById('si-price');
+  // Always send the USD price to the backend — dataset.usd holds it when lookup ran
+  const price       = parseFloat(priceEl.dataset.usd ?? priceEl.value);
   const fechaCompra = document.getElementById('si-fecha').value || null;
 
   if (!ticker || !name || isNaN(shares) || isNaN(cost) || isNaN(price)) {
