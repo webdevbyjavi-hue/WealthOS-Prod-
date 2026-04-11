@@ -911,10 +911,17 @@ button.nav__item {
   transition: background 0.12s, color 0.12s;
   line-height: 1;
 }
-.dp__day:hover { background: var(--bg-hover); color: var(--text-primary); }
-.dp__day--today { color: var(--accent-light); }
+.dp__day:not(.dp__day--future):hover { background: var(--bg-hover); color: var(--text-primary); }
+.dp__day--today {
+  background: #fff;
+  color: #111;
+  font-weight: 600;
+  border-radius: 6px;
+}
+.dp__day--today:hover { background: #fff; color: #111; }
 .dp__day--selected { background: var(--accent-grad); color: #fff; font-weight: 500; }
 .dp__day--selected:hover { background: var(--accent-grad); }
+.dp__day--future { color: var(--text-tertiary); opacity: 0.4; cursor: default; pointer-events: none; }
 
 .modal__actions {
   display: flex;

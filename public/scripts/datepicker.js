@@ -60,10 +60,12 @@
       for (let i = 0; i < first; i++) grid += '<span></span>';
       for (let d = 1; d <= dim; d++) {
         const ymd = toYMD(vy, vm, d);
+        const isFuture = ymd > todayYMD;
         let cls = 'dp__day';
         if (ymd === todayYMD) cls += ' dp__day--today';
         if (ymd === selYMD)   cls += ' dp__day--selected';
-        grid += `<span class="${cls}" data-ymd="${ymd}">${d}</span>`;
+        if (isFuture)         cls += ' dp__day--future';
+        grid += `<span class="${cls}"${isFuture ? '' : ` data-ymd="${ymd}"`}>${d}</span>`;
       }
 
       popup.innerHTML = `

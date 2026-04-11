@@ -36,8 +36,8 @@
   // ─── Field mappers (camelCase localStorage ↔ snake_case API) ────────────────
   const mappers = {
     stocks: {
-      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPrice }),
-      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, precioActualMxn: h.precio_actual_mxn ? parseFloat(h.precio_actual_mxn) : null, precioCompraMxn: h.precio_compra_mxn ? parseFloat(h.precio_compra_mxn) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
+      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCostUsd ?? h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice }),
+      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
     },
     bonos: {
       toApi:   b => ({ instrumento: b.instrumento, serie: b.serie, titulos: b.titulos, valor_nominal: b.valorNominal, precio_compra: b.precioCompra, precio_actual: b.precioActual, tasa_cupon: b.tasaCupon || 0, rendimiento: b.rendimiento, vencimiento: b.vencimiento }),

@@ -508,9 +508,11 @@ function openStockModal(id = null) {
     document.getElementById('si-ticker').value = s.ticker;
     document.getElementById('si-name').value   = s.name;
     document.getElementById('si-shares').value = s.shares;
-    document.getElementById('si-cost').value   = s.avgCost;
-    priceEl.dataset.usd = s.currentPrice;
-    priceEl.value       = s.precioActualMxn != null ? s.precioActualMxn.toFixed(2) : s.currentPrice.toFixed(2);
+    // si-cost always shows USD (what the user originally paid per share)
+    document.getElementById('si-cost').value   = s.avgCostUsd != null ? s.avgCostUsd.toFixed(4) : s.avgCost.toFixed(4);
+    // si-price shows MXN; dataset.usd holds the raw USD for the backend payload
+    priceEl.dataset.usd = s.currentPriceUsd != null ? s.currentPriceUsd : s.currentPrice;
+    priceEl.value       = s.currentPrice != null ? s.currentPrice.toFixed(2) : '';
     document.getElementById('si-fecha').value  = s.fechaCompra || '';
   } else {
     const priceEl = document.getElementById('si-price');
