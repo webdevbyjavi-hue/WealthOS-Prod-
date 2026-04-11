@@ -23,30 +23,24 @@ const { getOrFetchTodayRate }     = require('../services/exchangeRateService');
 const round4 = (n) => Math.round(n * 10000) / 10000;
 
 /**
- * Fetch the exchange rate and build all currency columns from USD inputs.
- * Returns null for all computed fields if the exchange rate is unavailable
- * so the insert/update still succeeds.
+ * Fetch the exchange rate and convert current_price from USD to MXN.
+ * avg_cost is user-entered in MXN and is stored as-is — no conversion applied.
  *
- * @param {number} avgCostUsd      — avg_cost sent by the client (USD)
- * @param {number} currentPriceUsd — current_price sent by the client (USD)
- * @returns {Promise<object>} — full set of columns to merge into the payload
+ * @param {number} currentPriceUsd — current_price sent by the client (USD, from Twelve Data lookup)
+ * @returns {Promise<object>} — columns to merge into the payload
  */
-async function buildCurrencyFields(avgCostUsd, currentPriceUsd) {
+async function buildCurrencyFields(currentPriceUsd) {
   try {
     const { rate } = await getOrFetchTodayRate();
     return {
-      avg_cost_usd:      avgCostUsd,
       current_price_usd: currentPriceUsd,
-      avg_cost:          round4(avgCostUsd      * rate),
       current_price:     round4(currentPriceUsd * rate),
       tipo_de_cambio:    rate,
     };
   } catch (err) {
     console.warn('[stocksController] Could not compute MXN fields:', err.message);
     return {
-      avg_cost_usd:      avgCostUsd,
       current_price_usd: currentPriceUsd,
-      avg_cost:          null,
       current_price:     null,
       tipo_de_cambio:    null,
     };
@@ -72,15 +66,14 @@ async function list(req, res, next) {
 // ─── POST /api/stocks ─────────────────────────────────────────────────────────
 async function create(req, res, next) {
   try {
-    const { avg_cost, current_price } = req.body;
-    const currency = await buildCurrencyFields(
-      parseFloat(avg_cost)      || 0,
-      parseFloat(current_price) || 0
-    );
+    const { current_price } = req.body;
+    // avg_cost is user-entered in MXN — stored as-is, no conversion.
+    // current_price comes from the Twelve Data lookup in USD — converted to MXN.
+    const currency = await buildCurrencyFields(parseFloat(current_price) || 0);
 
     const payload = {
       ...req.body,
-      ...currency,  // overwrites avg_cost/current_price with MXN values and adds _usd columns
+      ...currency,  // overwrites current_price with MXN value and adds _usd columns
       user_id: req.user.id,
     };
 
@@ -102,11 +95,10 @@ async function update(req, res, next) {
   try {
     const { id } = req.params;
 
-    // Fetch existing USD values as fallback when the client omits a field.
-    // avg_cost_usd / current_price_usd are the source-of-truth USD columns.
+    // Fetch existing USD current_price as fallback when the client omits it.
     const { data: existing, error: fetchErr } = await supabase
       .from('stocks')
-      .select('avg_cost_usd, current_price_usd')
+      .select('current_price_usd')
       .eq('id', id)
       .eq('user_id', req.user.id)
       .single();
@@ -114,14 +106,14 @@ async function update(req, res, next) {
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ success: false, message: 'Record not found.' });
 
-    const avgCostUsd      = parseFloat(req.body.avg_cost      ?? existing.avg_cost_usd);
+    // avg_cost is user-entered in MXN — stored as-is, no conversion.
+    // current_price comes from the Twelve Data lookup in USD — converted to MXN.
     const currentPriceUsd = parseFloat(req.body.current_price ?? existing.current_price_usd);
-
-    const currency = await buildCurrencyFields(avgCostUsd, currentPriceUsd);
+    const currency = await buildCurrencyFields(currentPriceUsd);
 
     const updates = {
       ...req.body,
-      ...currency,  // overwrites avg_cost/current_price with MXN and adds _usd columns
+      ...currency,  // overwrites current_price with MXN and adds _usd columns
       updated_at: new Date().toISOString(),
     };
     delete updates.user_id; // never let the caller change ownership

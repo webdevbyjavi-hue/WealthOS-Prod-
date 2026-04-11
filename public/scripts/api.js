@@ -36,7 +36,7 @@
   // ─── Field mappers (camelCase localStorage ↔ snake_case API) ────────────────
   const mappers = {
     stocks: {
-      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCostUsd ?? h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice }),
+      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice }),
       fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
     },
     bonos: {

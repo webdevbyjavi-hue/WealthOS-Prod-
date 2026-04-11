@@ -560,12 +560,8 @@ async function saveStock() {
     if (existing) {
       backup = { ...existing };
       const totalShares = existing.shares + shares;
-      // Merge in USD space — cost (form) and avgCostUsd are both USD;
-      // avgCost is MXN and must not be mixed with USD cost directly.
-      const existingCostUsd = existing.avgCostUsd ?? existing.avgCost;
-      const newAvgCostUsd = (existing.shares * existingCostUsd + shares * cost) / totalShares;
-      existing.avgCostUsd = newAvgCostUsd;
-      existing.avgCost = newAvgCostUsd; // backend will overwrite with correct MXN
+      // avg_cost is MXN — weighted average stays in MXN.
+      existing.avgCost = (existing.shares * existing.avgCost + shares * cost) / totalShares;
       existing.currentPriceUsd = price;
       existing.shares = totalShares; existing.currentPrice = priceMxn; existing.name = name;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
@@ -573,10 +569,9 @@ async function saveStock() {
       apiAction = 'update'; targetId = existing.id;
     } else {
       targetId = Date.now();
-      // avgCostUsd and currentPriceUsd must be set so toApi sends USD to the backend,
-      // which re-converts to MXN. Without them toApi falls back to avgCost/currentPrice
-      // (MXN) and the backend would multiply by the exchange rate a second time.
-      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, avgCostUsd: cost, currentPrice: priceMxn, currentPriceUsd: price, fechaCompra, history: generateHistory(priceMxn) });
+      // avg_cost is stored in MXN as entered. currentPriceUsd is the USD value from
+      // the Twelve Data lookup so toApi sends it correctly for backend MXN conversion.
+      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, currentPrice: priceMxn, currentPriceUsd: price, fechaCompra, history: generateHistory(priceMxn) });
     }
   }
 
