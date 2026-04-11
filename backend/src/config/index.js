@@ -29,6 +29,10 @@ const config = {
   // Optional: Alpha Vantage API key for live price fetching.
   // If absent, the snapshot service will skip fetching and log a warning.
   alphaVantageKey: process.env.ALPHA_VANTAGE_API_KEY || null,
+
+  // Optional: Banxico BMX token for government bond rate lookups.
+  // Get a token at: https://www.banxico.org.mx/SieAPIRest/service/v1/token
+  banxicoToken: process.env.BANXICO_BMX_TOKEN || null,
 };
 
 module.exports = config;

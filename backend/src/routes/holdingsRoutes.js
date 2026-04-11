@@ -16,6 +16,7 @@ const { body, param } = require('express-validator');
 const validate = require('../middlewares/validate');
 const holdingsController = require('../controllers/holdingsController');
 const stocksController   = require('../controllers/stocksController');
+const banxicoService     = require('../services/banxicoService');
 
 const uuidParam = param('id').isUUID().withMessage('id must be a valid UUID.');
 const positiveNumber = (field) => body(field).isFloat({ min: 0 }).withMessage(`${field} must be a non-negative number.`);
@@ -115,9 +116,31 @@ function buildStocksRouter() {
   return router;
 }
 
+// ─── Bonos router — extends the generic CRUD router with a live-rate lookup ──
+function buildBonosRouter() {
+  const router = buildRouter('bonos', bonosRules);
+
+  // GET /api/bonos/tasa/:instrumento
+  // Returns the latest Tasa de Interés from Banxico BMX for the given instrument.
+  // Must be defined before any /:id wildcard routes (buildRouter adds none for GET).
+  router.get('/tasa/:instrumento', async (req, res, next) => {
+    try {
+      const data = await banxicoService.getTasa(req.params.instrumento);
+      res.json({ success: true, data });
+    } catch (err) {
+      if (err.status === 400) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      next(err);
+    }
+  });
+
+  return router;
+}
+
 module.exports = {
   stocksRouter:  buildStocksRouter(),
-  bonosRouter:   buildRouter('bonos',   bonosRules),
+  bonosRouter:   buildBonosRouter(),
   fondosRouter:  buildRouter('fondos',  fondosRules),
   fibrasRouter:  buildRouter('fibras',  fibrasRules),
   retiroRouter:  buildRouter('retiro',  retiroRules),

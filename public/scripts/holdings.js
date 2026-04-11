@@ -906,6 +906,26 @@ function setBonosLineRange(days, btn) {
 }
 
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
+// Fetch live Tasa de Interés from Banxico and pre-fill the rendimiento field.
+// Shows a placeholder while loading; silently skips on error so the user can
+// still enter the rate manually.
+async function fetchBonoTasa(instrumento) {
+  const el = document.getElementById('bi-rendimiento');
+  el.placeholder = 'Cargando…';
+  el.disabled    = true;
+  try {
+    const data = await WOS_API.bonos.getTasa(instrumento);
+    el.value = data.tasa;
+    el.title = `Tasa de Interés Banxico (${data.fecha}) — Serie ${data.serie}`;
+  } catch (_) {
+    el.value = '';
+    el.title = '';
+  } finally {
+    el.placeholder = '0.00';
+    el.disabled    = false;
+  }
+}
+
 function openBonoModal(id = null) {
   editingBonoId = id;
   document.getElementById('bono-modal-title').textContent = id ? 'Editar Bono' : 'Agregar Bono';
@@ -926,6 +946,8 @@ function openBonoModal(id = null) {
     ['bi-serie','bi-titulos','bi-nominal','bi-compra','bi-actual','bi-cupon','bi-rendimiento','bi-vencimiento','bi-fecha']
       .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('bi-instrumento').value = 'CETES';
+    // Auto-fetch the live rate for the default instrument on new entries
+    fetchBonoTasa('CETES');
   }
   document.getElementById('bono-modal-overlay').classList.add('modal-overlay--visible');
 }
@@ -3065,6 +3087,12 @@ async function initHoldings() {
 }
 
 initHoldings();
+
+// When the user switches instrumento in the Add Bono modal, fetch the live rate.
+// Only fires on new entries (editingBonoId === null) so edits keep the saved value.
+document.getElementById('bi-instrumento').addEventListener('change', function () {
+  if (editingBonoId === null) fetchBonoTasa(this.value);
+});
 
 window.addEventListener('resize', () => {
   if (lineChart) lineChart.resize();

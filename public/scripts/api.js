@@ -124,6 +124,15 @@
       clear:  ()            => request('DELETE', '/api/history'),
     },
 
+    // ── Bonos — live rate lookup ──────────────────────────────────────────────
+    bonos: {
+      /** Fetch the latest Tasa de Interés from Banxico BMX for an instrument.
+       *  @param {string} instrumento — CETES | BONDIA | BONOS | UDIBONOS
+       *  @returns {Promise<{ instrumento, tasa, fecha, serie }>}
+       */
+      getTasa: (instrumento) => request('GET', `/api/bonos/tasa/${encodeURIComponent(instrumento)}`).then(r => r.data),
+    },
+
     // ── Lookup ────────────────────────────────────────────────────────────────
     lookup: {
       ticker: (symbol) => request('GET', `/api/lookup/ticker/${encodeURIComponent(symbol)}`).then(r => r.data),
