@@ -560,11 +560,11 @@ async function saveStock() {
     } else if (apiAction === 'update' && item) {
       await WOS_API.holdings.update('stocks', targetId, item);
     }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { stocks = stocks.filter(h => h.id !== targetId); }
     else if (backup) { const idx = stocks.findIndex(h => h.id === targetId); if (idx !== -1) stocks[idx] = backup; }
     renderAll();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -577,10 +577,10 @@ async function removeStock(id) {
   renderAll();
   try {
     await WOS_API.holdings.remove('stocks', id);
-  } catch (_) {
+  } catch (err) {
     stocks = backup;
     renderAll();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -950,11 +950,11 @@ async function saveBono() {
     const item = bonos.find(x => x.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('bonos', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('bonos', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { bonos = bonos.filter(x => x.id !== targetId); }
     else if (backup) { const idx = bonos.findIndex(x => x.id === targetId); if (idx !== -1) bonos[idx] = backup; }
     renderAllBonos();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -967,10 +967,10 @@ async function removeBono(id) {
   renderAllBonos();
   try {
     await WOS_API.holdings.remove('bonos', id);
-  } catch (_) {
+  } catch (err) {
     bonos = backup;
     renderAllBonos();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -1336,11 +1336,11 @@ async function saveFondo() {
     const item = fondos.find(f => f.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('fondos', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('fondos', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { fondos = fondos.filter(f => f.id !== targetId); }
     else if (backup) { const idx = fondos.findIndex(f => f.id === targetId); if (idx !== -1) fondos[idx] = backup; }
     renderAllFondos();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -1353,10 +1353,10 @@ async function removeFondo(id) {
   renderAllFondos();
   try {
     await WOS_API.holdings.remove('fondos', id);
-  } catch (_) {
+  } catch (err) {
     fondos = backup;
     renderAllFondos();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -1724,11 +1724,11 @@ async function saveFibra() {
     const item = fibras.find(f => f.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('fibras', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('fibras', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { fibras = fibras.filter(f => f.id !== targetId); }
     else if (backup) { const idx = fibras.findIndex(f => f.id === targetId); if (idx !== -1) fibras[idx] = backup; }
     renderAllFibras();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -1741,10 +1741,10 @@ async function removeFibra(id) {
   renderAllFibras();
   try {
     await WOS_API.holdings.remove('fibras', id);
-  } catch (_) {
+  } catch (err) {
     fibras = backup;
     renderAllFibras();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -1842,7 +1842,7 @@ function renderRetiroTable(filter = '') {
     r.tipo.toLowerCase().includes(f) ||
     r.nombre.toLowerCase().includes(f) ||
     r.institucion.toLowerCase().includes(f) ||
-    r.subcuenta.toLowerCase().includes(f)
+    (r.subcuenta || '').toLowerCase().includes(f)
   );
 
   if (retiroSortCol) {
@@ -2099,11 +2099,11 @@ async function saveRetiro() {
     const item = retiro.find(x => x.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('retiro', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('retiro', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { retiro = retiro.filter(x => x.id !== targetId); }
     else if (backup) { const idx = retiro.findIndex(x => x.id === targetId); if (idx !== -1) retiro[idx] = backup; }
     renderAllRetiro();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -2116,10 +2116,10 @@ async function removeRetiro(id) {
   renderAllRetiro();
   try {
     await WOS_API.holdings.remove('retiro', id);
-  } catch (_) {
+  } catch (err) {
     retiro = backup;
     renderAllRetiro();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -2535,11 +2535,10 @@ async function saveBien() {
     return;
   }
 
-  const dataBase = { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual,
-                     gastosNotariales, escrituracion, impuestoAdquisicion,
-                     otrosGastos, saldoHipoteca, rentaMensual };
-  const valorActualComputed = computeValorActual(dataBase);
-  const data = { ...dataBase, valorActual: valorActualComputed };
+  const valorActualComputed = computeValorActual({ precioCompra, fechaCompra, plusvaliaAnual });
+  const data = { nombre, tipo, ubicacion, precioCompra, valorActual: valorActualComputed,
+                 gastosNotariales, escrituracion, impuestoAdquisicion,
+                 otrosGastos, saldoHipoteca, rentaMensual };
 
   const editId = editingBienId;
   let apiAction = 'create', targetId = null, backup = null;
@@ -2564,11 +2563,11 @@ async function saveBien() {
     const item = bienes.find(x => x.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('bienes', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('bienes', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { bienes = bienes.filter(x => x.id !== targetId); }
     else if (backup) { const idx = bienes.findIndex(x => x.id === targetId); if (idx !== -1) bienes[idx] = backup; }
     renderAllBienes();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -2581,10 +2580,10 @@ async function removeBien(id) {
   renderAllBienes();
   try {
     await WOS_API.holdings.remove('bienes', id);
-  } catch (_) {
+  } catch (err) {
     bienes = backup;
     renderAllBienes();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -2962,11 +2961,11 @@ async function saveCrypto() {
     const item = cryptos.find(x => x.id === targetId);
     if (apiAction === 'create' && item) { const created = await WOS_API.holdings.create('crypto', item); item.id = created.id; }
     else if (apiAction === 'update' && item) { await WOS_API.holdings.update('crypto', targetId, item); }
-  } catch (_) {
+  } catch (err) {
     if (apiAction === 'create') { cryptos = cryptos.filter(x => x.id !== targetId); }
     else if (backup) { const idx = cryptos.findIndex(x => x.id === targetId); if (idx !== -1) cryptos[idx] = backup; }
     renderAllCrypto();
-    showToast('Failed to save. Please try again.');
+    console.error('[WOS] save error:', err); showToast('Save failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -2979,10 +2978,10 @@ async function removeCrypto(id) {
   renderAllCrypto();
   try {
     await WOS_API.holdings.remove('crypto', id);
-  } catch (_) {
+  } catch (err) {
     cryptos = backup;
     renderAllCrypto();
-    showToast('Failed to remove. Please try again.');
+    console.error('[WOS] remove error:', err); showToast('Remove failed: ' + ((err && (err.message || (err.data && err.data.message))) || 'Unknown error'));
   }
 }
 
@@ -3015,7 +3014,7 @@ async function initHoldings() {
       WOS_API.holdings.list('bienes'),
     ]);
     stocks = s; bonos = b; fondos = f; fibras = fb; retiro = r; cryptos = c; bienes = bi;
-  } catch (_) {
+  } catch (err) {
     // arrays remain empty — show empty state
   }
 
