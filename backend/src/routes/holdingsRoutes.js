@@ -15,6 +15,7 @@ const { Router } = require('express');
 const { body, param } = require('express-validator');
 const validate = require('../middlewares/validate');
 const holdingsController = require('../controllers/holdingsController');
+const stocksController   = require('../controllers/stocksController');
 
 const uuidParam = param('id').isUUID().withMessage('id must be a valid UUID.');
 const positiveNumber = (field) => body(field).isFloat({ min: 0 }).withMessage(`${field} must be a non-negative number.`);
@@ -104,8 +105,18 @@ const cryptoRules = [
   positiveNumber('current_price'),
 ];
 
+// ─── Stocks router — uses custom controller for MXN field computation ─────────
+function buildStocksRouter() {
+  const router = Router();
+  router.get('/',    stocksController.list);
+  router.post('/',   [...stocksRules, validate], stocksController.create);
+  router.put('/:id', [uuidParam, validate],      stocksController.update);
+  router.delete('/:id', [uuidParam, validate],   stocksController.remove);
+  return router;
+}
+
 module.exports = {
-  stocksRouter:  buildRouter('stocks',  stocksRules),
+  stocksRouter:  buildStocksRouter(),
   bonosRouter:   buildRouter('bonos',   bonosRules),
   fondosRouter:  buildRouter('fondos',  fondosRules),
   fibrasRouter:  buildRouter('fibras',  fibrasRules),

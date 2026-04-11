@@ -19,7 +19,8 @@ const historyRoutes    = require('./src/routes/historyRoutes');
 const assetsRoutes     = require('./src/routes/assetsRoutes');
 const snapshotsRoutes  = require('./src/routes/snapshotsRoutes');
 const portfoliosRoutes = require('./src/routes/portfoliosRoutes');
-const lookupRoutes     = require('./src/routes/lookupRoutes');
+const lookupRoutes         = require('./src/routes/lookupRoutes');
+const exchangeRateRoutes   = require('./src/routes/exchangeRateRoutes');
 const {
   stocksRouter,
   bonosRouter,
@@ -64,7 +65,8 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 
 // ─── Protected routes (require valid Supabase JWT) ────────────────────────────
-app.use('/api/lookup',     authMiddleware, lookupRoutes);
+app.use('/api/lookup',          authMiddleware, lookupRoutes);
+app.use('/api/exchange-rates',  authMiddleware, exchangeRateRoutes);
 app.use('/api/accounts',   authMiddleware, accountsRoutes);
 app.use('/api/history',    authMiddleware, historyRoutes);
 app.use('/api/assets',     authMiddleware, assetsRoutes);
@@ -81,6 +83,26 @@ app.use('/api/crypto',     authMiddleware, cryptoRouter);
 // ─── 404 & global error handler ───────────────────────────────────────────────
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
+
+// ─── Daily exchange-rate cron job ────────────────────────────────────────────
+// Runs at 22:00 UTC Mon–Fri — 1 hour before the snapshot cron.
+// Fetches USD/MXN from Twelve Data once and caches it in `exchange_rates`.
+// All user requests that day read from the DB; zero extra API calls.
+if (config.nodeEnv !== 'test') {
+  const { runExchangeRateUpdate } = require('./src/services/exchangeRateService');
+
+  cron.schedule('0 22 * * 1-5', async () => {
+    console.log('[cron] Fetching daily USD/MXN exchange rate...');
+    try {
+      const { date, rate } = await runExchangeRateUpdate();
+      console.log(`[cron] USD/MXN rate cached for ${date}: ${rate}`);
+    } catch (err) {
+      console.error('[cron] Exchange rate update failed:', err.message);
+    }
+  }, { timezone: 'UTC' });
+
+  console.log('[WealthOS API] Daily exchange-rate cron scheduled: 22:00 UTC Mon–Fri');
+}
 
 // ─── Daily snapshot cron job ──────────────────────────────────────────────────
 // Runs at 23:00 UTC (6:00 PM EST / 7:00 PM EDT) Monday–Friday.

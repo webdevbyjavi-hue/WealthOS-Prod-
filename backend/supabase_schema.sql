@@ -97,15 +97,18 @@ CREATE TRIGGER trg_trim_history
 -- STOCKS
 -- ══════════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS stocks (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  ticker          TEXT NOT NULL,
-  name            TEXT NOT NULL,
-  shares          NUMERIC(18,6) NOT NULL CHECK (shares >= 0),
-  avg_cost        NUMERIC(18,4) NOT NULL CHECK (avg_cost >= 0),
-  current_price   NUMERIC(18,4) NOT NULL CHECK (current_price >= 0),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  ticker            TEXT NOT NULL,
+  name              TEXT NOT NULL,
+  shares            NUMERIC(18,6) NOT NULL CHECK (shares >= 0),
+  avg_cost          NUMERIC(18,4) NOT NULL CHECK (avg_cost >= 0),        -- in USD
+  current_price     NUMERIC(18,4) NOT NULL CHECK (current_price >= 0),   -- in USD
+  tipo_de_cambio    NUMERIC(12,6),            -- USD/MXN rate used for conversion (set by backend)
+  precio_compra_mxn NUMERIC(18,4),            -- avg_cost × tipo_de_cambio  (set by backend)
+  precio_actual_mxn NUMERIC(18,4),            -- current_price × tipo_de_cambio (set by backend)
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, ticker)
 );
 
