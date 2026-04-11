@@ -288,8 +288,8 @@ function renderKPIs() {
   document.getElementById('total-value').textContent    = fmt(totalValue);
   document.getElementById('total-change').textContent   = fmtPct(pnlPct);
   document.getElementById('total-change').className     = 'kpi__change ' + (pnlPct >= 0 ? 'kpi__change--up' : 'kpi__change--down');
-  document.getElementById('daily-change').textContent   = (dailyChange >= 0 ? '+' : '') + fmt(dailyChange);
-  document.getElementById('total-invested').textContent = fmt(totalInvested);
+  document.getElementById('total-invested').textContent = fmt(investmentValue);
+  document.getElementById('total-liquid').textContent   = fmt(cashTotal);
   document.getElementById('unrealized-pnl').textContent = (pnl >= 0 ? '+' : '') + fmt(pnl);
   document.getElementById('pnl-pct').textContent        = fmtPct(pnlPct);
 }

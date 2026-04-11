@@ -188,8 +188,11 @@ function renderSummaryStrip() {
   const totalInvested = stocksInvested + bonosInvested + fondosInvested + fibrasInvested + retiroInvested + cryptoInvested + bienesInvested;
   const gain          = totalValue - totalInvested;
 
-  document.getElementById('sum-total').textContent    = fmt(totalValue);
-  document.getElementById('sum-invested').textContent = fmt(totalInvested);
+  const liquidValue = bonosValue + fondosValue;
+
+  document.getElementById('sum-total').textContent      = fmt(totalValue);
+  document.getElementById('sum-invested').textContent   = fmt(totalInvested);
+  document.getElementById('sum-categories').textContent = fmt(liquidValue);
   const pnlEl = document.getElementById('sum-pnl');
   pnlEl.textContent = (gain >= 0 ? '+' : '') + fmt(gain);
   pnlEl.style.color = gain >= 0 ? 'var(--up)' : 'var(--down)';

@@ -70,18 +70,28 @@
 
       popup.innerHTML = `
         <div class="dp__header">
-          <button class="dp__nav" data-dir="-1">&#8249;</button>
+          <button class="dp__nav dp__nav--year" data-year="-1" title="Previous year">&#171;</button>
+          <button class="dp__nav" data-dir="-1" title="Previous month">&#8249;</button>
           <span class="dp__title">${MONTHS[vm]} ${vy}</span>
-          <button class="dp__nav" data-dir="1">&#8250;</button>
+          <button class="dp__nav" data-dir="1" title="Next month">&#8250;</button>
+          <button class="dp__nav dp__nav--year" data-year="1" title="Next year">&#187;</button>
         </div>
         <div class="dp__grid">${grid}</div>`;
 
-      popup.querySelectorAll('.dp__nav').forEach(btn =>
+      popup.querySelectorAll('.dp__nav[data-dir]').forEach(btn =>
         btn.addEventListener('click', e => {
           e.stopPropagation();
           vm += +btn.dataset.dir;
           if (vm > 11) { vm = 0;  vy++; }
           if (vm < 0)  { vm = 11; vy--; }
+          render();
+        })
+      );
+
+      popup.querySelectorAll('.dp__nav--year').forEach(btn =>
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          vy += +btn.dataset.year;
           render();
         })
       );

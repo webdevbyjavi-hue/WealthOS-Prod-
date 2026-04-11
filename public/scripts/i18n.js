@@ -70,7 +70,7 @@
       sum_total_holdings:  'Total Holdings Value',
       sum_invested:        'Total Invested',
       sum_pnl:             'Unrealized P&L',
-      sum_categories:      'Active Categories',
+      sum_categories:      'Activos Líquidos',
 
       // Stocks tab
       s_total_portfolio:  'Total Portfolio Value',
@@ -457,7 +457,7 @@
       sum_total_holdings:  'Valor Total de Posiciones',
       sum_invested:        'Total Invertido',
       sum_pnl:             'G/P No Realizada',
-      sum_categories:      'Categorías Activas',
+      sum_categories:      'Activos Líquidos',
 
       // Tab Stocks
       s_total_portfolio:  'Valor Total del Portafolio',

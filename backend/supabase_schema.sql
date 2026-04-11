@@ -227,6 +227,8 @@ CREATE TABLE IF NOT EXISTS bienes (
   escrituracion           NUMERIC(18,2) DEFAULT 0,
   impuesto_adquisicion    NUMERIC(18,2) DEFAULT 0,
   otros_gastos            NUMERIC(18,2) DEFAULT 0,
+  fecha_compra            DATE,
+  plusvalia_anual         NUMERIC(6,4) DEFAULT 0,  -- annual appreciation rate as a percentage (e.g. 6.5 = 6.5%/yr)
   valor_actual            NUMERIC(18,2) NOT NULL CHECK (valor_actual >= 0),
   saldo_hipoteca          NUMERIC(18,2) DEFAULT 0,
   renta_mensual           NUMERIC(18,2) DEFAULT 0,

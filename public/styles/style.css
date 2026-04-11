@@ -887,6 +887,7 @@ button.nav__item {
   padding: 0;
 }
 .dp__nav:hover { background: var(--bg-hover); color: var(--text-primary); }
+.dp__nav--year { font-size: 13px; }
 .dp__grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
