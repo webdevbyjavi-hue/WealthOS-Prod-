@@ -560,7 +560,13 @@ async function saveStock() {
     if (existing) {
       backup = { ...existing };
       const totalShares = existing.shares + shares;
-      existing.avgCost = (existing.shares * existing.avgCost + shares * cost) / totalShares;
+      // Merge in USD space — cost (form) and avgCostUsd are both USD;
+      // avgCost is MXN and must not be mixed with USD cost directly.
+      const existingCostUsd = existing.avgCostUsd ?? existing.avgCost;
+      const newAvgCostUsd = (existing.shares * existingCostUsd + shares * cost) / totalShares;
+      existing.avgCostUsd = newAvgCostUsd;
+      existing.avgCost = newAvgCostUsd; // backend will overwrite with correct MXN
+      existing.currentPriceUsd = price;
       existing.shares = totalShares; existing.currentPrice = priceMxn; existing.name = name;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Merged with existing ${ticker} position.`);
@@ -581,7 +587,10 @@ async function saveStock() {
       const created = await WOS_API.holdings.create('stocks', item);
       item.id = created.id;
     } else if (apiAction === 'update' && item) {
-      await WOS_API.holdings.update('stocks', targetId, item);
+      const updated = await WOS_API.holdings.update('stocks', targetId, item);
+      const idx = stocks.findIndex(h => h.id === targetId);
+      if (idx !== -1) stocks[idx] = updated;
+      renderAll();
     }
   } catch (err) {
     if (apiAction === 'create') { stocks = stocks.filter(h => h.id !== targetId); }
