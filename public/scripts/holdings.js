@@ -537,8 +537,9 @@ async function saveStock() {
   const shares      = parseFloat(document.getElementById('si-shares').value);
   const cost        = parseFloat(document.getElementById('si-cost').value);
   const priceEl     = document.getElementById('si-price');
-  // Always send the USD price to the backend — dataset.usd holds it when lookup ran
+  // price (USD) is sent to the backend for MXN conversion; priceMxn is for local display
   const price       = parseFloat(priceEl.dataset.usd ?? priceEl.value);
+  const priceMxn    = parseFloat(priceEl.value);
   const fechaCompra = document.getElementById('si-fecha').value || null;
 
   if (!ticker || !name || isNaN(shares) || isNaN(cost) || isNaN(price)) {
@@ -552,7 +553,7 @@ async function saveStock() {
   if (editId) {
     const s = stocks.find(h => h.id === editId);
     backup = { ...s };
-    if (s) Object.assign(s, { ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra });
+    if (s) Object.assign(s, { ticker, name, shares, avgCost: cost, currentPrice: priceMxn, fechaCompra });
     apiAction = 'update'; targetId = editId;
   } else {
     const existing = stocks.find(h => h.ticker === ticker);
@@ -560,13 +561,13 @@ async function saveStock() {
       backup = { ...existing };
       const totalShares = existing.shares + shares;
       existing.avgCost = (existing.shares * existing.avgCost + shares * cost) / totalShares;
-      existing.shares = totalShares; existing.currentPrice = price; existing.name = name;
+      existing.shares = totalShares; existing.currentPrice = priceMxn; existing.name = name;
       if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
       showToast(`Merged with existing ${ticker} position.`);
       apiAction = 'update'; targetId = existing.id;
     } else {
       targetId = Date.now();
-      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra, history: generateHistory(price) });
+      stocks.push({ id: targetId, ticker, name, shares, avgCost: cost, currentPrice: priceMxn, fechaCompra, history: generateHistory(priceMxn) });
     }
   }
 
@@ -2558,7 +2559,8 @@ async function saveBien() {
   }
 
   const valorActualComputed = computeValorActual({ precioCompra, fechaCompra, plusvaliaAnual });
-  const data = { nombre, tipo, ubicacion, precioCompra, valorActual: valorActualComputed,
+  const data = { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual,
+                 valorActual: valorActualComputed,
                  gastosNotariales, escrituracion, impuestoAdquisicion,
                  otrosGastos, saldoHipoteca, rentaMensual };
 
