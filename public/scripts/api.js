@@ -40,8 +40,8 @@
       fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
     },
     bonos: {
-      toApi:   b => ({ instrumento: b.instrumento, serie: b.serie, titulos: b.titulos, valor_nominal: b.valorNominal, precio_compra: b.precioCompra, precio_actual: b.precioActual, tasa_cupon: b.tasaCupon || 0, rendimiento: b.rendimiento, vencimiento: b.vencimiento }),
-      fromApi: b => ({ id: b.id, instrumento: b.instrumento, serie: b.serie, titulos: parseInt(b.titulos), valorNominal: parseFloat(b.valor_nominal), precioCompra: parseFloat(b.precio_compra), precioActual: parseFloat(b.precio_actual), tasaCupon: parseFloat(b.tasa_cupon), rendimiento: parseFloat(b.rendimiento), vencimiento: b.vencimiento, history: _fakeHistory(parseFloat(b.precio_actual) * parseInt(b.titulos)) }),
+      toApi:   b => ({ tipo: b.tipo, plazo: b.plazo, serie_banxico: b.serieBanxico, purchase_date: b.purchaseDate, tasa_compra: b.tasaCompra, monto: b.monto, descripcion: b.descripcion || null }),
+      fromApi: b => ({ id: b.id, tipo: b.tipo, plazo: b.plazo, serieBanxico: b.serie_banxico, purchaseDate: b.purchase_date, tasaCompra: parseFloat(b.tasa_compra), monto: parseFloat(b.monto), descripcion: b.descripcion || '', history: _fakeHistory(parseFloat(b.monto)) }),
     },
     fondos: {
       toApi:   f => ({ clave: f.clave, nombre: f.nombre, operadora: f.operadora, unidades: f.unidades, precio_compra: f.precioCompra, nav_actual: f.navActual, rendimiento: f.rendimiento, tipo: f.tipo }),
@@ -124,13 +124,12 @@
       clear:  ()            => request('DELETE', '/api/history'),
     },
 
-    // ── Bonos — live rate lookup ──────────────────────────────────────────────
+    // ── Bonos — catalog + live Banxico rate lookup ────────────────────────────
     bonos: {
-      /** Fetch the latest Tasa de Interés from Banxico BMX for an instrument.
-       *  @param {string} instrumento — CETES | BONDIA | BONOS | UDIBONOS
-       *  @returns {Promise<{ instrumento, tasa, fecha, serie }>}
-       */
-      getTasa: (instrumento) => request('GET', `/api/bonos/tasa/${encodeURIComponent(instrumento)}`).then(r => r.data),
+      /** Full static catalog: { catalog: [...], tipos: [...] } */
+      getCatalog: () => request('GET', '/api/bonos/catalog').then(r => r.data),
+      /** Latest Tasa de Interés for a Banxico series ID (e.g. "SF43936"). */
+      getTasa: (serieBanxico) => request('GET', `/api/bonos/tasa/${encodeURIComponent(serieBanxico)}`).then(r => r.data),
     },
 
     // ── Lookup ────────────────────────────────────────────────────────────────

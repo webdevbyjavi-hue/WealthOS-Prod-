@@ -9,6 +9,7 @@ const CASHFLOW_KEY = 'wealthos_transactions';
 let accounts      = [];
 let transactions  = [];
 let editingId     = null;
+let cashflowView  = null; // null = all, 'in', 'out', 'invested'
 let sortCol       = 'name';
 let sortDir       = 1;
 let filterText    = '';
@@ -239,6 +240,8 @@ async function saveTransaction() {
     const currency = acct ? acct.currency : '';
     if (type === 'in') {
       logEvent({ type: 'transaction_in', category: 'Transaction', icon: '↓', title: `Cash In: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: amount * fxRate });
+    } else if (type === 'invested') {
+      logEvent({ type: 'transaction_invested', category: 'Transaction', icon: '◈', title: `Invested: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: -(amount * fxRate) });
     } else {
       logEvent({ type: 'transaction_out', category: 'Transaction', icon: '↑', title: `Cash Out: ${acctName}`, detail: `${currency} ${amount.toLocaleString()}${description ? ' · ' + description : ''} · ${date}`, amount: -(amount * fxRate) });
     }
@@ -401,6 +404,16 @@ function totalMXN() {
   return accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
 }
 
+/* ─── Cash Flow Filter ───────────────────────────────────────── */
+function setCashflowView(view) {
+  cashflowView = cashflowView === view ? null : view;
+  ['in','out','invested'].forEach(v => {
+    const btn = document.getElementById(`cf-btn-${v}`);
+    if (btn) btn.classList.toggle('cf-filter__btn--active', cashflowView === v);
+  });
+  renderCashFlowChart();
+}
+
 /* ─── Charts ─────────────────────────────────────────────────── */
 function renderCharts() {
   renderCurrencyChart();
@@ -485,12 +498,47 @@ function renderCashFlowChart() {
     });
   }
 
-  const inData  = months.map(m => transactions
-    .filter(t => t.type === 'in'  && t.date.startsWith(m.key))
-    .reduce((s, t) => s + (t.amountMXN || 0), 0));
-  const outData = months.map(m => transactions
-    .filter(t => t.type === 'out' && t.date.startsWith(m.key))
-    .reduce((s, t) => s + (t.amountMXN || 0), 0));
+  const sumType = (type, m) => transactions
+    .filter(t => t.type === type && t.date.startsWith(m.key))
+    .reduce((s, t) => s + (t.amountMXN || 0), 0);
+
+  const inData       = months.map(m => sumType('in', m));
+  const outData      = months.map(m => sumType('out', m));
+  const investedData = months.map(m => sumType('invested', m));
+
+  const allDatasets = [
+    {
+      id: 'in',
+      label: 'Cash In',
+      data: inData,
+      backgroundColor: 'rgba(52, 211, 153, 0.65)',
+      borderColor: '#34d399',
+      borderWidth: 1,
+      borderRadius: 4,
+    },
+    {
+      id: 'out',
+      label: 'Cash Out',
+      data: outData,
+      backgroundColor: 'rgba(248, 113, 113, 0.65)',
+      borderColor: '#f87171',
+      borderWidth: 1,
+      borderRadius: 4,
+    },
+    {
+      id: 'invested',
+      label: 'Invested',
+      data: investedData,
+      backgroundColor: 'rgba(99, 102, 241, 0.65)',
+      borderColor: '#6366f1',
+      borderWidth: 1,
+      borderRadius: 4,
+    }
+  ];
+
+  const datasets = cashflowView
+    ? allDatasets.filter(d => d.id === cashflowView)
+    : allDatasets;
 
   const ctx = document.getElementById('chart-cashflow').getContext('2d');
   if (chartCashflow) chartCashflow.destroy();
@@ -499,24 +547,7 @@ function renderCashFlowChart() {
     type: 'bar',
     data: {
       labels: months.map(m => m.label),
-      datasets: [
-        {
-          label: 'Cash In',
-          data: inData,
-          backgroundColor: 'rgba(52, 211, 153, 0.65)',
-          borderColor: '#34d399',
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-        {
-          label: 'Cash Out',
-          data: outData,
-          backgroundColor: 'rgba(248, 113, 113, 0.65)',
-          borderColor: '#f87171',
-          borderWidth: 1,
-          borderRadius: 4,
-        }
-      ]
+      datasets
     },
     options: {
       responsive: true,

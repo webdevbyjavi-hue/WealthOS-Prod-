@@ -24,7 +24,7 @@ const accountRules = [
 ];
 
 const transactionRules = [
-  body('type').isIn(['in', 'out']).withMessage("type must be 'in' or 'out'."),
+  body('type').isIn(['in', 'out', 'invested']).withMessage("type must be 'in', 'out', or 'invested'."),
   body('amount').isFloat({ min: 0.01 }).withMessage('amount must be a positive number.'),
   body('date').optional().isISO8601().withMessage('date must be a valid ISO date.'),
 ];

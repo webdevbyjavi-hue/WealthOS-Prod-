@@ -229,24 +229,24 @@
       <!-- KPI STRIP -->
       <div class="bonos-kpi-grid">
         <div class="kpi-card kpi-card--primary">
-          <span class="kpi__label">Valor de Mercado</span>
+          <span class="kpi__label">Monto Total Invertido</span>
           <span class="kpi__value" id="b-total-value">$0.00</span>
-          <span class="kpi__change kpi__change--up" id="b-total-change">+0.00%</span>
+          <span class="kpi__change kpi__change--up" id="b-total-change">0 posiciones</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi__label">Capital Invertido</span>
-          <span class="kpi__value kpi__value--sm" id="b-invested">$0.00</span>
-          <span class="kpi__sub">costo de adquisición</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi__label">Ganancia / Pérdida</span>
-          <span class="kpi__value kpi__value--sm" id="b-gain">$0.00</span>
-          <span class="kpi__sub" id="b-gain-pct">0.00%</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi__label">Rendimiento Promedio</span>
+          <span class="kpi__label">Tasa Promedio</span>
           <span class="kpi__value kpi__value--sm" id="b-avg-yield">0.00%</span>
-          <span class="kpi__sub">ponderado por valor</span>
+          <span class="kpi__sub">ponderada por monto</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi__label">Intereses Est. Anuales</span>
+          <span class="kpi__value kpi__value--sm" id="b-gain">$0.00</span>
+          <span class="kpi__sub" id="b-gain-pct">sobre el monto invertido</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi__label">Posiciones Activas</span>
+          <span class="kpi__value kpi__value--sm" id="b-invested">0</span>
+          <span class="kpi__sub">instrumentos en cartera</span>
         </div>
       </div>
 
@@ -295,7 +295,7 @@
             <span class="holdings-count" id="bonos-count">0 posiciones</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar instrumento o serie…" oninput="filterBonosTable(this.value)" />
+            <input class="search-input" type="text" placeholder="Buscar tipo o plazo…" oninput="filterBonosTable(this.value)" />
             <button class="btn btn--primary" onclick="openBonoModal()">+ Agregar Bono</button>
           </div>
         </div>
@@ -304,15 +304,12 @@
             <thead>
               <tr>
                 <th></th>
-                <th class="th-sort" data-col="instrumento" onclick="sortBonos('instrumento')">Instrumento <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="serie" onclick="sortBonos('serie')">Serie <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="titulos" onclick="sortBonos('titulos')">Títulos <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="precioCompra" onclick="sortBonos('precioCompra')">Precio Compra <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="precioActual" onclick="sortBonos('precioActual')">Precio Actual <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="value" onclick="sortBonos('value')">Valor de Mercado <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="gain" onclick="sortBonos('gain')">Ganancia / Pérdida <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="rendimiento" onclick="sortBonos('rendimiento')">Rendimiento <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="vencimiento" onclick="sortBonos('vencimiento')">Vencimiento <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="tipo"         onclick="sortBonos('tipo')">Tipo <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="plazo"        onclick="sortBonos('plazo')">Plazo <span class="sort-icon">↕</span></th>
+                <th>Descripción</th>
+                <th class="th-sort" data-col="tasaCompra"   onclick="sortBonos('tasaCompra')">Tasa Compra <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="monto"        onclick="sortBonos('monto')">Monto Invertido <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="purchaseDate" onclick="sortBonos('purchaseDate')">Fecha Compra <span class="sort-icon">↕</span></th>
                 <th></th>
               </tr>
             </thead>
@@ -834,6 +831,23 @@
 <!-- TOAST -->
 <div id="toast-container" class="toast-container"></div>
 
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay" id="confirm-delete-overlay">
+  <div class="modal confirm-modal">
+    <div class="modal__header confirm-modal__header">
+      <span class="confirm-modal__icon">⚠</span>
+      <h2 class="modal__title confirm-modal__title" id="confirm-modal-title">Eliminar posición</h2>
+    </div>
+    <div class="modal__body confirm-modal__body">
+      <p class="confirm-modal__message" id="confirm-modal-message">¿Estás seguro de que deseas eliminar esta posición? Esta acción no se puede deshacer.</p>
+    </div>
+    <div class="modal__actions confirm-modal__actions">
+      <button class="btn btn--ghost" id="confirm-cancel-btn">Cancelar</button>
+      <button class="btn btn--danger" id="confirm-delete-btn">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <!-- STOCK ADD / EDIT MODAL -->
 <div class="modal-overlay" id="stock-modal-overlay" onclick="closeStockModal(event)">
   <div class="modal">
@@ -888,69 +902,66 @@
 <div class="modal-overlay" id="bono-modal-overlay" onclick="closeBonoModal(event)">
   <div class="modal">
     <div class="modal__header">
-      <h2 class="modal__title" id="bono-modal-title">Agregar Bono</h2>
+      <h2 class="modal__title" id="bono-modal-title">Agregar Bono Gubernamental</h2>
       <button class="modal__close" onclick="closeBonoModal()">✕</button>
     </div>
     <div class="modal__body">
+
+      <!-- Row 1: Tipo + Plazo (cascading) -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Instrumento</label>
-          <select class="form-input" id="bi-instrumento">
-            <option value="CETES">CETES</option>
-            <option value="BONDIA">BONDIA</option>
-            <option value="BONOS">BONOS</option>
-            <option value="UDIBONOS">UDIBONOS</option>
+          <label class="form-label">Tipo de Instrumento</label>
+          <select class="form-input" id="bi-tipo" onchange="onBonoTipoChange(this.value)">
+            <!-- Populated dynamically from catalog -->
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Serie</label>
-          <input class="form-input" id="bi-serie" type="text" placeholder="e.g. BI 250130" />
+          <label class="form-label">Plazo</label>
+          <select class="form-input" id="bi-plazo" onchange="onBonoPlazoChange(this.value)">
+            <!-- Populated dynamically based on selected tipo -->
+          </select>
         </div>
       </div>
+
+      <!-- Row 2: Descripción (read-only, from catalog) -->
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Títulos</label>
-          <input class="form-input" id="bi-titulos" type="number" placeholder="0" min="1" step="1" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Valor Nominal (MXN)</label>
-          <input class="form-input" id="bi-nominal" type="number" placeholder="10.00" min="0" step="0.01" />
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Descripción</label>
+          <input class="form-input" id="bi-descripcion" type="text" readonly placeholder="Se llena automáticamente al seleccionar tipo y plazo" />
         </div>
       </div>
+
+      <!-- Row 3: Tasa de Interés + Lookup -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Precio de Compra (MXN)</label>
-          <input class="form-input" id="bi-compra" type="number" placeholder="0.0000" min="0" step="0.0001" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Precio Actual (MXN)</label>
-          <input class="form-input" id="bi-actual" type="number" placeholder="0.0000" min="0" step="0.0001" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Tasa Cupón (%)</label>
-          <input class="form-input" id="bi-cupon" type="number" placeholder="0.00" min="0" step="0.01" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Rendimiento (%)</label>
-          <input class="form-input" id="bi-rendimiento" type="number" placeholder="0.00" min="0" step="0.01" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Fecha de Vencimiento</label>
-          <div class="datepicker">
-            <input class="form-input datepicker__input" id="bi-vencimiento" type="text" readonly placeholder="Select date…" autocomplete="off" />
-            <div class="datepicker__popup" hidden></div>
+          <label class="form-label">Tasa de Interés (%)</label>
+          <div class="input-lookup-row">
+            <input class="form-input" id="bi-tasa" type="number" placeholder="0.00" min="0" step="0.0001" />
+            <button class="btn btn--ghost btn--lookup" id="bi-lookup-btn" onclick="lookupBonoTasa()">Lookup</button>
           </div>
+          <span class="form-hint" id="bi-tasa-ref" style="display:none"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Serie Banxico</label>
+          <input class="form-input" id="bi-serie-banxico" type="text" readonly placeholder="SF00000" />
+        </div>
+      </div>
+
+      <!-- Row 4: Monto + Fecha de Compra -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Monto Invertido (MXN)</label>
+          <input class="form-input" id="bi-monto" type="number" placeholder="0.00" min="0" step="0.01" />
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de Compra</label>
           <div class="datepicker">
-            <input class="form-input datepicker__input" id="bi-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <input class="form-input datepicker__input" id="bi-fecha" type="text" readonly placeholder="Seleccionar fecha…" autocomplete="off" />
             <div class="datepicker__popup" hidden></div>
           </div>
         </div>
       </div>
+
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeBonoModal()">Cancelar</button>
         <button class="btn btn--primary" onclick="saveBono()">Guardar Posición</button>

@@ -38,6 +38,34 @@ function showToast(msg) {
   setTimeout(() => { t.classList.remove('toast--visible'); setTimeout(() => t.remove(), 300); }, 3000);
 }
 
+// ─── Confirm-delete modal ─────────────────────────────────────────────────────
+(function () {
+  const overlay  = document.getElementById('confirm-delete-overlay');
+  const cancelBtn = document.getElementById('confirm-cancel-btn');
+  const deleteBtn = document.getElementById('confirm-delete-btn');
+  const msgEl    = document.getElementById('confirm-modal-message');
+  const titleEl  = document.getElementById('confirm-modal-title');
+  let _resolve;
+
+  function openConfirm(message, title) {
+    msgEl.textContent   = message || '¿Estás seguro? Esta acción no se puede deshacer.';
+    titleEl.textContent = title   || 'Eliminar posición';
+    overlay.classList.add('modal-overlay--visible');
+    return new Promise(resolve => { _resolve = resolve; });
+  }
+
+  function close(result) {
+    overlay.classList.remove('modal-overlay--visible');
+    if (_resolve) { _resolve(result); _resolve = null; }
+  }
+
+  cancelBtn.addEventListener('click', () => close(false));
+  deleteBtn.addEventListener('click', () => close(true));
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+
+  window.confirmDelete = openConfirm;
+})();
+
 // ─── Stock ticker lookup ───────────────────────────────────────────────────────
 async function lookupStockTicker() {
   const ticker = document.getElementById('si-ticker').value.trim().toUpperCase();
@@ -171,8 +199,8 @@ function renderKPIs() {
 function renderSummaryStrip() {
   const stocksValue    = stocks.reduce((s, h) => s + h.currentPrice * h.shares, 0);
   const stocksInvested = stocks.reduce((s, h) => s + h.avgCost      * h.shares, 0);
-  const bonosValue     = bonos.reduce((s, b)  => s + b.precioActual * b.titulos, 0);
-  const bonosInvested  = bonos.reduce((s, b)  => s + b.precioCompra * b.titulos, 0);
+  const bonosValue     = bonos.reduce((s, b)  => s + b.monto, 0);
+  const bonosInvested  = bonos.reduce((s, b)  => s + b.monto, 0);
   const fondosValue    = fondos.reduce((s, f) => s + f.navActual * f.unidades, 0);
   const fondosInvested = fondos.reduce((s, f) => s + f.precioCompra * f.unidades, 0);
   const fibrasValue    = fibras.reduce((s, f) => s + f.precioActual * f.certificados, 0);
@@ -605,7 +633,7 @@ async function saveStock() {
 }
 
 async function removeStock(id) {
-  if (!confirm('Remove this position?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Stock')) return;
   const s = stocks.find(h => h.id === id);
   const backup = [...stocks];
   stocks = stocks.filter(h => h.id !== id);
@@ -634,30 +662,19 @@ function renderAll() {
 // ─── Instrument colour map ────────────────────────────────────────────────────
 const INSTRUMENTO_COLORS = {
   'CETES':    '#6366f1',
-  'BONDIA':   '#34d399',
-  'BONOS':    '#fbbf24',
+  'BONDES D': '#34d399',
+  'M-Bonos':  '#fbbf24',
   'UDIBONOS': '#f87171',
 };
-function instrColor(instr) { return INSTRUMENTO_COLORS[instr] || '#8b5cf6'; }
-
-// ─── Sample data ──────────────────────────────────────────────────────────────
-const SAMPLE_BONOS = [
-  { id:1, instrumento:'CETES',    serie:'BI 250130', titulos:5000,  valorNominal:10,  precioCompra:9.4500, precioActual:9.7200, tasaCupon:0,    rendimiento:11.60, vencimiento:'2025-01-30', fechaCompra:'2024-07-15' },
-  { id:2, instrumento:'CETES',    serie:'BI 250424', titulos:3000,  valorNominal:10,  precioCompra:9.1200, precioActual:9.5500, tasaCupon:0,    rendimiento:11.40, vencimiento:'2025-04-24', fechaCompra:'2024-10-20' },
-  { id:3, instrumento:'BONOS',    serie:'M 281115',  titulos:200,   valorNominal:100, precioCompra:98.50,  precioActual:101.20, tasaCupon:8.50, rendimiento:9.80,  vencimiento:'2028-11-15', fechaCompra:'2023-05-08' },
-  { id:4, instrumento:'UDIBONOS', serie:'S 291206',  titulos:150,   valorNominal:100, precioCompra:99.20,  precioActual:102.50, tasaCupon:4.00, rendimiento:4.20,  vencimiento:'2029-12-06', fechaCompra:'2022-12-12' },
-  { id:5, instrumento:'BONDIA',   serie:'BI 250106', titulos:10000, valorNominal:10,  precioCompra:9.9800, precioActual:10.000, tasaCupon:0,    rendimiento:11.75, vencimiento:'2025-01-06', fechaCompra:'2024-12-01' },
-  { id:6, instrumento:'BONOS',    serie:'M 461119',  titulos:100,   valorNominal:100, precioCompra:95.80,  precioActual:98.30,  tasaCupon:10.0, rendimiento:10.25, vencimiento:'2046-11-19', fechaCompra:'2024-03-22' },
-];
+function instrColor(tipo) { return INSTRUMENTO_COLORS[tipo] || '#8b5cf6'; }
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let bonos = [];
+let bonosCatalog = null;   // { catalog: [...], tipos: [...] } — loaded once on first modal open
 let bonosLineRangeDays = 7;
 let bonosLineChart, bonosDonutChart, bonosBarChart;
 let editingBonoId = null;
 let bonosSortCol = null, bonosSortDir = 1;
-
-function saveBonos() { /* no-op — data goes directly to API */ }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 function sortBonos(col) {
@@ -667,42 +684,28 @@ function sortBonos(col) {
 }
 function getBonoSortValue(b, col) {
   switch (col) {
-    case 'instrumento':  return b.instrumento;
-    case 'serie':        return b.serie;
-    case 'titulos':      return b.titulos;
-    case 'precioCompra': return b.precioCompra;
-    case 'precioActual': return b.precioActual;
-    case 'value':        return b.precioActual * b.titulos;
-    case 'gain':         return (b.precioActual - b.precioCompra) * b.titulos;
-    case 'rendimiento':  return b.rendimiento;
-    case 'vencimiento':  return b.vencimiento;
+    case 'tipo':         return b.tipo;
+    case 'plazo':        return b.plazo;
+    case 'tasaCompra':   return b.tasaCompra;
+    case 'monto':        return b.monto;
+    case 'purchaseDate': return b.purchaseDate;
     default:             return 0;
   }
 }
 
 // ─── KPI Rendering ────────────────────────────────────────────────────────────
 function renderBonosKPIs() {
-  const totalValue    = bonos.reduce((s, b) => s + b.precioActual * b.titulos, 0);
-  const totalInvested = bonos.reduce((s, b) => s + b.precioCompra * b.titulos, 0);
-  const gain          = totalValue - totalInvested;
-  const gainPct       = totalInvested ? (gain / totalInvested) * 100 : 0;
-  const weightedYield = totalValue
-    ? bonos.reduce((s, b) => s + b.rendimiento * (b.precioActual * b.titulos), 0) / totalValue
+  const totalMonto    = bonos.reduce((s, b) => s + b.monto, 0);
+  const weightedYield = totalMonto
+    ? bonos.reduce((s, b) => s + b.tasaCompra * b.monto, 0) / totalMonto
     : 0;
+  const estInterest   = bonos.reduce((s, b) => s + b.monto * (b.tasaCompra / 100), 0);
 
-  document.getElementById('b-total-value').textContent  = fmt(totalValue);
-  document.getElementById('b-total-change').textContent = fmtPct(gainPct);
-  document.getElementById('b-total-change').className   =
-    'kpi__change ' + (gainPct >= 0 ? 'kpi__change--up' : 'kpi__change--down');
-
-  document.getElementById('b-invested').textContent = fmt(totalInvested);
-
-  const gainEl = document.getElementById('b-gain');
-  gainEl.textContent = (gain >= 0 ? '+' : '') + fmt(gain);
-  gainEl.className   = 'kpi__value kpi__value--sm ' + (gain >= 0 ? 'kpi__change--up' : 'kpi__change--down');
-  document.getElementById('b-gain-pct').textContent = fmtPct(gainPct);
-
-  document.getElementById('b-avg-yield').textContent = weightedYield.toFixed(2) + '%';
+  document.getElementById('b-total-value').textContent  = fmt(totalMonto);
+  document.getElementById('b-total-change').textContent = `${bonos.length} posición${bonos.length !== 1 ? 'es' : ''}`;
+  document.getElementById('b-avg-yield').textContent    = weightedYield.toFixed(2) + '%';
+  document.getElementById('b-gain').textContent         = fmt(estInterest);
+  document.getElementById('b-invested').textContent     = bonos.length;
 
   renderSummaryStrip();
 }
@@ -714,7 +717,8 @@ function renderBonosTable(filter = '') {
   tbody.innerHTML = '';
 
   let filtered = bonos.filter(b =>
-    b.instrumento.toLowerCase().includes(f) || b.serie.toLowerCase().includes(f)
+    b.tipo.toLowerCase().includes(f) || b.plazo.toLowerCase().includes(f) ||
+    (b.descripcion || '').toLowerCase().includes(f)
   );
 
   if (bonosSortCol) {
@@ -740,30 +744,27 @@ function renderBonosTable(filter = '') {
     `${bonos.length} posición${bonos.length !== 1 ? 'es' : ''}`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="table__empty">Sin posiciones en bonos gubernamentales.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="table__empty">Sin posiciones en bonos gubernamentales.</td></tr>`;
     return;
   }
 
   filtered.forEach(b => {
-    const mv   = b.precioActual * b.titulos;
-    const gain = (b.precioActual - b.precioCompra) * b.titulos;
-    const up   = gain >= 0;
-    const venc = new Date(b.vencimiento + 'T12:00:00').toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
-    const color = instrColor(b.instrumento);
+    const color   = instrColor(b.tipo);
+    const dateStr = b.purchaseDate
+      ? new Date(b.purchaseDate + 'T12:00:00').toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '—';
+    const desc = b.descripcion || b.serieBanxico || '—';
 
     const tr = document.createElement('tr');
     tr.className = 'table-row';
     tr.innerHTML = `
       <td><span class="s-indicator" style="background:${color};box-shadow:0 0 6px ${color}66"></span></td>
-      <td class="td--ticker" style="color:${color}">${b.instrumento}</td>
-      <td class="s-td-company">${b.serie}</td>
-      <td>${b.titulos.toLocaleString()}</td>
-      <td>${fmt(b.precioCompra)}</td>
-      <td class="td--price">${fmt(b.precioActual)}</td>
-      <td>${fmt(mv)}</td>
-      <td class="${up ? 'td--up' : 'td--down'}">${(up ? '+' : '') + fmt(gain)}</td>
-      <td>${b.rendimiento.toFixed(2)}%</td>
-      <td>${venc}</td>
+      <td class="td--ticker" style="color:${color}">${b.tipo}</td>
+      <td>${b.plazo}</td>
+      <td class="s-td-company" title="${desc}">${desc.length > 45 ? desc.slice(0, 42) + '…' : desc}</td>
+      <td>${b.tasaCompra.toFixed(4)}%</td>
+      <td>${fmt(b.monto)}</td>
+      <td>${dateStr}</td>
       <td>
         <div class="s-row-actions">
           <button class="s-btn-edit" onclick="openBonoModal('${b.id}')" title="Editar">✎</button>
@@ -782,7 +783,7 @@ function getBonosPortfolioHistory(n) {
     bonos.reduce((s, b) => {
       const hist = b.history || [];
       const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || b.precioActual * b.titulos);
+      return s + (hist[idx] || b.monto);
     }, 0)
   );
 }
@@ -825,9 +826,9 @@ function initBonosCharts() {
     }
   });
 
-  // Donut — allocation by instrumento
+  // Donut — allocation by tipo
   const grouped = {};
-  bonos.forEach(b => { grouped[b.instrumento] = (grouped[b.instrumento] || 0) + b.precioActual * b.titulos; });
+  bonos.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + b.monto; });
   const dLabels = Object.keys(grouped);
   bonosDonutChart = new Chart(document.getElementById('chart-bonos-donut'), {
     type: 'doughnut',
@@ -844,16 +845,16 @@ function initBonosCharts() {
     }
   });
 
-  // Bar — rendimiento per position
+  // Bar — tasa compra per position
   bonosBarChart = new Chart(document.getElementById('chart-bonos-bar'), {
     type: 'bar',
     data: {
-      labels: bonos.map(b => b.serie),
+      labels: bonos.map(b => `${b.tipo} ${b.plazo}`),
       datasets: [{
-        label: 'Rendimiento',
-        data: bonos.map(b => b.rendimiento),
-        backgroundColor: bonos.map(b => instrColor(b.instrumento) + 'bf'),
-        borderColor: bonos.map(b => instrColor(b.instrumento)),
+        label: 'Tasa Compra',
+        data: bonos.map(b => b.tasaCompra),
+        backgroundColor: bonos.map(b => instrColor(b.tipo) + 'bf'),
+        borderColor: bonos.map(b => instrColor(b.tipo)),
         borderWidth: 1, borderRadius: 5, borderSkipped: false,
       }]
     },
@@ -861,7 +862,7 @@ function initBonosCharts() {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor:'#111525', borderColor:'#1e2640', borderWidth:1, padding:10, callbacks:{ label(ctx){ return '  '+ctx.raw.toFixed(2)+'%'; } } }
+        tooltip: { backgroundColor:'#111525', borderColor:'#1e2640', borderWidth:1, padding:10, callbacks:{ label(ctx){ return '  '+ctx.raw.toFixed(4)+'%'; } } }
       },
       scales: {
         x: { grid:{ display:false }, ticks:{ color:'#8892a4', padding:4 }, border:{ color:'#1e2640' } },
@@ -884,17 +885,17 @@ function updateBonosCharts() {
   bonosLineChart.update();
 
   const grouped = {};
-  bonos.forEach(b => { grouped[b.instrumento] = (grouped[b.instrumento] || 0) + b.precioActual * b.titulos; });
+  bonos.forEach(b => { grouped[b.tipo] = (grouped[b.tipo] || 0) + b.monto; });
   const dLabels = Object.keys(grouped);
   bonosDonutChart.data.labels = dLabels;
   bonosDonutChart.data.datasets[0].data = dLabels.map(k => parseFloat(grouped[k].toFixed(2)));
   bonosDonutChart.data.datasets[0].backgroundColor = dLabels.map(instrColor);
   bonosDonutChart.update();
 
-  bonosBarChart.data.labels = bonos.map(b => b.serie);
-  bonosBarChart.data.datasets[0].data = bonos.map(b => b.rendimiento);
-  bonosBarChart.data.datasets[0].backgroundColor = bonos.map(b => instrColor(b.instrumento) + 'bf');
-  bonosBarChart.data.datasets[0].borderColor = bonos.map(b => instrColor(b.instrumento));
+  bonosBarChart.data.labels = bonos.map(b => `${b.tipo} ${b.plazo}`);
+  bonosBarChart.data.datasets[0].data = bonos.map(b => b.tasaCompra);
+  bonosBarChart.data.datasets[0].backgroundColor = bonos.map(b => instrColor(b.tipo) + 'bf');
+  bonosBarChart.data.datasets[0].borderColor = bonos.map(b => instrColor(b.tipo));
   bonosBarChart.update();
 }
 
@@ -905,50 +906,117 @@ function setBonosLineRange(days, btn) {
   updateBonosCharts();
 }
 
-// ─── Add / Edit Modal ─────────────────────────────────────────────────────────
-// Fetch live Tasa de Interés from Banxico and pre-fill the rendimiento field.
-// Shows a placeholder while loading; silently skips on error so the user can
-// still enter the rate manually.
-async function fetchBonoTasa(instrumento) {
-  const el = document.getElementById('bi-rendimiento');
-  el.placeholder = 'Cargando…';
-  el.disabled    = true;
+// ─── Catalog helpers — cascading dropdown support ─────────────────────────────
+function _populateBonoTipos() {
+  const sel = document.getElementById('bi-tipo');
+  sel.innerHTML = '';
+  if (!bonosCatalog) return;
+  bonosCatalog.tipos.forEach(tipo => {
+    const opt = document.createElement('option');
+    opt.value = tipo; opt.textContent = tipo;
+    sel.appendChild(opt);
+  });
+}
+
+function _populateBonoPlazo(tipo) {
+  const sel = document.getElementById('bi-plazo');
+  sel.innerHTML = '';
+  if (!bonosCatalog) return;
+  bonosCatalog.catalog.filter(e => e.tipo === tipo).forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e.plazo; opt.textContent = e.plazo;
+    sel.appendChild(opt);
+  });
+}
+
+function _resolveBonoEntry(tipo, plazo) {
+  if (!bonosCatalog) return null;
+  return bonosCatalog.catalog.find(e => e.tipo === tipo && e.plazo === plazo) || null;
+}
+
+// Called when tipo dropdown changes (inline onchange= handler in HTML)
+function onBonoTipoChange(tipo) {
+  _populateBonoPlazo(tipo);
+  onBonoPlazoChange(document.getElementById('bi-plazo').value);
+}
+
+// Called when plazo dropdown changes — fills description + serie read-only fields
+function onBonoPlazoChange(plazo) {
+  const tipo  = document.getElementById('bi-tipo').value;
+  const entry = _resolveBonoEntry(tipo, plazo);
+  if (!entry) return;
+  document.getElementById('bi-descripcion').value   = entry.descripcion || '';
+  document.getElementById('bi-serie-banxico').value = entry.serie_banxico;
+}
+
+// ─── Lookup button ────────────────────────────────────────────────────────────
+async function lookupBonoTasa() {
+  const serieBanxico = document.getElementById('bi-serie-banxico').value.trim();
+  if (!serieBanxico) { showToast('Selecciona un instrumento y plazo primero.'); return; }
+
+  const btn = document.getElementById('bi-lookup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Buscando…';
+
   try {
-    const data = await WOS_API.bonos.getTasa(instrumento);
-    el.value = data.tasa;
-    el.title = `Tasa de Interés Banxico (${data.fecha}) — Serie ${data.serie}`;
-  } catch (_) {
-    el.value = '';
-    el.title = '';
+    const data = await WOS_API.bonos.getTasa(serieBanxico);
+    document.getElementById('bi-tasa').value = data.tasa;
+    const refEl = document.getElementById('bi-tasa-ref');
+    refEl.textContent  = `Banxico · ${data.fecha} · ${data.serie_banxico}`;
+    refEl.style.display = 'block';
+    showToast(`Tasa: ${data.tasa}% al ${data.fecha}`);
+  } catch (err) {
+    showToast(err.message || 'Error al consultar Banxico. Ingresa la tasa manualmente.');
   } finally {
-    el.placeholder = '0.00';
-    el.disabled    = false;
+    btn.disabled = false;
+    btn.textContent = 'Lookup';
   }
 }
 
-function openBonoModal(id = null) {
+// ─── Open / Close Modal ───────────────────────────────────────────────────────
+async function openBonoModal(id = null) {
   editingBonoId = id;
-  document.getElementById('bono-modal-title').textContent = id ? 'Editar Bono' : 'Agregar Bono';
+  document.getElementById('bono-modal-title').textContent =
+    id ? 'Editar Bono Gubernamental' : 'Agregar Bono Gubernamental';
+
+  // Load catalog once
+  if (!bonosCatalog) {
+    try {
+      bonosCatalog = await WOS_API.bonos.getCatalog();
+    } catch (_) {
+      showToast('No se pudo cargar el catálogo. Recarga la página.');
+      return;
+    }
+  }
+
+  _populateBonoTipos();
+  document.getElementById('bi-tasa-ref').style.display = 'none';
+  document.getElementById('bi-tasa-ref').textContent   = '';
+
   if (id) {
     const b = bonos.find(x => x.id === id);
     if (!b) return;
-    document.getElementById('bi-instrumento').value = b.instrumento;
-    document.getElementById('bi-serie').value       = b.serie;
-    document.getElementById('bi-titulos').value     = b.titulos;
-    document.getElementById('bi-nominal').value     = b.valorNominal;
-    document.getElementById('bi-compra').value      = b.precioCompra;
-    document.getElementById('bi-actual').value      = b.precioActual;
-    document.getElementById('bi-cupon').value       = b.tasaCupon;
-    document.getElementById('bi-rendimiento').value = b.rendimiento;
-    document.getElementById('bi-vencimiento').value = b.vencimiento;
-    document.getElementById('bi-fecha').value       = b.fechaCompra || '';
+    document.getElementById('bi-tipo').value          = b.tipo;
+    _populateBonoPlazo(b.tipo);
+    document.getElementById('bi-plazo').value         = b.plazo;
+    document.getElementById('bi-descripcion').value   = b.descripcion || '';
+    document.getElementById('bi-serie-banxico').value = b.serieBanxico || '';
+    document.getElementById('bi-tasa').value          = b.tasaCompra;
+    document.getElementById('bi-monto').value         = b.monto;
+    document.getElementById('bi-fecha').value         = b.purchaseDate || '';
   } else {
-    ['bi-serie','bi-titulos','bi-nominal','bi-compra','bi-actual','bi-cupon','bi-rendimiento','bi-vencimiento','bi-fecha']
-      .forEach(id => { document.getElementById(id).value = ''; });
-    document.getElementById('bi-instrumento').value = 'CETES';
-    // Auto-fetch the live rate for the default instrument on new entries
-    fetchBonoTasa('CETES');
+    const firstTipo = bonosCatalog.tipos[0] || '';
+    document.getElementById('bi-tipo').value = firstTipo;
+    _populateBonoPlazo(firstTipo);
+    const firstPlazo = document.getElementById('bi-plazo').value;
+    onBonoPlazoChange(firstPlazo);
+    document.getElementById('bi-tasa').value  = '';
+    document.getElementById('bi-monto').value = '';
+    document.getElementById('bi-fecha').value = '';
+    // Auto-fetch the live rate for the default selection
+    if (firstTipo && firstPlazo) lookupBonoTasa();
   }
+
   document.getElementById('bono-modal-overlay').classList.add('modal-overlay--visible');
 }
 
@@ -960,19 +1028,16 @@ function closeBonoModal(e) {
 }
 
 async function saveBono() {
-  const instrumento  = document.getElementById('bi-instrumento').value;
-  const serie        = document.getElementById('bi-serie').value.trim().toUpperCase();
-  const titulos      = parseInt(document.getElementById('bi-titulos').value);
-  const valorNominal = parseFloat(document.getElementById('bi-nominal').value);
-  const precioCompra = parseFloat(document.getElementById('bi-compra').value);
-  const precioActual = parseFloat(document.getElementById('bi-actual').value);
-  const tasaCupon    = parseFloat(document.getElementById('bi-cupon').value) || 0;
-  const rendimiento  = parseFloat(document.getElementById('bi-rendimiento').value);
-  const vencimiento  = document.getElementById('bi-vencimiento').value;
-  const fechaCompra  = document.getElementById('bi-fecha').value || null;
+  const tipo         = document.getElementById('bi-tipo').value;
+  const plazo        = document.getElementById('bi-plazo').value;
+  const serieBanxico = document.getElementById('bi-serie-banxico').value.trim();
+  const tasaCompra   = parseFloat(document.getElementById('bi-tasa').value);
+  const monto        = parseFloat(document.getElementById('bi-monto').value);
+  const purchaseDate = document.getElementById('bi-fecha').value || null;
+  const descripcion  = document.getElementById('bi-descripcion').value || '';
 
-  if (!serie || isNaN(titulos) || isNaN(valorNominal) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(rendimiento) || !vencimiento) {
-    alert('Por favor completa todos los campos.');
+  if (!tipo || !plazo || !serieBanxico || isNaN(tasaCompra) || isNaN(monto) || !purchaseDate) {
+    showToast('Por favor completa todos los campos requeridos.');
     return;
   }
 
@@ -982,25 +1047,14 @@ async function saveBono() {
   if (editId) {
     const b = bonos.find(x => x.id === editId);
     backup = { ...b };
-    if (b) Object.assign(b, { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra });
+    if (b) Object.assign(b, { tipo, plazo, serieBanxico, tasaCompra, monto, purchaseDate, descripcion });
     apiAction = 'update'; targetId = editId;
   } else {
-    const existing = bonos.find(x => x.instrumento === instrumento && x.serie === serie);
-    if (existing) {
-      backup = { ...existing };
-      const totalTitulos = existing.titulos + titulos;
-      existing.precioCompra = (existing.titulos * existing.precioCompra + titulos * precioCompra) / totalTitulos;
-      existing.titulos = totalTitulos; existing.precioActual = precioActual; existing.rendimiento = rendimiento;
-      if (fechaCompra && !existing.fechaCompra) existing.fechaCompra = fechaCompra;
-      showToast(`Posición consolidada con ${instrumento} ${serie}.`);
-      apiAction = 'update'; targetId = existing.id;
-    } else {
-      targetId = Date.now();
-      bonos.push({ id: targetId, instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento, fechaCompra, history: generateHistory(precioActual * titulos) });
-    }
+    targetId = Date.now();
+    bonos.push({ id: targetId, tipo, plazo, serieBanxico, tasaCompra, monto, purchaseDate, descripcion, history: generateHistory(monto) });
   }
 
-  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏛️', title: `${editId ? 'Updated' : 'Added'} Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
+  logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏛️', title: `${editId ? 'Updated' : 'Added'} Bono: ${tipo} ${plazo}`, detail: `Tasa: ${tasaCompra}% · Monto: ${fmt(monto)}`, amount: monto });
   renderAllBonos();
   closeBonoModal();
 
@@ -1017,11 +1071,11 @@ async function saveBono() {
 }
 
 async function removeBono(id) {
-  if (!confirm('¿Eliminar esta posición?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Bono')) return;
   const b = bonos.find(x => x.id === id);
   const backup = [...bonos];
   bonos = bonos.filter(x => x.id !== id);
-  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏛️', title: `Removed Bono: ${b.instrumento} ${b.serie}`, detail: `${b.titulos} títulos`, amount: b.precioActual * b.titulos });
+  if (b) logEvent({ type: 'investment_removed', category: 'Investment', icon: '🏛️', title: `Removed Bono: ${b.tipo} ${b.plazo}`, detail: `Tasa: ${b.tasaCompra}% · Monto: ${fmt(b.monto)}`, amount: b.monto });
   renderAllBonos();
   try {
     await WOS_API.holdings.remove('bonos', id);
@@ -1403,7 +1457,7 @@ async function saveFondo() {
 }
 
 async function removeFondo(id) {
-  if (!confirm('¿Eliminar esta posición?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Fondo')) return;
   const f = fondos.find(x => x.id === id);
   const backup = [...fondos];
   fondos = fondos.filter(x => x.id !== id);
@@ -1791,7 +1845,7 @@ async function saveFibra() {
 }
 
 async function removeFibra(id) {
-  if (!confirm('¿Eliminar esta posición?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Fibra')) return;
   const f = fibras.find(x => x.id === id);
   const backup = [...fibras];
   fibras = fibras.filter(x => x.id !== id);
@@ -2166,7 +2220,7 @@ async function saveRetiro() {
 }
 
 async function removeRetiro(id) {
-  if (!confirm('¿Eliminar esta posición?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Retiro')) return;
   const r = retiro.find(x => x.id === id);
   const backup = [...retiro];
   retiro = retiro.filter(x => x.id !== id);
@@ -2631,7 +2685,7 @@ async function saveBien() {
 }
 
 async function removeBien(id) {
-  if (!confirm('¿Eliminar esta propiedad?')) return;
+  if (!await confirmDelete('¿Eliminar esta propiedad? Esta acción no se puede deshacer.', 'Eliminar Propiedad')) return;
   const b = bienes.find(x => x.id === id);
   const backup = [...bienes];
   bienes = bienes.filter(x => x.id !== id);
@@ -3029,7 +3083,7 @@ async function saveCrypto() {
 }
 
 async function removeCrypto(id) {
-  if (!confirm('Remove this position?')) return;
+  if (!await confirmDelete('¿Eliminar esta posición? Esta acción no se puede deshacer.', 'Eliminar Crypto')) return;
   const c = cryptos.find(x => x.id === id);
   const backup = [...cryptos];
   cryptos = cryptos.filter(x => x.id !== id);
@@ -3087,12 +3141,6 @@ async function initHoldings() {
 }
 
 initHoldings();
-
-// When the user switches instrumento in the Add Bono modal, fetch the live rate.
-// Only fires on new entries (editingBonoId === null) so edits keep the saved value.
-document.getElementById('bi-instrumento').addEventListener('change', function () {
-  if (editingBonoId === null) fetchBonoTasa(this.value);
-});
 
 window.addEventListener('resize', () => {
   if (lineChart) lineChart.resize();

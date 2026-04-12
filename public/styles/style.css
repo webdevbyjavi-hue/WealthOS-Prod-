@@ -820,6 +820,7 @@ button.nav__item {
   white-space: nowrap;
 }
 .btn--lookup:disabled { opacity: 0.5; cursor: default; }
+.form-hint { display: block; margin-top: 4px; font-size: 11px; color: var(--text-muted, #8892a4); }
 
 .form-input {
   background: var(--bg-base);

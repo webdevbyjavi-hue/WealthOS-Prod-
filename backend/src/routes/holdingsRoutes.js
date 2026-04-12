@@ -17,6 +17,7 @@ const validate = require('../middlewares/validate');
 const holdingsController = require('../controllers/holdingsController');
 const stocksController   = require('../controllers/stocksController');
 const banxicoService     = require('../services/banxicoService');
+const { BONOS_CATALOG, TIPOS, getPlazosByTipo } = require('../config/bonosCatalog');
 
 const uuidParam = param('id').isUUID().withMessage('id must be a valid UUID.');
 const positiveNumber = (field) => body(field).isFloat({ min: 0 }).withMessage(`${field} must be a non-negative number.`);
@@ -44,17 +45,14 @@ const stocksRules = [
   positiveNumber('current_price'),
 ];
 
-// ─── Bonos  { instrumento, serie, titulos, valor_nominal, precio_compra,
-//              precio_actual, tasa_cupon, rendimiento, vencimiento } ───────────
+// ─── Bonos  { tipo, plazo, serie_banxico, purchase_date, tasa_compra, monto } ─
 const bonosRules = [
-  body('instrumento').trim().notEmpty().withMessage('instrumento is required.'),
-  body('serie').trim().notEmpty().withMessage('serie is required.').toUpperCase(),
-  body('titulos').isInt({ min: 1 }).withMessage('titulos must be a positive integer.'),
-  positiveNumber('valor_nominal'),
-  positiveNumber('precio_compra'),
-  positiveNumber('precio_actual'),
-  positiveNumber('rendimiento'),
-  body('vencimiento').isISO8601().withMessage('vencimiento must be a valid date (YYYY-MM-DD).'),
+  body('tipo').trim().notEmpty().withMessage('tipo is required.'),
+  body('plazo').trim().notEmpty().withMessage('plazo is required.'),
+  body('serie_banxico').trim().notEmpty().withMessage('serie_banxico is required.'),
+  body('purchase_date').isISO8601().withMessage('purchase_date must be a valid date (YYYY-MM-DD).'),
+  positiveNumber('tasa_compra'),
+  positiveNumber('monto'),
 ];
 
 // ─── Fondos  { clave, nombre, operadora, unidades, precio_compra, nav_actual,
@@ -116,16 +114,26 @@ function buildStocksRouter() {
   return router;
 }
 
-// ─── Bonos router — extends the generic CRUD router with a live-rate lookup ──
+// ─── Bonos router — CRUD + catalog + live Banxico rate lookup ────────────────
 function buildBonosRouter() {
   const router = buildRouter('bonos', bonosRules);
 
-  // GET /api/bonos/tasa/:instrumento
-  // Returns the latest Tasa de Interés from Banxico BMX for the given instrument.
-  // Must be defined before any /:id wildcard routes (buildRouter adds none for GET).
-  router.get('/tasa/:instrumento', async (req, res, next) => {
+  // GET /api/bonos/catalog
+  // Returns the full static catalog so the frontend can build cascading dropdowns
+  // without an extra roundtrip when the modal opens.
+  router.get('/catalog', (_req, res) => {
+    res.json({
+      success: true,
+      data: { catalog: BONOS_CATALOG, tipos: TIPOS },
+    });
+  });
+
+  // GET /api/bonos/tasa/:serie
+  // Fetches the latest Tasa de Interés from Banxico BMX for a series ID.
+  // serie must be a known ID from the catalog (e.g. "SF43936").
+  router.get('/tasa/:serie', async (req, res, next) => {
     try {
-      const data = await banxicoService.getTasa(req.params.instrumento);
+      const data = await banxicoService.getTasaBySerie(req.params.serie);
       res.json({ success: true, data });
     } catch (err) {
       if (err.status === 400) {

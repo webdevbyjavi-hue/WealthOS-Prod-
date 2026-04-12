@@ -511,3 +511,54 @@
     text-overflow: unset;
   }
 }
+
+/* ── Danger button ─────────────────────────────────────── */
+.btn--danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 12px rgba(239,68,68,0.25);
+}
+.btn--danger:hover {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  box-shadow: 0 4px 18px rgba(239,68,68,0.35);
+  transform: translateY(-1px);
+}
+
+/* ── Confirm-delete modal ──────────────────────────────── */
+.confirm-modal {
+  max-width: 420px;
+  width: 90%;
+}
+.confirm-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 20px 24px 16px;
+}
+.confirm-modal__icon {
+  font-size: 22px;
+  color: var(--down);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.confirm-modal__title {
+  font-size: 17px;
+  margin: 0;
+}
+.confirm-modal__body {
+  padding: 18px 24px 4px;
+}
+.confirm-modal__message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 22px;
+}

@@ -3,45 +3,36 @@
 /**
  * banxicoService.js
  * ─────────────────
- * Fetches the latest "Tasa de Interés" for Mexican government bond instruments
- * from the Banxico BMX (SIE) REST API.
+ * Fetches the latest "Tasa de Interés" from the Banxico BMX (SIE) REST API.
  *
- * BMX API docs: https://www.banxico.org.mx/SieAPIRest/service/v1/doc/catalogoSeries
  * Endpoint: GET /SieAPIRest/service/v1/series/{idSerie}/datos/oportuno
- * Auth:     Bmx-Token header
+ * Auth:     Bmx-Token request header
+ * Docs:     https://www.banxico.org.mx/SieAPIRest/service/v1/doc/catalogoSeries
  *
- * Series → Banxico SIE series ID mapping:
- *   CETES   → SF43936  CETES 28 días — tasa de rendimiento en subasta primaria
- *   BONDIA  → SF60653  Tasa de fondeo bancario (overnight) — benchmark for BONDÍA
- *   BONOS   → SF60648  Bonos de desarrollo del Gobierno Federal a tasa fija (M 10 años)
- *   UDIBONOS → SF44119 UDIBONOS — tasa de rendimiento en subasta primaria (3 años)
- *
- * These can be updated in SERIES_MAP if Banxico changes their catalogue.
+ * The catalog that maps (tipo, plazo) → serie_banxico lives in
+ * src/config/bonosCatalog.js and is served via GET /api/bonos/catalog.
+ * This service only cares about the raw series ID — it's agnostic to catalog.
  */
+
+const { BONOS_CATALOG } = require('../config/bonosCatalog');
 
 const BMX_BASE = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series';
 
-/** Maps the UI instrumento value to a Banxico SIE series ID. */
-const SERIES_MAP = {
-  CETES:    'SF43936',
-  BONDIA:   'SF60653',
-  BONOS:    'SF60648',
-  UDIBONOS: 'SF44119',
-};
+/** Set of valid Banxico series IDs from our catalog, for fast validation. */
+const VALID_SERIES = new Set(BONOS_CATALOG.map(e => e.serie_banxico));
 
 /**
- * Returns the latest tasa de interés for a given instrument.
+ * Fetches the latest published rate for a given Banxico SIE series ID.
  *
- * @param {string} instrumento — one of CETES, BONDIA, BONOS, UDIBONOS
- * @returns {Promise<{ instrumento: string, tasa: number, fecha: string, serie: string }>}
- * @throws if the instrument is unknown, the API is unreachable, or the response is malformed
+ * @param {string} serieBanxico — e.g. "SF43936"
+ * @returns {Promise<{ serie_banxico: string, tasa: number, fecha: string }>}
+ * @throws {Error} with .status = 400 for unknown series IDs
  */
-async function getTasa(instrumento) {
-  const key = instrumento.toUpperCase();
-  const idSerie = SERIES_MAP[key];
+async function getTasaBySerie(serieBanxico) {
+  const serie = serieBanxico.trim().toUpperCase();
 
-  if (!idSerie) {
-    const err = new Error(`Instrumento desconocido: ${instrumento}. Válidos: ${Object.keys(SERIES_MAP).join(', ')}`);
+  if (!VALID_SERIES.has(serie)) {
+    const err = new Error(`Serie desconocida: ${serie}. Válidas: ${[...VALID_SERIES].join(', ')}`);
     err.status = 400;
     throw err;
   }
@@ -51,37 +42,28 @@ async function getTasa(instrumento) {
     throw new Error('[banxicoService] BANXICO_BMX_TOKEN not set in environment.');
   }
 
-  const url = `${BMX_BASE}/${idSerie}/datos/oportuno`;
-
-  const res = await fetch(url, {
-    headers: { 'Bmx-Token': token },
-  });
+  const url = `${BMX_BASE}/${serie}/datos/oportuno`;
+  const res = await fetch(url, { headers: { 'Bmx-Token': token } });
 
   if (!res.ok) {
-    throw new Error(`[banxicoService] Banxico API HTTP ${res.status} for serie ${idSerie}`);
+    throw new Error(`[banxicoService] Banxico API HTTP ${res.status} for serie ${serie}`);
   }
 
   const json = await res.json();
-
-  // Response shape: { bmx: { series: [{ idSerie, titulo, datos: [{ fecha, dato }] }] } }
+  // Response: { bmx: { series: [{ idSerie, titulo, datos: [{ fecha, dato }] }] } }
   const datos = json?.bmx?.series?.[0]?.datos;
   if (!Array.isArray(datos) || datos.length === 0) {
-    throw new Error(`[banxicoService] No data returned for serie ${idSerie}`);
+    throw new Error(`[banxicoService] No data returned for serie ${serie}`);
   }
 
   const latest = datos[datos.length - 1];
   const tasa   = parseFloat(latest.dato);
 
   if (isNaN(tasa)) {
-    throw new Error(`[banxicoService] Non-numeric dato "${latest.dato}" for serie ${idSerie}`);
+    throw new Error(`[banxicoService] Non-numeric dato "${latest.dato}" for serie ${serie}`);
   }
 
-  return {
-    instrumento: key,
-    tasa,
-    fecha:  latest.fecha,
-    serie:  idSerie,
-  };
+  return { serie_banxico: serie, tasa, fecha: latest.fecha };
 }
 
-module.exports = { getTasa, SERIES_MAP };
+module.exports = { getTasaBySerie };

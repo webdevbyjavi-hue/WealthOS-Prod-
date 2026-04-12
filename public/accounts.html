@@ -123,7 +123,12 @@
       <div class="panel">
         <div class="panel__header">
           <span class="panel__title" data-i18n="panel_cash_flow">Cash Flow</span>
-          <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="cf-filter">
+              <button class="cf-filter__btn" id="cf-btn-in" onclick="setCashflowView('in')" data-i18n="cf_cash_in">Cash In</button>
+              <button class="cf-filter__btn" id="cf-btn-out" onclick="setCashflowView('out')" data-i18n="cf_cash_out">Cash Out</button>
+              <button class="cf-filter__btn" id="cf-btn-invested" onclick="setCashflowView('invested')" data-i18n="cf_invested">Invested</button>
+            </div>
             <span class="panel__badge" data-i18n="badge_cash_flow">last 6 months · MXN</span>
             <button class="btn btn--ghost" style="font-size:11px;padding:4px 10px" onclick="openAddTransactionModal()" data-i18n="btn_add_transaction">+ Transaction</button>
           </div>
@@ -309,6 +314,7 @@
           <select class="form-input" id="ti-type">
             <option value="in" data-i18n="opt_cash_in">Cash In ↑</option>
             <option value="out" data-i18n="opt_cash_out">Cash Out ↓</option>
+            <option value="invested" data-i18n="opt_invested">Invested ◈</option>
           </select>
         </div>
       </div>
