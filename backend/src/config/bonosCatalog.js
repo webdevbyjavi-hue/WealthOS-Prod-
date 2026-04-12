@@ -23,6 +23,9 @@
  *
  * UDIBONOS (inflation-linked):
  *   SF44119  3 años    SF44121  10 años   SF46410  30 años
+ *
+ * BONDDIA (overnight money-market fund — tasa fondeo bancario as reference):
+ *   SF60653  diario
  */
 
 const BONOS_CATALOG = [
@@ -48,6 +51,12 @@ const BONOS_CATALOG = [
   { tipo: 'UDIBONOS', plazo: '3 años',   serie_banxico: 'SF44119', descripcion: 'UDIBONOS — protección contra inflación — 3 años' },
   { tipo: 'UDIBONOS', plazo: '10 años',  serie_banxico: 'SF44121', descripcion: 'UDIBONOS — protección contra inflación — 10 años' },
   { tipo: 'UDIBONOS', plazo: '30 años',  serie_banxico: 'SF46410', descripcion: 'UDIBONOS — protección contra inflación — 30 años' },
+
+  // ─── BONDDIA ────────────────────────────────────────────────────────────────
+  // BONDDIA es un fondo de mercado de dinero (GBM/Cetesdirecto) que invierte en
+  // reportos a 1 día. No tiene serie SIE propia; SF60653 es la tasa fondeo
+  // bancario overnight de Banxico, usada como referencia de rendimiento.
+  { tipo: 'BONDDIA', plazo: 'diario',    serie_banxico: 'SF60653', descripcion: 'BONDDIA — fondo mercado de dinero overnight (referencia: tasa fondeo bancario)' },
 ];
 
 /** Unique instrument types, in display order. */

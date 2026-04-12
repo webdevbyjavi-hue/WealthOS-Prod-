@@ -796,7 +796,7 @@ button.nav__item {
 .asset-fields { display: flex; flex-direction: column; gap: 16px; }
 
 .form-group  { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-.form-row    { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.form-row    { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 
 .form-label {
   font-family: var(--font-mono);
