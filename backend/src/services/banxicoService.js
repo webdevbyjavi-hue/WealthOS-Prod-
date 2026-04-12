@@ -46,7 +46,12 @@ async function getTasaBySerie(serieBanxico) {
   const res = await fetch(url, { headers: { 'Bmx-Token': token } });
 
   if (!res.ok) {
-    throw new Error(`[banxicoService] Banxico API HTTP ${res.status} for serie ${serie}`);
+    let detail = '';
+    try {
+      const errBody = await res.json();
+      detail = errBody?.error?.mensaje || errBody?.error?.detalle || JSON.stringify(errBody);
+    } catch (_) { /* ignore parse errors */ }
+    throw new Error(`[banxicoService] Banxico API HTTP ${res.status} for serie ${serie}${detail ? `: ${detail}` : ''}`);
   }
 
   const json = await res.json();

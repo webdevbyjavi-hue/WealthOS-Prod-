@@ -356,7 +356,7 @@ function loadWosPortfolio() {
   // Value & cost-basis per category
   const catValues = {
     'Stocks':               raw.stocks.reduce((s,h) => s + h.currentPrice * h.shares, 0),
-    'Bonos Gubernamentales':raw.bonos.reduce ((s,b) => s + b.precioActual  * b.titulos, 0),
+    'Bonos Gubernamentales':raw.bonos.reduce ((s,b) => s + (b.monto || 0), 0),
     'Fondos de Inversión':  raw.fondos.reduce((s,f) => s + f.navActual     * f.unidades, 0),
     'Fibras':               raw.fibras.reduce((s,f) => s + f.precioActual  * f.certificados, 0),
     'Fondos para el Retiro':raw.retiro.reduce((s,r) => s + r.saldo, 0),
@@ -365,7 +365,7 @@ function loadWosPortfolio() {
   };
   const catCosts = {
     'Stocks':               raw.stocks.reduce((s,h) => s + h.avgCost      * h.shares, 0),
-    'Bonos Gubernamentales':raw.bonos.reduce ((s,b) => s + b.precioCompra * b.titulos, 0),
+    'Bonos Gubernamentales':raw.bonos.reduce ((s,b) => s + (b.monto || 0), 0),
     'Fondos de Inversión':  raw.fondos.reduce((s,f) => s + f.precioCompra * f.unidades, 0),
     'Fibras':               raw.fibras.reduce((s,f) => s + f.precioCompra * f.certificados, 0),
     'Fondos para el Retiro':raw.retiro.reduce((s,r) => s + r.saldo - (r.aportacionYTD || 0), 0),
@@ -387,7 +387,7 @@ function loadWosPortfolio() {
   }
   const dailyChange =
     dailyDelta(raw.stocks, h => h.currentPrice * h.shares) +
-    dailyDelta(raw.bonos,  b => b.precioActual  * b.titulos) +
+    dailyDelta(raw.bonos,  b => b.monto || 0) +
     dailyDelta(raw.fondos, f => f.navActual     * f.unidades) +
     dailyDelta(raw.fibras, f => f.precioActual  * f.certificados) +
     dailyDelta(raw.crypto, c => c.currentPrice  * c.amount);
@@ -397,7 +397,7 @@ function loadWosPortfolio() {
   function portfolioHistory(n) {
     const allItems = [
       ...raw.stocks.map(h => ({ hist: h.history, cur: h.currentPrice * h.shares })),
-      ...raw.bonos.map (b => ({ hist: b.history, cur: b.precioActual  * b.titulos })),
+      ...raw.bonos.map (b => ({ hist: b.history, cur: b.monto || 0 })),
       ...raw.fondos.map(f => ({ hist: f.history, cur: f.navActual     * f.unidades })),
       ...raw.fibras.map(f => ({ hist: f.history, cur: f.precioActual  * f.certificados })),
       ...raw.retiro.map(r => ({ hist: r.history, cur: r.saldo })),
