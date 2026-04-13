@@ -135,6 +135,8 @@
     // ── Lookup ────────────────────────────────────────────────────────────────
     lookup: {
       ticker: (symbol) => request('GET', `/api/lookup/ticker/${encodeURIComponent(symbol)}`).then(r => r.data),
+      fibra:  (ticker) => request('GET', `/api/lookup/fibra/${encodeURIComponent(ticker)}`).then(r => r.data),
+      crypto: (symbol) => request('GET', `/api/lookup/crypto/${encodeURIComponent(symbol)}`).then(r => r.data),
     },
 
     // ── Exchange rates ────────────────────────────────────────────────────────

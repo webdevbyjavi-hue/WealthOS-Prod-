@@ -168,4 +168,45 @@ async function fetchStockInfo(ticker) {
   return data;
 }
 
-module.exports = { fetchPrice, fetchStockPrice, fetchCryptoPrice, fetchStockInfo };
+/**
+ * Fetch coin name and latest price for a cryptocurrency symbol.
+ * Uses Twelve Data /quote endpoint with symbol=COIN/USD, cached for 5 min.
+ *
+ * @param {string} symbol  — e.g. "BTC", "ETH"
+ * @returns {Promise<{symbol, name, price}|null>}
+ */
+async function fetchCryptoInfo(symbol) {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+  if (!apiKey) return null;
+
+  const coin = symbol.toUpperCase();
+  const pair = `${coin}/USD`;
+
+  const cached = _lookupCache.get(pair);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const url = new URL(`${TD_BASE}/quote`);
+  url.searchParams.set('symbol', pair);
+  url.searchParams.set('apikey', apiKey);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Twelve Data HTTP ${res.status} for crypto ${pair}`);
+
+  const json = await res.json();
+  assertTdOk(json, pair);
+
+  if (!json.close) {
+    throw new Error(`No data found for "${coin}". Check the symbol and try again.`);
+  }
+
+  const data = {
+    symbol: coin,
+    name:   json.name || coin,
+    price:  parseFloat(json.close),
+  };
+
+  _lookupCache.set(pair, { data, expiresAt: Date.now() + LOOKUP_TTL_MS });
+  return data;
+}
+
+module.exports = { fetchPrice, fetchStockPrice, fetchCryptoPrice, fetchStockInfo, fetchCryptoInfo };

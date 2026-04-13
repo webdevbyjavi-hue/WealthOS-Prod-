@@ -869,7 +869,7 @@
           <input class="form-input" id="si-name" type="text" data-i18n-placeholder="ph_company" placeholder="e.g. Apple Inc." readonly />
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label" data-i18n="lbl_shares_owned">Shares Owned</label>
           <input class="form-input" id="si-shares" type="number" placeholder="0" min="0" step="0.001" />
@@ -981,11 +981,14 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Ticker</label>
-          <input class="form-input" id="fbi-ticker" type="text" placeholder="e.g. FUNO11" />
+          <div class="input-lookup-row">
+            <input class="form-input" id="fbi-ticker" type="text" placeholder="e.g. FUNO11" />
+            <button class="btn btn--ghost btn--lookup" id="fbi-lookup-btn" onclick="lookupFibraTicker()">Lookup</button>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Nombre</label>
-          <input class="form-input" id="fbi-nombre" type="text" placeholder="e.g. Fibra Uno" />
+          <input class="form-input" id="fbi-nombre" type="text" placeholder="e.g. Fibra Uno" readonly />
         </div>
       </div>
       <div class="form-row">
@@ -1012,10 +1015,10 @@
         </div>
         <div class="form-group">
           <label class="form-label">Precio Actual (MXN)</label>
-          <input class="form-input" id="fbi-actual" type="number" placeholder="0.0000" min="0" step="0.0001" />
+          <input class="form-input" id="fbi-actual" type="number" placeholder="0.0000" min="0" step="0.0001" readonly />
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Distribución Anual por CBFI (MXN)</label>
           <input class="form-input" id="fbi-distribucion" type="number" placeholder="0.00" min="0" step="0.01" />
@@ -1074,7 +1077,7 @@
           </select>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Unidades</label>
           <input class="form-input" id="fi-unidades" type="number" placeholder="0" min="0" step="0.001" />
@@ -1157,7 +1160,7 @@
           <input class="form-input" id="ri-aportacion-ytd" type="number" placeholder="0.00" min="0" step="0.01" />
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Aportación Patronal (MXN)</label>
           <input class="form-input" id="ri-patronal" type="number" placeholder="0.00" min="0" step="0.01" />
@@ -1194,7 +1197,7 @@
       <button class="modal__close" onclick="closeBienesModal()">✕</button>
     </div>
     <div class="modal__body">
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Nombre / Descripción</label>
           <input class="form-input" id="bri-nombre" type="text" placeholder="e.g. Casa Pedregal" />
@@ -1216,7 +1219,7 @@
       </div>
 
       <div class="modal__section-label">Precio de Adquisición</div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Precio de Compra (MXN)</label>
           <input class="form-input" id="bri-precio" type="number" placeholder="0.00" min="0" step="1" />
@@ -1235,7 +1238,7 @@
       </div>
 
       <div class="modal__section-label">Gastos de Adquisición</div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Gastos Notariales (MXN)</label>
           <input class="form-input" id="bri-notariales" type="number" placeholder="0.00" min="0" step="1" />
@@ -1285,14 +1288,17 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Symbol</label>
-          <input class="form-input" id="ci-symbol" type="text" placeholder="e.g. BTC" />
+          <div class="input-lookup-row">
+            <input class="form-input" id="ci-symbol" type="text" placeholder="e.g. BTC" />
+            <button class="btn btn--ghost btn--lookup" id="ci-lookup-btn" onclick="lookupCryptoSymbol()">Lookup</button>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Coin Name</label>
-          <input class="form-input" id="ci-name" type="text" placeholder="e.g. Bitcoin" />
+          <input class="form-input" id="ci-name" type="text" placeholder="e.g. Bitcoin" readonly />
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row form-row--aligned">
         <div class="form-group">
           <label class="form-label">Amount (tokens)</label>
           <input class="form-input" id="ci-amount" type="number" placeholder="0" min="0" step="0.00000001" />
@@ -1303,7 +1309,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Current Price (USD)</label>
-          <input class="form-input" id="ci-price" type="number" placeholder="0.00" min="0" step="0.01" />
+          <input class="form-input" id="ci-price" type="number" placeholder="0.00" min="0" step="0.01" readonly />
         </div>
         <div class="form-group">
           <label class="form-label">Purchase Date</label>

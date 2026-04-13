@@ -102,6 +102,50 @@ async function lookupStockTicker() {
   }
 }
 
+async function lookupFibraTicker() {
+  const ticker = document.getElementById('fbi-ticker').value.trim().toUpperCase();
+  if (!ticker) { showToast('Ingresa un ticker primero.'); return; }
+
+  const btn = document.getElementById('fbi-lookup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Buscando…';
+
+  try {
+    const info = await WOS_API.lookup.fibra(ticker);
+    document.getElementById('fbi-ticker').value = info.ticker;
+    document.getElementById('fbi-nombre').value = info.name;
+    document.getElementById('fbi-actual').value = info.price.toFixed(4);
+    showToast(`Cargado: ${info.name} @ $${info.price.toFixed(4)} MXN`);
+  } catch (err) {
+    showToast(err.message || 'Lookup fallido. Verifica el ticker e intenta de nuevo.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Lookup';
+  }
+}
+
+async function lookupCryptoSymbol() {
+  const symbol = document.getElementById('ci-symbol').value.trim().toUpperCase();
+  if (!symbol) { showToast('Enter a symbol first.'); return; }
+
+  const btn = document.getElementById('ci-lookup-btn');
+  btn.disabled = true;
+  btn.textContent = 'Looking up…';
+
+  try {
+    const info = await WOS_API.lookup.crypto(symbol);
+    document.getElementById('ci-symbol').value = info.symbol;
+    document.getElementById('ci-name').value   = info.name;
+    document.getElementById('ci-price').value  = info.price.toFixed(2);
+    showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)} USD`);
+  } catch (err) {
+    showToast(err.message || 'Lookup failed. Check the symbol and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Lookup';
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  STOCKS DASHBOARD
 // ══════════════════════════════════════════════════════════════
