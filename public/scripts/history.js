@@ -5,6 +5,8 @@ document.getElementById('current-date').textContent =
 let activeFilter = 'All';
 let searchText   = '';
 let dateRange    = 'all';
+let currentPage  = 1;
+const PAGE_SIZE  = 20;
 
 // ─── In-memory events (populated from API on load) ────────────────────────────
 let allEvents = [];
@@ -50,13 +52,72 @@ function applyFilters(events) {
 function render() {
   const all      = getEvents();
   const filtered = applyFilters(all);
+  const total    = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Clamp page to valid range
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1)          currentPage = 1;
+
+  const start     = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
   updateStats(all);
-  renderTimeline(filtered);
+  renderTimeline(pageItems);
+  renderPagination(currentPage, totalPages, total);
+
   const isES = window.WOS_LANG === 'es';
   document.getElementById('result-count').textContent = isES
-    ? filtered.length + ' ' + (filtered.length !== 1 ? 'eventos' : 'evento')
-    : filtered.length + ' event' + (filtered.length !== 1 ? 's' : '');
+    ? total + ' ' + (total !== 1 ? 'eventos' : 'evento')
+    : total + ' event' + (total !== 1 ? 's' : '');
+}
+
+function goToPage(n) {
+  currentPage = n;
+  render();
+  document.querySelector('.history-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPagination(page, totalPages, total) {
+  const bar = document.getElementById('pagination-bar');
+  if (totalPages <= 1) { bar.innerHTML = ''; return; }
+
+  const start = (page - 1) * PAGE_SIZE + 1;
+  const end   = Math.min(page * PAGE_SIZE, total);
+  const isES  = window.WOS_LANG === 'es';
+  const rangeLabel = isES
+    ? `${start}–${end} de ${total}`
+    : `${start}–${end} of ${total}`;
+
+  // Build page buttons (show at most 7 slots with ellipsis)
+  function pageButtons() {
+    const btns = [];
+    const delta = 2;
+    const left  = page - delta;
+    const right = page + delta;
+    let lastPushed = null;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= left && i <= right)) {
+        if (lastPushed !== null && i - lastPushed > 1) {
+          btns.push('<span class="pg-ellipsis">…</span>');
+        }
+        btns.push(
+          `<button class="pg-btn${i === page ? ' pg-btn--active' : ''}" onclick="goToPage(${i})">${i}</button>`
+        );
+        lastPushed = i;
+      }
+    }
+    return btns.join('');
+  }
+
+  bar.innerHTML = `
+    <div class="pg-range">${rangeLabel}</div>
+    <div class="pg-controls">
+      <button class="pg-btn pg-btn--nav" onclick="goToPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>‹</button>
+      ${pageButtons()}
+      <button class="pg-btn pg-btn--nav" onclick="goToPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>›</button>
+    </div>`;
 }
 
 function updateStats(events) {
@@ -167,18 +228,21 @@ function escHtml(s) {
 // ─── Controls ─────────────────────────────────────────────────────────────────
 function setFilter(filter, btn) {
   activeFilter = filter;
+  currentPage  = 1;
   document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('filter-tab--active'));
   btn.classList.add('filter-tab--active');
   render();
 }
 
 function onSearch(val) {
-  searchText = val;
+  searchText  = val;
+  currentPage = 1;
   render();
 }
 
 function onDateFilter(val) {
-  dateRange = val;
+  dateRange   = val;
+  currentPage = 1;
   render();
 }
 

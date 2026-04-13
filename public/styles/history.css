@@ -200,6 +200,75 @@
 .entry__badge--Account     { background: rgba(163,230,53,0.12); color: #a3e635; }
 .entry__badge--Transaction { background: rgba(6,182,212,0.12);  color: #06b6d4; }
 
+/* ─── Pagination ─────────────────────────────────────────────── */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 8px 4px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pg-range {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.pg-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pg-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s;
+  line-height: 1;
+}
+
+.pg-btn:hover:not(:disabled):not(.pg-btn--active) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.pg-btn--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  cursor: default;
+}
+
+.pg-btn--nav {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.pg-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pg-ellipsis {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 0 4px;
+  user-select: none;
+}
+
 /* ─── Empty State ────────────────────────────────────────────── */
 .history-empty {
   display: flex;
