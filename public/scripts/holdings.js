@@ -17,6 +17,22 @@ function switchTab(name, btn) {
   if (name === 'bienes') { if (!bienesLineChart) initBienesCharts(); else updateBienesCharts(); }
 }
 
+// ─── Add Position (topbar button) ────────────────────────────────────────────
+function openAddModal() {
+  const activeTab = (document.querySelector('.cat-tab--active') || {}).dataset?.tab || 'stocks';
+  const dispatch = {
+    stocks: openStockModal,
+    bonos:  openBonoModal,
+    fondos: openFondoModal,
+    fibras: openFibraModal,
+    retiro: openRetiroModal,
+    crypto: openCryptoModal,
+    bienes: openBienesModal,
+  };
+  const fn = dispatch[activeTab];
+  if (fn) fn();
+}
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 document.getElementById('export-btn').addEventListener('click', () => {
   alert(typeof t === 'function' ? t('export_coming_soon') : 'Export — coming soon.');
