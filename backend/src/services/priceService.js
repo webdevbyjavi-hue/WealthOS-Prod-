@@ -267,6 +267,46 @@ async function fetchHistoricalTimeSeries(ticker, assetType, startDate, endDate) 
   }));
 }
 
+/**
+ * Fetch the closing price of a stock on or before a specific date.
+ * Looks back up to 7 calendar days to cover weekends and market holidays.
+ *
+ * @param {string} ticker      — e.g. "AAPL"
+ * @param {string} targetDate  — YYYY-MM-DD
+ * @returns {Promise<{date: string, price: number}|null>}
+ */
+async function fetchStockPriceAtDate(ticker, targetDate) {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+  if (!apiKey) return null;
+
+  // Look back 7 days to cover weekends + market holidays
+  const fromD = new Date(targetDate + 'T12:00:00Z');
+  fromD.setDate(fromD.getDate() - 7);
+  const fromStr = fromD.toISOString().slice(0, 10);
+
+  const url = new URL(`${TD_BASE}/time_series`);
+  url.searchParams.set('symbol',     ticker.toUpperCase());
+  url.searchParams.set('interval',   '1day');
+  url.searchParams.set('start_date', fromStr);
+  url.searchParams.set('end_date',   targetDate);
+  url.searchParams.set('outputsize', '10');  // covers any holiday stretch
+  url.searchParams.set('order',      'DESC'); // most recent first
+  url.searchParams.set('apikey',     apiKey);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Twelve Data HTTP ${res.status} for ${ticker} at ${targetDate}`);
+
+  const json = await res.json();
+  assertTdOk(json, ticker);
+
+  const values = json.values;
+  if (!values || values.length === 0) return null;
+
+  // First bar in DESC order = most recent trading day at or before targetDate
+  const bar = values[0];
+  return { date: bar.datetime, price: parseFloat(bar.close) };
+}
+
 module.exports = {
   fetchPrice,
   fetchStockPrice,
@@ -274,4 +314,5 @@ module.exports = {
   fetchStockInfo,
   fetchCryptoInfo,
   fetchHistoricalTimeSeries,
+  fetchStockPriceAtDate,
 };

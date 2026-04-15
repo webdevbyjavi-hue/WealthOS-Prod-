@@ -106,10 +106,29 @@
       );
     }
 
+    function position() {
+      const rect    = input.getBoundingClientRect();
+      const popupH  = popup.offsetHeight;
+      const popupW  = popup.offsetWidth;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const placeAbove = spaceBelow < popupH + 8 && rect.top > popupH + 8;
+
+      popup.style.left = `${Math.min(rect.left, window.innerWidth - popupW - 8)}px`;
+      popup.style.top  = placeAbove
+        ? `${rect.top - popupH - 6}px`
+        : `${rect.bottom + 6}px`;
+    }
+
     function open() {
       if (selYMD) { const p = parseYMD(selYMD); vy = p.y; vm = p.m; }
       render();
+      // Reveal off-screen first so offsetHeight is measurable, then place it
+      popup.style.visibility = 'hidden';
       popup.hidden = false;
+      requestAnimationFrame(() => {
+        position();
+        popup.style.visibility = '';
+      });
     }
     function close() { popup.hidden = true; }
 

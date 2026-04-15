@@ -1,6 +1,6 @@
 'use strict';
 
-const { fetchStockInfo, fetchCryptoInfo } = require('../services/priceService');
+const { fetchStockInfo, fetchCryptoInfo, fetchStockPriceAtDate } = require('../services/priceService');
 
 /**
  * GET /api/lookup/ticker/:ticker
@@ -11,11 +11,21 @@ const { fetchStockInfo, fetchCryptoInfo } = require('../services/priceService');
 async function lookupTicker(req, res, next) {
   try {
     const ticker = (req.params.ticker || '').trim().toUpperCase();
+    const date   = req.query.date; // optional YYYY-MM-DD
+
     if (!ticker) {
       return res.status(400).json({ success: false, error: 'ticker is required.' });
     }
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, error: 'date must be YYYY-MM-DD.' });
+    }
 
-    const info = await fetchStockInfo(ticker);
+    // Fetch current quote + (optionally) historical price at the requested date in parallel
+    const [info, historical] = await Promise.all([
+      fetchStockInfo(ticker),
+      date ? fetchStockPriceAtDate(ticker, date) : Promise.resolve(null),
+    ]);
+
     if (!info) {
       return res.status(503).json({
         success: false,
@@ -23,7 +33,13 @@ async function lookupTicker(req, res, next) {
       });
     }
 
-    res.json({ success: true, data: info });
+    const data = { ...info };
+    if (historical) {
+      data.priceAtDate = historical.price;
+      data.dateActual  = historical.date; // actual trading day used (may differ if weekend/holiday)
+    }
+
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

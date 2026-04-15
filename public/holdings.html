@@ -856,31 +856,11 @@
       <button class="modal__close" onclick="closeStockModal()">✕</button>
     </div>
     <div class="modal__body">
+      <!-- Step 1: Ticker + Purchase Date → drives the Lookup -->
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" data-i18n="lbl_ticker_sym">Ticker Symbol</label>
-          <div class="input-lookup-row">
-            <input class="form-input" id="si-ticker" type="text" placeholder="e.g. AAPL" />
-            <button class="btn btn--ghost btn--lookup" id="si-lookup-btn" onclick="lookupStockTicker()">Lookup</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" data-i18n="lbl_company_name">Company Name</label>
-          <input class="form-input" id="si-name" type="text" data-i18n-placeholder="ph_company" placeholder="e.g. Apple Inc." readonly />
-        </div>
-      </div>
-      <div class="form-row form-row--aligned">
-        <div class="form-group">
-          <label class="form-label" data-i18n="lbl_shares_owned">Shares Owned</label>
-          <input class="form-input" id="si-shares" type="number" placeholder="0" min="0" step="0.001" />
-        </div>
-        <div class="form-group">
-          <label class="form-label" data-i18n="lbl_avg_buy_price">Avg Buy Price ($)</label>
-          <input class="form-input" id="si-cost" type="number" placeholder="0.00" min="0" step="0.01" />
-        </div>
-        <div class="form-group">
-          <label class="form-label" data-i18n="lbl_current_price">Precio Actual (MXN)</label>
-          <input class="form-input" id="si-price" type="number" placeholder="0.00" min="0" step="0.01" readonly />
+          <input class="form-input" id="si-ticker" type="text" placeholder="e.g. AAPL" />
         </div>
         <div class="form-group">
           <label class="form-label">Purchase Date</label>
@@ -888,6 +868,31 @@
             <input class="form-input datepicker__input" id="si-fecha" type="text" readonly placeholder="Select date…" autocomplete="off" />
             <div class="datepicker__popup" hidden></div>
           </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:1rem;">
+        <button class="btn btn--ghost btn--lookup" id="si-lookup-btn" onclick="lookupStockTicker()" style="width:100%;">Lookup Company &amp; Prices</button>
+      </div>
+      <!-- Step 2: Auto-filled after lookup -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_company_name">Company Name</label>
+          <input class="form-input" id="si-name" type="text" placeholder="Auto-filled after lookup" readonly />
+        </div>
+      </div>
+      <!-- Step 3: Position details (avg cost pre-filled, editable) -->
+      <div class="form-row form-row--aligned">
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_shares_owned">Shares Owned</label>
+          <input class="form-input" id="si-shares" type="number" placeholder="0" min="0" step="0.001" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_avg_buy_price">Avg Buy Price ($)</label>
+          <input class="form-input" id="si-cost" type="number" placeholder="Auto-filled after lookup" min="0" step="0.0001" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="lbl_current_price">Current Price (MXN)</label>
+          <input class="form-input" id="si-price" type="number" placeholder="Auto-filled after lookup" min="0" step="0.01" readonly />
         </div>
       </div>
       <div class="modal__actions">

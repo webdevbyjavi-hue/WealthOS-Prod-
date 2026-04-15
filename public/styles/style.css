@@ -869,10 +869,8 @@ button.nav__item {
 .datepicker { position: relative; }
 .datepicker__input { cursor: pointer; user-select: none; caret-color: transparent; }
 .datepicker__popup {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 200;
+  position: fixed;
+  z-index: 9999;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

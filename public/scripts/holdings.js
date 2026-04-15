@@ -85,36 +85,47 @@ function showToast(msg) {
 // ─── Stock ticker lookup ───────────────────────────────────────────────────────
 async function lookupStockTicker() {
   const ticker = document.getElementById('si-ticker').value.trim().toUpperCase();
+  const date   = document.getElementById('si-fecha').value; // YYYY-MM-DD from datepicker
+
   if (!ticker) { showToast('Enter a ticker symbol first.'); return; }
+  if (!date)   { showToast('Select a purchase date first.'); return; }
 
   const btn = document.getElementById('si-lookup-btn');
   btn.disabled = true;
   btn.textContent = 'Looking up…';
 
   try {
-    const info    = await WOS_API.lookup.ticker(ticker);
-    const priceEl = document.getElementById('si-price');
+    // Fetch quote + historical price in one call; FX rate in parallel
+    const [info, fx] = await Promise.all([
+      WOS_API.lookup.ticker(ticker, date),
+      WOS_API.exchangeRate.getUsdMxn().catch(() => null),
+    ]);
 
     document.getElementById('si-ticker').value = info.ticker;
     document.getElementById('si-name').value   = info.name;
 
-    // Fetch exchange rate and convert to MXN; fall back to raw USD on failure
-    try {
-      const fx       = await WOS_API.exchangeRate.getUsdMxn();
+    // Pre-fill avg buy price with the closing price on the purchase date
+    const purchasePrice = info.priceAtDate ?? info.price;
+    document.getElementById('si-cost').value = purchasePrice.toFixed(4);
+
+    // Current price → MXN for the si-price field
+    const priceEl = document.getElementById('si-price');
+    if (fx) {
       const mxnPrice = info.price * fx.rate;
       priceEl.dataset.usd = info.price;
       priceEl.value       = mxnPrice.toFixed(2);
-      showToast(`Loaded: ${info.name} @ $${mxnPrice.toFixed(2)} MXN (TC: ${fx.rate.toFixed(4)})`);
-    } catch {
+      const dateLabel = info.dateActual || date;
+      showToast(`${info.name} · ${dateLabel}: $${purchasePrice.toFixed(2)} USD · Today: $${mxnPrice.toFixed(2)} MXN`);
+    } else {
       priceEl.dataset.usd = info.price;
       priceEl.value       = info.price.toFixed(2);
-      showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)} USD`);
+      showToast(`${info.name} · Purchase price: $${purchasePrice.toFixed(2)} USD`);
     }
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the ticker and try again.');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Lookup';
+    btn.textContent = 'Lookup Company & Prices';
   }
 }
 

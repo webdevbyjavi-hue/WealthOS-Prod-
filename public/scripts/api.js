@@ -67,6 +67,10 @@
       toApi:   a => ({ name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency || 'MXN', balance: a.balance, fx_rate: a.fxRate || 1, notes: a.notes }),
       fromApi: a => ({ id: a.id, name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency, balance: parseFloat(a.balance), fxRate: parseFloat(a.fx_rate), balanceMXN: parseFloat(a.balance) * parseFloat(a.fx_rate), notes: a.notes, updatedAt: a.updated_at }),
     },
+    transactions: {
+      toApi:   t => ({ type: t.type, amount: t.amount, fx_rate: t.fxRate || 1, description: t.description || null, date: t.date, currency: t.currency || null }),
+      fromApi: t => ({ id: t.id, accountId: t.account_id, type: t.type, amount: parseFloat(t.amount), fxRate: parseFloat(t.fx_rate) || 1, amountMXN: parseFloat(t.amount) * (parseFloat(t.fx_rate) || 1), date: t.date, description: t.description || '', currency: t.currency || null }),
+    },
   };
 
   // Generate placeholder history for charts (91 pts ending at current price)
@@ -111,8 +115,8 @@
       create:            (d)      => request('POST',   '/api/accounts', mappers.accounts.toApi(d)).then(r => mappers.accounts.fromApi(r.data)),
       update:            (id, d)  => request('PUT',    `/api/accounts/${id}`, mappers.accounts.toApi(d)).then(r => mappers.accounts.fromApi(r.data)),
       remove:            (id)     => request('DELETE', `/api/accounts/${id}`),
-      listTransactions:  (id)     => request('GET',    `/api/accounts/${id}/transactions`).then(r => r.data),
-      createTransaction: (id, d)  => request('POST',   `/api/accounts/${id}/transactions`, d).then(r => r.data),
+      listTransactions:  (id)     => request('GET',    `/api/accounts/${id}/transactions`).then(r => r.data.map(mappers.transactions.fromApi)),
+      createTransaction: (id, d)  => request('POST',   `/api/accounts/${id}/transactions`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
       deleteTransaction: (aid, tid) => request('DELETE', `/api/accounts/${aid}/transactions/${tid}`),
     },
 
@@ -134,7 +138,12 @@
 
     // ── Lookup ────────────────────────────────────────────────────────────────
     lookup: {
-      ticker: (symbol) => request('GET', `/api/lookup/ticker/${encodeURIComponent(symbol)}`).then(r => r.data),
+      ticker: (symbol, date) => {
+        const path = date
+          ? `/api/lookup/ticker/${encodeURIComponent(symbol)}?date=${encodeURIComponent(date)}`
+          : `/api/lookup/ticker/${encodeURIComponent(symbol)}`;
+        return request('GET', path).then(r => r.data);
+      },
       fibra:  (ticker) => request('GET', `/api/lookup/fibra/${encodeURIComponent(ticker)}`).then(r => r.data),
       crypto: (symbol) => request('GET', `/api/lookup/crypto/${encodeURIComponent(symbol)}`).then(r => r.data),
     },
