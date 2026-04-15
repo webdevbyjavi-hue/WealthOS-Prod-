@@ -83,16 +83,20 @@ function showToast(msg) {
 })();
 
 // ─── Stock ticker lookup ───────────────────────────────────────────────────────
+let _stockLookupInProgress = false;
+
 async function lookupStockTicker() {
+  if (_stockLookupInProgress) return;
+
   const ticker = document.getElementById('si-ticker').value.trim().toUpperCase();
   const date   = document.getElementById('si-fecha').value; // YYYY-MM-DD from datepicker
 
   if (!ticker) { showToast('Enter a ticker symbol first.'); return; }
   if (!date)   { showToast('Select a purchase date first.'); return; }
 
+  _stockLookupInProgress = true;
   const btn = document.getElementById('si-lookup-btn');
-  btn.disabled = true;
-  btn.textContent = 'Looking up…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking up…'; }
 
   try {
     // Fetch quote + historical price in one call; FX rate in parallel
@@ -104,9 +108,11 @@ async function lookupStockTicker() {
     document.getElementById('si-ticker').value = info.ticker;
     document.getElementById('si-name').value   = info.name;
 
-    // Pre-fill avg buy price with the closing price on the purchase date
+    // Pre-fill avg buy price only in add mode (don't overwrite user's cost in edit mode)
     const purchasePrice = info.priceAtDate ?? info.price;
-    document.getElementById('si-cost').value = purchasePrice.toFixed(4);
+    if (!editingStockId) {
+      document.getElementById('si-cost').value = purchasePrice.toFixed(4);
+    }
 
     // Current price → MXN for the si-price field
     const priceEl = document.getElementById('si-price');
@@ -124,8 +130,8 @@ async function lookupStockTicker() {
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the ticker and try again.');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Lookup Company & Prices';
+    _stockLookupInProgress = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh Prices'; }
   }
 }
 
@@ -700,6 +706,9 @@ function setLineRange(days, btn) {
 function openStockModal(id = null) {
   editingStockId = id;
   document.getElementById('stock-modal-title').textContent = id ? 'Edit Stock' : 'Add Stock';
+  // Add mode: auto-lookup handles it — no button. Edit mode: show "Refresh Prices" button.
+  const lookupWrapper = document.getElementById('si-lookup-wrapper');
+  if (lookupWrapper) lookupWrapper.style.display = id ? '' : 'none';
   if (id) {
     const s = stocks.find(h => h.id === id);
     if (!s) return;
@@ -3321,6 +3330,27 @@ async function initHoldings() {
 }
 
 initHoldings();
+
+// ─── Stock modal: auto-trigger lookup when both Ticker + Date are filled ──────
+// Only fires in add mode (editingStockId === null). Edit mode uses the
+// "Refresh Prices" button instead to avoid overwriting intentional values.
+(function () {
+  const tickerEl = document.getElementById('si-ticker');
+  const fechaEl  = document.getElementById('si-fecha');
+  if (!tickerEl || !fechaEl) return;
+
+  tickerEl.addEventListener('blur', () => {
+    if (!editingStockId && tickerEl.value.trim() && fechaEl.value) {
+      lookupStockTicker();
+    }
+  });
+
+  fechaEl.addEventListener('change', () => {
+    if (!editingStockId && tickerEl.value.trim() && fechaEl.value) {
+      lookupStockTicker();
+    }
+  });
+})();
 
 window.addEventListener('resize', () => {
   if (lineChart) lineChart.resize();

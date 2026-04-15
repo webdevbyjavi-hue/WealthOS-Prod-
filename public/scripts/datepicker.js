@@ -102,6 +102,8 @@
           selYMD = el.dataset.ymd;
           nativeSet.call(input, formatDisplay(selYMD));
           close();
+          // Notify listeners (e.g. auto-lookup triggers) that the value changed
+          input.dispatchEvent(new Event('change', { bubbles: true }));
         })
       );
     }
@@ -122,7 +124,10 @@
     function open() {
       if (selYMD) { const p = parseYMD(selYMD); vy = p.y; vm = p.m; }
       render();
-      // Reveal off-screen first so offsetHeight is measurable, then place it
+      // Teleport popup to <body> so it escapes any ancestor transform/stacking
+      // context (e.g. modals that use transform: translateY).  position: fixed
+      // is only viewport-relative when there is no transformed ancestor.
+      if (popup.parentNode !== document.body) document.body.appendChild(popup);
       popup.style.visibility = 'hidden';
       popup.hidden = false;
       requestAnimationFrame(() => {
@@ -130,7 +135,12 @@
         popup.style.visibility = '';
       });
     }
-    function close() { popup.hidden = true; }
+
+    function close() {
+      popup.hidden = true;
+      // Return popup to its original wrapper so the DOM stays tidy
+      if (popup.parentNode === document.body) wrapper.appendChild(popup);
+    }
 
     input.addEventListener('click', e => {
       e.stopPropagation();

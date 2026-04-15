@@ -515,6 +515,7 @@ function renderCashFlowChart() {
       borderColor: '#34d399',
       borderWidth: 1,
       borderRadius: 4,
+      stack: 'inflow',
     },
     {
       id: 'out',
@@ -523,7 +524,8 @@ function renderCashFlowChart() {
       backgroundColor: 'rgba(248, 113, 113, 0.65)',
       borderColor: '#f87171',
       borderWidth: 1,
-      borderRadius: 4,
+      borderRadius: 0,
+      stack: 'outflow',
     },
     {
       id: 'invested',
@@ -533,6 +535,7 @@ function renderCashFlowChart() {
       borderColor: '#6366f1',
       borderWidth: 1,
       borderRadius: 4,
+      stack: 'outflow',
     }
   ];
 
@@ -580,10 +583,12 @@ function renderCashFlowChart() {
       },
       scales: {
         x: {
+          stacked: true,
           grid:  { color: 'rgba(255,255,255,0.04)' },
           ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 } }
         },
         y: {
+          stacked: true,
           grid:  { color: 'rgba(255,255,255,0.04)' },
           border: { dash: [3, 3] },
           ticks: {
