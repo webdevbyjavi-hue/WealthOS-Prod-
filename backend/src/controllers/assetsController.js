@@ -24,6 +24,7 @@
  */
 
 const { supabaseAdmin: supabase } = require('../services/supabaseClient');
+const { scheduleBackfill }        = require('../services/backfillService');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 async function resolveAsset(assetId, userId) {
   const { data, error } = await supabase
     .from('assets')
-    .select('id, ticker, name, asset_type, currency')
+    .select('id, ticker, name, asset_type, currency, purchase_date, quantity, avg_buy_price')
     .eq('id', assetId)
     .eq('user_id', userId)
     .single();
@@ -295,20 +296,37 @@ async function listAssets(req, res, next) {
 /**
  * POST /api/assets
  * @auth Required
- * Body: { ticker, name, asset_type, currency? }
+ * Body: { ticker, name, asset_type, currency?, purchase_date?, quantity?, avg_buy_price? }
+ *
+ * When purchase_date is provided the response includes `backfilling: true` and
+ * a historical price backfill is scheduled asynchronously — the HTTP response
+ * is returned immediately without waiting for the backfill to complete.
  */
 async function createAsset(req, res, next) {
   try {
-    const { ticker, name, asset_type, currency } = req.body;
+    const { ticker, name, asset_type, currency, purchase_date, quantity, avg_buy_price } = req.body;
 
     const { data, error } = await supabase
       .from('assets')
-      .insert({ user_id: req.user.id, ticker, name, asset_type, currency: currency || 'USD' })
+      .insert({
+        user_id:       req.user.id,
+        ticker,
+        name,
+        asset_type,
+        currency:      currency      || 'USD',
+        purchase_date: purchase_date || null,
+        quantity:      quantity      || null,
+        avg_buy_price: avg_buy_price || null,
+      })
       .select()
       .single();
 
     if (error) throw error;
-    res.status(201).json({ success: true, data });
+
+    const willBackfill = !!data.purchase_date;
+    if (willBackfill) scheduleBackfill(data);
+
+    res.status(201).json({ success: true, data, backfilling: willBackfill });
   } catch (err) {
     next(err);
   }
@@ -340,4 +358,48 @@ async function deleteAsset(req, res, next) {
   }
 }
 
-module.exports = { getHistory, exportHistory, getPerformance, listAssets, createAsset, deleteAsset };
+// ─── POST /api/assets/:id/backfill ───────────────────────────────────────────
+
+/**
+ * Manually re-trigger a historical backfill for a specific asset.
+ * Useful after correcting a purchase_date or if the initial backfill failed.
+ *
+ * @auth   Required — Bearer JWT
+ * @param  id  Asset UUID (path param)
+ * @returns 202 { success: true, backfilling: true }
+ * @returns 400 if the asset has no purchase_date set
+ * @returns 404 if asset not found or not owned by caller
+ */
+async function triggerBackfill(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const asset = await resolveAsset(id, req.user.id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: 'Asset not found.' });
+    }
+
+    if (!asset.purchase_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Asset has no purchase_date. Set one before triggering a backfill.',
+      });
+    }
+
+    scheduleBackfill(asset);
+
+    res.status(202).json({ success: true, backfilling: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getHistory,
+  exportHistory,
+  getPerformance,
+  listAssets,
+  createAsset,
+  deleteAsset,
+  triggerBackfill,
+};

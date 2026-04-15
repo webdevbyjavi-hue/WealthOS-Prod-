@@ -10,6 +10,7 @@ const {
   getHistory,
   exportHistory,
   getPerformance,
+  triggerBackfill,
 } = require('../controllers/assetsController');
 
 const router = Router();
@@ -60,6 +61,18 @@ router.post(
       .trim()
       .isLength({ min: 3, max: 3 })
       .withMessage('currency must be a 3-letter ISO code'),
+    body('purchase_date')
+      .optional()
+      .matches(DATE_RE)
+      .withMessage('purchase_date must be YYYY-MM-DD'),
+    body('quantity')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('quantity must be a non-negative number'),
+    body('avg_buy_price')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('avg_buy_price must be a non-negative number'),
     validate,
   ],
   createAsset
@@ -67,6 +80,9 @@ router.post(
 
 // DELETE /api/assets/:id
 router.delete('/:id', assetIdParam, deleteAsset);
+
+// POST /api/assets/:id/backfill — manually re-trigger historical backfill
+router.post('/:id/backfill', assetIdParam, triggerBackfill);
 
 // ── Time-series endpoints ─────────────────────────────────────────────────────
 

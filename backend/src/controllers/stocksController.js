@@ -18,6 +18,7 @@
 
 const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 const { getOrFetchTodayRate }     = require('../services/exchangeRateService');
+const { linkHoldingToAsset }      = require('../services/assetLinker');
 
 /** Round to 4 decimal places (matches NUMERIC(18,4) in the schema). */
 const round4 = (n) => Math.round(n * 10000) / 10000;
@@ -84,6 +85,22 @@ async function create(req, res, next) {
       .single();
 
     if (error) throw error;
+
+    // Fire-and-forget: link to the assets time-series table and schedule backfill.
+    // setImmediate ensures the HTTP response is sent before this runs.
+    setImmediate(() => {
+      linkHoldingToAsset({
+        userId:       req.user.id,
+        ticker:       data.ticker,
+        name:         data.name,
+        assetType:    'stock',
+        currency:     'USD',
+        purchaseDate: req.body.purchase_date || null,
+        quantity:     parseFloat(data.shares)       || null,
+        avgBuyPrice:  parseFloat(data.avg_cost_usd) || null,
+      });
+    });
+
     res.status(201).json({ success: true, data });
   } catch (err) {
     next(err);

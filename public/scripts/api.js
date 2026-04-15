@@ -139,6 +139,19 @@
       crypto: (symbol) => request('GET', `/api/lookup/crypto/${encodeURIComponent(symbol)}`).then(r => r.data),
     },
 
+    // ── Assets (time-series history) ─────────────────────────────────────────
+    assets: {
+      /** Returns array of asset objects owned by the authenticated user. */
+      list: () => request('GET', '/api/assets').then(r => r.data),
+      /**
+       * Returns { asset, history: [{ date, value, open, high, low, volume }] }
+       * for the given asset over the specified date range.
+       */
+      history: (id, from, to) =>
+        request('GET', `/api/assets/${encodeURIComponent(id)}/history?from=${from}&to=${to}`)
+          .then(r => r.data),
+    },
+
     // ── Exchange rates ────────────────────────────────────────────────────────
     exchangeRate: {
       getUsdMxn: () => request('GET', '/api/exchange-rates/usd-mxn').then(r => r.data),

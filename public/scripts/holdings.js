@@ -188,6 +188,12 @@ let lineChart, donutChart, barChart;
 let editingStockId = null;
 let sortCol = null, sortDir = 1; // 1 = asc, -1 = desc
 
+// Real portfolio history — populated by loadRealHistory() after initHoldings().
+// Each is a Map<'YYYY-MM-DD', number> or null when no snapshot data exists yet.
+let _stocksHistory = null;
+let _cryptoHistory = null;
+let _fibrasHistory = null;
+
 function sortBy(col) {
   sortDir = (sortCol === col) ? -sortDir : 1;
   sortCol = col;
@@ -359,6 +365,8 @@ function filterStocksTable(v) { renderTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getPortfolioHistory(n) {
+  const series = _sliceHistory(_stocksHistory, n);
+  if (series) return series.map(([, v]) => v);
   return Array.from({ length: n }, (_, i) =>
     stocks.reduce((s, h) => {
       const hist = h.history || [];
@@ -376,6 +384,95 @@ function getDateLabels(n) {
   });
 }
 
+// ─── Real history utilities ───────────────────────────────────────────────────
+
+/**
+ * Slice the last `n` [date, value] entries from a Map, sorted ascending by date.
+ * Returns null when the map is absent or empty.
+ */
+function _sliceHistory(histMap, n) {
+  if (!histMap || histMap.size === 0) return null;
+  return [...histMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-n);
+}
+
+/**
+ * Return chart date labels from a real history map when available,
+ * falling back to synthetic labels generated from today.
+ */
+function getRealDateLabels(histMap, n) {
+  const series = _sliceHistory(histMap, n);
+  if (series) {
+    return series.map(([date]) => {
+      const d = new Date(date + 'T12:00:00Z');
+      return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
+    });
+  }
+  return getDateLabels(n);
+}
+
+/**
+ * Fetch 90 days of historical OHLCV data for stocks, crypto, and fibras
+ * from /api/assets/:id/history and aggregate into per-category date→value Maps.
+ *
+ * Silently falls back to null (fake data) for any category where:
+ *   • The holding has no matching assets entry (backfill not yet triggered)
+ *   • No snapshots exist yet for the asset
+ *   • The API call fails for any reason
+ */
+async function loadRealHistory() {
+  const today = new Date().toISOString().slice(0, 10);
+  const from  = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 90);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  let allAssets;
+  try {
+    allAssets = await WOS_API.assets.list();
+  } catch {
+    return; // assets endpoint unavailable — keep fake data
+  }
+
+  const byTicker = Object.fromEntries(allAssets.map(a => [a.ticker, a]));
+
+  /**
+   * Build a date→value Map for a set of holdings.
+   * @param {Array}  holdings    — array of holding objects
+   * @param {string} tickerKey   — field name for the ticker/symbol
+   * @param {string} quantityKey — field name for the quantity
+   * @param {Function} fxFn     — (holding) → exchange rate multiplier
+   */
+  async function buildMap(holdings, tickerKey, quantityKey, fxFn) {
+    const map = new Map();
+    await Promise.all(holdings.map(async (h) => {
+      const asset = byTicker[h[tickerKey]];
+      if (!asset) return;
+      try {
+        const { history } = await WOS_API.assets.history(asset.id, from, today);
+        const fx = fxFn(h);
+        history.forEach(p => {
+          map.set(p.date, (map.get(p.date) || 0) + p.value * parseFloat(h[quantityKey]) * fx);
+        });
+      } catch { /* no snapshots yet */ }
+    }));
+    return map.size > 0 ? map : null;
+  }
+
+  // Run all three fetches in parallel
+  const [sm, cm, fm] = await Promise.all([
+    buildMap(stocks,  'ticker', 'shares',      h => h.tipoDeCambio || 1),
+    buildMap(cryptos, 'symbol', 'amount',       () => 1),
+    buildMap(fibras,  'ticker', 'certificados', () => 1),
+  ]);
+
+  _stocksHistory = sm;
+  _cryptoHistory = cm;
+  _fibrasHistory = fm;
+}
+
 Chart.defaults.color         = '#8892a4';
 Chart.defaults.borderColor   = '#1e2640';
 Chart.defaults.font.family   = "'DM Sans', system-ui, sans-serif";
@@ -383,7 +480,7 @@ Chart.defaults.font.size     = 11;
 
 function initCharts() {
   const pts   = getPortfolioHistory(lineRangeDays);
-  const dates = getDateLabels(lineRangeDays);
+  const dates = getRealDateLabels(_stocksHistory, lineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -559,7 +656,7 @@ function updateCharts() {
   if (!lineChart) return;
 
   const pts    = getPortfolioHistory(lineRangeDays);
-  const dates  = getDateLabels(lineRangeDays);
+  const dates  = getRealDateLabels(_stocksHistory, lineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -1690,6 +1787,8 @@ function filterFibrasTable(v) { renderFibrasTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getFibrasPortfolioHistory(n) {
+  const series = _sliceHistory(_fibrasHistory, n);
+  if (series) return series.map(([, v]) => v);
   return Array.from({ length: n }, (_, i) =>
     fibras.reduce((s, x) => {
       const hist = x.history || [];
@@ -1701,7 +1800,7 @@ function getFibrasPortfolioHistory(n) {
 
 function initFibrasCharts() {
   const pts    = getFibrasPortfolioHistory(fibrasLineRangeDays);
-  const dates  = getDateLabels(fibrasLineRangeDays);
+  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -1786,7 +1885,7 @@ function initFibrasCharts() {
 function updateFibrasCharts() {
   if (!fibrasLineChart) return;
   const pts    = getFibrasPortfolioHistory(fibrasLineRangeDays);
-  const dates  = getDateLabels(fibrasLineRangeDays);
+  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -2936,6 +3035,8 @@ function filterCryptoTable(v) { renderCryptoTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getCryptoPortfolioHistory(n) {
+  const series = _sliceHistory(_cryptoHistory, n);
+  if (series) return series.map(([, v]) => v);
   return Array.from({ length: n }, (_, i) =>
     cryptos.reduce((s, c) => {
       const hist = c.history || [];
@@ -2947,7 +3048,7 @@ function getCryptoPortfolioHistory(n) {
 
 function initCryptoCharts() {
   const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getDateLabels(cryptoLineRangeDays);
+  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
@@ -3037,7 +3138,7 @@ function initCryptoCharts() {
 function updateCryptoCharts() {
   if (!cryptoLineChart) return;
   const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getDateLabels(cryptoLineRangeDays);
+  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
@@ -3198,6 +3299,14 @@ async function initHoldings() {
   renderAllRetiro();
   renderAllCrypto();
   renderAllBienes();
+
+  // Fetch real historical price data from asset_snapshots and refresh charts.
+  // Uses .catch() so any failure is silent — charts keep showing fake data.
+  loadRealHistory().then(() => {
+    updateCharts();        // stocks — safe no-op if chart not yet initialised
+    updateCryptoCharts();  // crypto — safe no-op if chart not yet initialised
+    updateFibrasCharts();  // fibras — safe no-op if chart not yet initialised
+  }).catch(() => {});
 }
 
 initHoldings();

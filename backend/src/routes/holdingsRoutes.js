@@ -18,6 +18,7 @@ const holdingsController = require('../controllers/holdingsController');
 const stocksController   = require('../controllers/stocksController');
 const banxicoService     = require('../services/banxicoService');
 const { BONOS_CATALOG, TIPOS, getPlazosByTipo } = require('../config/bonosCatalog');
+const { linkHoldingToAsset } = require('../services/assetLinker');
 
 const uuidParam = param('id').isUUID().withMessage('id must be a valid UUID.');
 const positiveNumber = (field) => body(field).isFloat({ min: 0 }).withMessage(`${field} must be a non-negative number.`);
@@ -36,13 +37,14 @@ function buildRouter(table, createRules = []) {
   return router;
 }
 
-// ─── Stocks  { ticker, name, shares, avg_cost, current_price } ────────────────
+// ─── Stocks  { ticker, name, shares, avg_cost, current_price, purchase_date? } ─
 const stocksRules = [
   body('ticker').trim().notEmpty().withMessage('ticker is required.').toUpperCase(),
   body('name').trim().notEmpty().withMessage('name is required.'),
   positiveNumber('shares'),
   positiveNumber('avg_cost'),
   positiveNumber('current_price'),
+  body('purchase_date').optional().isISO8601().withMessage('purchase_date must be YYYY-MM-DD.'),
 ];
 
 // ─── Bonos  { tipo, plazo, serie_banxico, purchase_date, tasa_compra, monto } ─
@@ -67,13 +69,14 @@ const fondosRules = [
 ];
 
 // ─── Fibras  { ticker, nombre, sector, certificados, precio_compra,
-//               precio_actual, distribucion, rendimiento } ───────────────────
+//               precio_actual, distribucion, rendimiento, purchase_date? } ────
 const fibrasRules = [
   body('ticker').trim().notEmpty().withMessage('ticker is required.').toUpperCase(),
   body('nombre').trim().notEmpty().withMessage('nombre is required.'),
   body('certificados').isInt({ min: 1 }).withMessage('certificados must be a positive integer.'),
   positiveNumber('precio_compra'),
   positiveNumber('precio_actual'),
+  body('purchase_date').optional().isISO8601().withMessage('purchase_date must be YYYY-MM-DD.'),
 ];
 
 // ─── Retiro  { tipo, nombre, institucion, subcuenta, saldo,
@@ -95,14 +98,49 @@ const bienesRules = [
   positiveNumber('valor_actual'),
 ];
 
-// ─── Crypto  { symbol, name, amount, avg_cost, current_price } ───────────────
+// ─── Crypto  { symbol, name, amount, avg_cost, current_price, purchase_date? } ─
 const cryptoRules = [
   body('symbol').trim().notEmpty().withMessage('symbol is required.').toUpperCase(),
   body('name').trim().notEmpty().withMessage('name is required.'),
   positiveNumber('amount'),
   positiveNumber('avg_cost'),
   positiveNumber('current_price'),
+  body('purchase_date').optional().isISO8601().withMessage('purchase_date must be YYYY-MM-DD.'),
 ];
+
+// ─── withAssetLink — wrap a holdings `create` handler to auto-link to assets ──
+//
+// Intercepts res.json after a successful POST, extracts the saved holding row,
+// and fires linkHoldingToAsset in the background. Never blocks the response.
+//
+// linkConfig: { assetType, tickerField, nameField, quantityField, priceField, currency }
+
+function withAssetLink(originalCreate, linkConfig) {
+  return function (req, res, next) {
+    const originalJson = res.json.bind(res);
+
+    res.json = function (body) {
+      if (body?.success && body?.data) {
+        const holding = body.data;
+        setImmediate(() => {
+          linkHoldingToAsset({
+            userId:       req.user.id,
+            ticker:       holding[linkConfig.tickerField],
+            name:         holding[linkConfig.nameField],
+            assetType:    linkConfig.assetType,
+            currency:     linkConfig.currency || 'USD',
+            purchaseDate: holding.purchase_date ?? req.body.purchase_date ?? null,
+            quantity:     parseFloat(holding[linkConfig.quantityField]) || null,
+            avgBuyPrice:  parseFloat(holding[linkConfig.priceField])    || null,
+          });
+        });
+      }
+      return originalJson(body);
+    };
+
+    return originalCreate(req, res, next);
+  };
+}
 
 // ─── Stocks router — uses custom controller for MXN field computation ─────────
 function buildStocksRouter() {
@@ -146,12 +184,56 @@ function buildBonosRouter() {
   return router;
 }
 
+// ─── Crypto router — uses holdingsController + auto-link to assets table ──────
+function buildCryptoRouter() {
+  const { list, create, update, remove } = holdingsController('crypto');
+  const router = Router();
+  router.get('/', list);
+  router.post(
+    '/',
+    [...cryptoRules, validate],
+    withAssetLink(create, {
+      assetType:     'crypto',
+      tickerField:   'symbol',
+      nameField:     'name',
+      quantityField: 'amount',
+      priceField:    'avg_cost',
+      currency:      'USD',
+    })
+  );
+  router.put('/:id',    [uuidParam, validate], update);
+  router.delete('/:id', [uuidParam, validate], remove);
+  return router;
+}
+
+// ─── Fibras router — uses holdingsController + auto-link to assets table ──────
+function buildFibrasRouter() {
+  const { list, create, update, remove } = holdingsController('fibras');
+  const router = Router();
+  router.get('/', list);
+  router.post(
+    '/',
+    [...fibrasRules, validate],
+    withAssetLink(create, {
+      assetType:     'reit',
+      tickerField:   'ticker',
+      nameField:     'nombre',
+      quantityField: 'certificados',
+      priceField:    'precio_compra',
+      currency:      'MXN',
+    })
+  );
+  router.put('/:id',    [uuidParam, validate], update);
+  router.delete('/:id', [uuidParam, validate], remove);
+  return router;
+}
+
 module.exports = {
   stocksRouter:  buildStocksRouter(),
   bonosRouter:   buildBonosRouter(),
   fondosRouter:  buildRouter('fondos',  fondosRules),
-  fibrasRouter:  buildRouter('fibras',  fibrasRules),
+  fibrasRouter:  buildFibrasRouter(),
   retiroRouter:  buildRouter('retiro',  retiroRules),
   bienesRouter:  buildRouter('bienes',  bienesRules),
-  cryptoRouter:  buildRouter('crypto',  cryptoRules),
+  cryptoRouter:  buildCryptoRouter(),
 };
