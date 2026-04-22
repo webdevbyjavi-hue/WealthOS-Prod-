@@ -37,7 +37,7 @@
   const mappers = {
     stocks: {
       toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice }),
-      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, history: _fakeHistory(parseFloat(h.current_price)) }),
+      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null }),
     },
     bonos: {
       toApi:   b => ({ tipo: b.tipo, plazo: b.plazo, serie_banxico: b.serieBanxico, purchase_date: b.purchaseDate, tasa_compra: b.tasaCompra, monto: b.monto, descripcion: b.descripcion || null }),
@@ -49,7 +49,7 @@
     },
     fibras: {
       toApi:   f => ({ ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: f.certificados, precio_compra: f.precioCompra, precio_actual: f.precioActual, distribucion: f.distribucion, rendimiento: f.rendimiento }),
-      fromApi: f => ({ id: f.id, ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: parseInt(f.certificados), precioCompra: parseFloat(f.precio_compra), precioActual: parseFloat(f.precio_actual), distribucion: parseFloat(f.distribucion), rendimiento: parseFloat(f.rendimiento), history: _fakeHistory(parseFloat(f.precio_actual) * parseInt(f.certificados)) }),
+      fromApi: f => ({ id: f.id, ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: parseInt(f.certificados), precioCompra: parseFloat(f.precio_compra), precioActual: parseFloat(f.precio_actual), distribucion: parseFloat(f.distribucion), rendimiento: parseFloat(f.rendimiento) }),
     },
     retiro: {
       toApi:   r => ({ tipo: r.tipo, nombre: r.nombre, institucion: r.institucion, subcuenta: r.subcuenta, saldo: r.saldo, aportacion_ytd: r.aportacionYTD || 0, aportacion_patronal: r.aportacionPatronal || 0, rendimiento: r.rendimiento, proyeccion: r.proyeccion || 0 }),
@@ -61,7 +61,7 @@
     },
     crypto: {
       toApi:   c => ({ symbol: c.symbol, name: c.name, amount: c.amount, avg_cost: c.avgCost, current_price: c.currentPrice }),
-      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price), history: _fakeHistory(parseFloat(c.current_price) * parseFloat(c.amount)) }),
+      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price) }),
     },
     accounts: {
       toApi:   a => ({ name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency || 'MXN', balance: a.balance, fx_rate: a.fxRate || 1, notes: a.notes }),
@@ -161,6 +161,34 @@
           .then(r => r.data),
     },
 
+    // ── Prices (shared historical price data from stocks_snapshot) ────────────
+    prices: {
+      /**
+       * Returns [{ date, open, high, low, close, volume }] for a symbol.
+       * Symbol must be in TwelveData format: 'AAPL', 'BTC/USD', 'FUNO11.MX'
+       */
+      history: (symbol, from, to) => {
+        const p = new URLSearchParams({ symbol });
+        if (from) p.set('from', from);
+        if (to)   p.set('to',   to);
+        return request('GET', `/api/prices/history?${p}`).then(r => r.data);
+      },
+    },
+
+    // ── Portfolio (total value trendline) ─────────────────────────────────────
+    portfolio: {
+      /**
+       * Returns [{ date, total_value }] — sum of all stocks/fibras/crypto
+       * holdings valued at daily close, derived from the portfolio_daily_value view.
+       */
+      history: (from, to) => {
+        const p = new URLSearchParams();
+        if (from) p.set('from', from);
+        if (to)   p.set('to',   to);
+        return request('GET', `/api/portfolio/history?${p}`).then(r => r.data);
+      },
+    },
+
     // ── Exchange rates ────────────────────────────────────────────────────────
     exchangeRate: {
       getUsdMxn: () => request('GET', '/api/exchange-rates/usd-mxn').then(r => r.data),
@@ -168,6 +196,5 @@
 
     // Expose mappers for sync.js
     _mappers: mappers,
-    _fakeHistory: _fakeHistory,
   };
 })();

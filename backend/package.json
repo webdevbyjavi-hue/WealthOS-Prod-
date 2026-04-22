@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "lint": "eslint .",
-    "seed": "node seeds/seedAssets.js"
+    "seed": "node seeds/seedAssets.js",
+    "test": "jest --forceExit"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -23,6 +24,7 @@
     "node-cron": "^3.0.3"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.4"
   }
 }

@@ -23,8 +23,9 @@
  * Chart.js, or Tremor without any client-side transformation.
  */
 
-const { supabaseAdmin: supabase } = require('../services/supabaseClient');
-const { scheduleBackfill }        = require('../services/backfillService');
+const { supabaseAdmin: supabase }             = require('../services/supabaseClient');
+const { scheduleBackfill }                    = require('../services/backfillService');
+const { normalizeSymbol }                     = require('../services/priceService');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,10 +85,12 @@ async function getHistory(req, res, next) {
       return res.status(404).json({ success: false, message: 'Asset not found.' });
     }
 
+    const symbol = normalizeSymbol(asset.ticker, asset.asset_type);
+
     const { data: snapshots, error } = await supabase
-      .from('asset_snapshots')
-      .select('date, open, high, low, close, volume, market_cap')
-      .eq('asset_id', id)
+      .from('stocks_snapshot')
+      .select('date, open, high, low, close, volume')
+      .eq('symbol', symbol)
       .gte('date', from)
       .lte('date', to)
       .order('date', { ascending: true });
@@ -95,13 +98,12 @@ async function getHistory(req, res, next) {
     if (error) throw error;
 
     const history = (snapshots || []).map((s) => ({
-      date:       s.date,
-      value:      parseFloat(s.close),
-      open:       s.open       != null ? parseFloat(s.open)       : null,
-      high:       s.high       != null ? parseFloat(s.high)       : null,
-      low:        s.low        != null ? parseFloat(s.low)        : null,
-      volume:     s.volume     != null ? parseFloat(s.volume)     : null,
-      market_cap: s.market_cap != null ? parseFloat(s.market_cap) : null,
+      date:   s.date,
+      value:  parseFloat(s.close),
+      open:   s.open   != null ? parseFloat(s.open)   : null,
+      high:   s.high   != null ? parseFloat(s.high)   : null,
+      low:    s.low    != null ? parseFloat(s.low)    : null,
+      volume: s.volume != null ? parseFloat(s.volume) : null,
     }));
 
     res.json({ success: true, data: { asset, history } });
@@ -132,10 +134,12 @@ async function exportHistory(req, res, next) {
       return res.status(404).json({ success: false, message: 'Asset not found.' });
     }
 
+    const symbol = normalizeSymbol(asset.ticker, asset.asset_type);
+
     const { data: snapshots, error } = await supabase
-      .from('asset_snapshots')
-      .select('date, open, high, low, close, volume, market_cap')
-      .eq('asset_id', id)
+      .from('stocks_snapshot')
+      .select('date, open, high, low, close, volume')
+      .eq('symbol', symbol)
       .gte('date', from)
       .lte('date', to)
       .order('date', { ascending: true });
@@ -143,17 +147,16 @@ async function exportHistory(req, res, next) {
     if (error) throw error;
 
     // Build CSV string
-    const header = 'date,open,high,low,close,volume,market_cap\n';
+    const header = 'date,open,high,low,close,volume\n';
     const rows = (snapshots || [])
       .map((s) =>
         [
           s.date,
-          s.open       ?? '',
-          s.high       ?? '',
-          s.low        ?? '',
+          s.open   ?? '',
+          s.high   ?? '',
+          s.low    ?? '',
           s.close,
-          s.volume     ?? '',
-          s.market_cap ?? '',
+          s.volume ?? '',
         ].join(',')
       )
       .join('\n');
@@ -200,12 +203,13 @@ async function getPerformance(req, res, next) {
 
     // We need the most recent close and closes ~7, 30, 90, 365 days ago.
     // Fetch the last 370 days so we can satisfy all windows in one query.
-    const from = daysAgo(370);
+    const from   = daysAgo(370);
+    const symbol = normalizeSymbol(asset.ticker, asset.asset_type);
 
     const { data: snapshots, error } = await supabase
-      .from('asset_snapshots')
+      .from('stocks_snapshot')
       .select('date, close')
-      .eq('asset_id', id)
+      .eq('symbol', symbol)
       .gte('date', from)
       .order('date', { ascending: true });
 

@@ -19,6 +19,7 @@ const historyRoutes    = require('./src/routes/historyRoutes');
 const assetsRoutes     = require('./src/routes/assetsRoutes');
 const snapshotsRoutes  = require('./src/routes/snapshotsRoutes');
 const portfoliosRoutes = require('./src/routes/portfoliosRoutes');
+const { pricesRouter, portfolioRouter } = require('./src/routes/pricesRoutes');
 const lookupRoutes         = require('./src/routes/lookupRoutes');
 const exchangeRateRoutes   = require('./src/routes/exchangeRateRoutes');
 const {
@@ -72,6 +73,8 @@ app.use('/api/history',    authMiddleware, historyRoutes);
 app.use('/api/assets',     authMiddleware, assetsRoutes);
 app.use('/api/snapshots',  authMiddleware, snapshotsRoutes);
 app.use('/api/portfolios', authMiddleware, portfoliosRoutes);
+app.use('/api/prices',     authMiddleware, pricesRouter);
+app.use('/api/portfolio',  authMiddleware, portfolioRouter);
 app.use('/api/stocks',     authMiddleware, stocksRouter);
 app.use('/api/bonos',      authMiddleware, bonosRouter);
 app.use('/api/fondos',     authMiddleware, fondosRouter);

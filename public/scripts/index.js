@@ -8,6 +8,21 @@ function setVisitorCount(){
 let _wosRaw = { stocks: [], bonos: [], fondos: [], fibras: [], retiro: [], crypto: [], bienes: [] };
 let _cashTotal = 0;
 
+// Real portfolio history from /api/portfolio/history — [{date, total_value}] or null
+let _portfolioHistoryData = null;
+
+async function refreshPortfolioHistory() {
+  const d = new Date();
+  d.setDate(d.getDate() - 365);
+  const from = d.toISOString().slice(0, 10);
+  const to   = new Date().toISOString().slice(0, 10);
+  try {
+    _portfolioHistoryData = await WOS_API.portfolio.history(from, to);
+  } catch (_) {
+    _portfolioHistoryData = null;
+  }
+}
+
 async function refreshPortfolio() {
   const [stocks, bonos, fondos, fibras, retiro, crypto, bienes, accts] = await Promise.all([
     WOS_API.holdings.list('stocks'),
@@ -511,17 +526,28 @@ function applyCustomRange() {
   const endStr   = document.getElementById('date-end').value;
   if (!startStr || !endStr || endStr < startStr) return;
 
+  if (_portfolioHistoryData && _portfolioHistoryData.length > 0) {
+    const slice = _portfolioHistoryData.filter(r => r.date >= startStr && r.date <= endStr);
+    if (slice.length > 0) {
+      const pts   = slice.map(r => r.total_value);
+      const dates = slice.map(r => {
+        const d = new Date(r.date + 'T12:00:00Z');
+        return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
+      });
+      drawLineChart(pts, dates);
+      return;
+    }
+  }
+
   const msPerDay  = 86400000;
   const startDate = new Date(startStr);
   const endDate   = new Date(endStr);
   const n         = Math.min(Math.round((endDate - startDate) / msPerDay) + 1, 90);
-
   const labels = Array.from({ length: n }, (_, i) => {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
   });
-
   const { portfolioHistory, totalValue } = loadWosPortfolio();
   if (!totalValue) return;
   drawLineChart(portfolioHistory(n), labels);
@@ -538,6 +564,18 @@ function getDateLabels(n) {
 function renderLine(range) {
   const slices = { '1W': 7, '1M': 30, '3M': 90, 'YTD': 90 };
   const n = slices[range] || 30;
+
+  if (_portfolioHistoryData && _portfolioHistoryData.length > 0) {
+    const slice = _portfolioHistoryData.slice(-n);
+    const pts   = slice.map(r => r.total_value);
+    const dates = slice.map(r => {
+      const d = new Date(r.date + 'T12:00:00Z');
+      return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
+    });
+    drawLineChart(pts, dates);
+    return;
+  }
+
   const { portfolioHistory, totalValue } = loadWosPortfolio();
   if (!totalValue) return;
   drawLineChart(portfolioHistory(n), getDateLabels(n));
@@ -736,6 +774,9 @@ async function refreshPrices(){
 setVisitorCount();
 render(); // show empty state immediately while API loads
 (async () => {
-  try { await refreshPortfolio(); } catch (_) {}
+  await Promise.all([
+    refreshPortfolio().catch(() => {}),
+    refreshPortfolioHistory(),
+  ]);
   render();
 })();

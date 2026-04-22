@@ -3,38 +3,33 @@
 /**
  * snapshotService.js
  * ──────────────────
- * Fetches the latest daily price for every tracked asset and upserts a row
- * into asset_snapshots.  Designed to run once per day at market close.
+ * Daily price snapshot job. Collects every distinct symbol tracked by any
+ * user, fetches the latest completed trading session via Twelve Data /quote
+ * (batched to minimise API credits), and upserts into stocks_snapshot.
  *
- * Behaviour:
- *   • Loads all assets from the database (via supabaseAdmin — bypasses RLS)
- *   • For each asset, fetches today's price from the price service
- *   • Upserts into asset_snapshots using the (asset_id, date) unique constraint
- *     → If the row doesn't exist it is inserted; if it exists it is updated
- *   • Processes assets sequentially to respect Alpha Vantage rate limits
- *     (free tier: 5 req/min)
- *   • Returns a structured result object with per-asset success/failure details
- *   • Never throws — errors are caught per asset so one failure can't abort the run
+ * Key design:
+ *   • Reads distinct (ticker, asset_type) from the assets registry — one
+ *     symbol appears once regardless of how many users hold it.
+ *   • Uses fetchBatchQuote() — one HTTP request per batch of symbols.
+ *     With 8 credits/minute and batch size 8, 80 symbols = 10 HTTP requests.
+ *   • All API calls go through requestQueue.js as HIGH priority so the
+ *     nightly job always takes precedence over background backfills.
+ *   • Writes to stocks_snapshot with ON CONFLICT DO NOTHING — idempotent.
+ *   • Never throws — per-batch errors are caught, logged, and reported.
  *
- * Usage:
- *   const { runSnapshots } = require('./snapshotService');
- *   const result = await runSnapshots();
+ * Called by:
+ *   • The node-cron job in server.js at 23:00 UTC Mon–Fri (after all major
+ *     markets have closed, so /quote returns that day's completed session).
+ *   • The manual trigger endpoint POST /api/snapshots/run.
  */
 
-const { supabaseAdmin } = require('./supabaseClient');
-const { fetchPrice }    = require('./priceService');
+const { supabaseAdmin }                          = require('./supabaseClient');
+const { fetchBatchQuote, normalizeSymbol }       = require('./priceService');
+const { enqueue }                                = require('./requestQueue');
 
-// Alpha Vantage free tier: 5 requests/minute → ~12 s between calls is safe.
-// Set to 0 in test/dev environments where a mock price service is used.
-const RATE_LIMIT_DELAY_MS = parseInt(process.env.SNAPSHOT_RATE_DELAY_MS || '12000', 10);
+const BATCH_SIZE = parseInt(process.env.SNAPSHOT_BATCH_SIZE || '8', 10);
 
-/** Pause for `ms` milliseconds. */
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Return today's date as a UTC DATE string (YYYY-MM-DD). */
-function todayUTC() {
+function _todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -42,103 +37,110 @@ function todayUTC() {
  * Run the daily snapshot job.
  *
  * @returns {Promise<{
- *   date: string,
- *   total: number,
+ *   date:      string,
+ *   total:     number,
  *   succeeded: number,
- *   failed: number,
- *   results: Array<{ asset_id, ticker, status, date?, error? }>
+ *   failed:    number,
+ *   results:   Array<{ symbol, status, date?, error?, reason? }>
  * }>}
  */
 async function runSnapshots() {
-  const runDate = todayUTC();
+  const runDate = _todayUTC();
   console.log(`[snapshotService] Starting snapshot run for ${runDate}`);
 
-  // ── 1. Load all assets (service role bypasses RLS so we get every user's assets)
-  const { data: assets, error: fetchErr } = await supabaseAdmin
+  // ── 1. Load all (ticker, asset_type) pairs from the assets registry ──────────
+  //    supabaseAdmin bypasses RLS so we get every user's assets in one query.
+  const { data: assetRows, error: fetchErr } = await supabaseAdmin
     .from('assets')
-    .select('id, user_id, ticker, name, asset_type, currency')
-    .order('created_at', { ascending: true });
+    .select('ticker, asset_type')
+    .order('ticker');
 
   if (fetchErr) {
     throw new Error(`[snapshotService] Failed to load assets: ${fetchErr.message}`);
   }
 
-  if (!assets || assets.length === 0) {
+  if (!assetRows || assetRows.length === 0) {
     console.log('[snapshotService] No assets found. Nothing to snapshot.');
     return { date: runDate, total: 0, succeeded: 0, failed: 0, results: [] };
   }
 
-  console.log(`[snapshotService] Processing ${assets.length} asset(s)...`);
+  // ── 2. Deduplicate: one entry per TwelveData-formatted symbol ─────────────────
+  //    Multiple users holding AAPL → one 'AAPL' entry. BTC → 'BTC/USD'.
+  const symbolMap = new Map(); // tdSymbol → (unused, just for dedup)
+  for (const row of assetRows) {
+    const tdSym = normalizeSymbol(row.ticker, row.asset_type);
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, row.asset_type);
+  }
+
+  const symbols = [...symbolMap.keys()];
+  console.log(`[snapshotService] Fetching ${symbols.length} unique symbol(s)...`);
 
   const results = [];
 
-  for (let i = 0; i < assets.length; i++) {
-    const asset = assets[i];
+  // ── 3. Batch /quote requests (HIGH priority — nightly job first in queue) ─────
+  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+    const batch = symbols.slice(i, i + BATCH_SIZE);
 
+    let quoteMap;
     try {
-      // ── 2. Fetch the latest price for this asset
-      const price = await fetchPrice(asset);
-
-      if (!price) {
-        // Price service returned null (e.g. API key not configured)
-        results.push({ asset_id: asset.id, ticker: asset.ticker, status: 'skipped', reason: 'no_api_key' });
-        continue;
-      }
-
-      // ── 3. Upsert into asset_snapshots
-      //    onConflict targets the (asset_id, date) unique constraint.
-      //    If the row already exists, all price columns are updated.
-      const snapshotDate = price.date || runDate;
-
-      const { error: upsertErr } = await supabaseAdmin
-        .from('asset_snapshots')
-        .upsert(
-          {
-            asset_id:   asset.id,
-            date:       snapshotDate,
-            open:       price.open       ?? null,
-            high:       price.high       ?? null,
-            low:        price.low        ?? null,
-            close:      price.close,
-            volume:     price.volume     ?? null,
-            market_cap: price.market_cap ?? null,
-          },
-          { onConflict: 'asset_id,date' }
-        );
-
-      if (upsertErr) throw upsertErr;
-
-      console.log(`[snapshotService] ✓ ${asset.ticker} — close: ${price.close} (${snapshotDate})`);
-      results.push({ asset_id: asset.id, ticker: asset.ticker, status: 'ok', date: snapshotDate });
-
+      quoteMap = await enqueue(
+        () => fetchBatchQuote(batch),
+        { priority: 'high', creditCost: batch.length }
+      );
     } catch (err) {
-      const message = err?.message || String(err);
-      console.error(`[snapshotService] ✗ ${asset.ticker} — ${message}`);
-      results.push({ asset_id: asset.id, ticker: asset.ticker, status: 'error', error: message });
+      console.error(`[snapshotService] Batch failed: ${err.message}`);
+      for (const sym of batch) {
+        results.push({ symbol: sym, status: 'error', error: err.message });
+      }
+      continue;
     }
 
-    // Rate-limit delay between API calls (skip after the last asset)
-    if (i < assets.length - 1 && RATE_LIMIT_DELAY_MS > 0) {
-      await sleep(RATE_LIMIT_DELAY_MS);
+    // ── 4. Collect rows and upsert ───────────────────────────────────────────
+    const rows = [];
+    for (const sym of batch) {
+      const quote = quoteMap.get(sym);
+      if (!quote) {
+        console.warn(`[snapshotService] ✗ ${sym} — no data returned`);
+        results.push({ symbol: sym, status: 'skipped', reason: 'no_data' });
+        continue;
+      }
+      rows.push({
+        symbol: sym,
+        date:   quote.date,
+        open:   quote.open   ?? null,
+        high:   quote.high   ?? null,
+        low:    quote.low    ?? null,
+        close:  quote.close,
+        volume: quote.volume ?? null,
+      });
+      console.log(`[snapshotService] ✓ ${sym} — close: ${quote.close} (${quote.date})`);
+      results.push({ symbol: sym, status: 'ok', date: quote.date });
+    }
+
+    if (rows.length > 0) {
+      const { error: upsertErr } = await supabaseAdmin
+        .from('stocks_snapshot')
+        .upsert(rows, { onConflict: 'symbol,date' });
+
+      if (upsertErr) {
+        console.error(`[snapshotService] Upsert error: ${upsertErr.message}`);
+        for (const row of rows) {
+          const r = results.find((x) => x.symbol === row.symbol && x.status === 'ok');
+          if (r) { r.status = 'error'; r.error = upsertErr.message; delete r.date; }
+        }
+      }
     }
   }
 
   const succeeded = results.filter((r) => r.status === 'ok').length;
   const failed    = results.filter((r) => r.status === 'error').length;
-  const skipped   = results.filter((r) => r.status === 'skipped').length;
 
   console.log(
-    `[snapshotService] Run complete — ` +
-    `${succeeded} succeeded, ${failed} failed, ${skipped} skipped out of ${assets.length} total.`
+    `[snapshotService] Run complete — ${succeeded} succeeded, ${failed} failed ` +
+    `out of ${symbols.length} unique symbol(s).`
   );
 
-  return {
-    date:      runDate,
-    total:     assets.length,
-    succeeded,
-    failed,
-    results,
-  };
+  return { date: runDate, total: symbols.length, succeeded, failed, results };
 }
 
 module.exports = { runSnapshots };

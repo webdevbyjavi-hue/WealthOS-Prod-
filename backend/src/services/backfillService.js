@@ -3,116 +3,138 @@
 /**
  * backfillService.js
  * ──────────────────
- * Fetches and stores historical daily OHLCV snapshots for an asset,
+ * Fetches and stores historical daily OHLCV data for an asset symbol,
  * starting from its purchase_date up to today.
  *
- * Design:
- *   • One API call covers the entire date range — not one call per day.
- *   • Only fetches dates not already stored in asset_snapshots.
- *   • Upserts in batches of 500 to stay within Supabase payload limits.
- *   • backfillAsset() never throws — errors are caught, logged, returned.
- *   • scheduleBackfill() queues assets sequentially with an 8-second delay
- *     between jobs to respect the Twelve Data 8 req/min free-tier limit.
+ * Key design:
+ *   • Writes to stocks_snapshot keyed by (symbol, date) — shared globally.
+ *     If ten users hold AAPL, the first backfill populates the table; all
+ *     subsequent users find it already covered and issue zero API calls.
+ *   • Gap detection queries the DB before making any API call. Fully-covered
+ *     symbols return immediately without touching TwelveData.
+ *   • Only the TwelveData fetch goes through requestQueue — gap detection and
+ *     Supabase writes are not rate-limited API calls.
+ *   • Rate limiting (8 req/min, 800/day) is enforced by requestQueue.js.
+ *   • scheduleBackfill() is fire-and-forget — HTTP response is sent before
+ *     any work begins. Errors are logged, never propagated.
  */
 
-const { supabaseAdmin } = require('./supabaseClient');
-const { fetchHistoricalTimeSeries } = require('./priceService');
+const { supabaseAdmin }                             = require('./supabaseClient');
+const { fetchHistoricalTimeSeries, normalizeSymbol } = require('./priceService');
+const { enqueue }                                   = require('./requestQueue');
 
 const BATCH_SIZE = 500;
-const BACKFILL_DELAY_MS = parseInt(process.env.BACKFILL_RATE_DELAY_MS || '8000', 10);
 
-/** Async sleep helper. */
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Return today's date as YYYY-MM-DD (UTC). */
-function todayUTC() {
+function _todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
 /**
- * Backfill historical snapshots for one asset.
+ * Query stocks_snapshot to find the earliest and latest stored date for a
+ * symbol within the target range. Returns gap information without making
+ * any TwelveData API call.
  *
- * Checks what date range is already stored and only fetches the missing prefix
- * (dates before the earliest stored snapshot). The daily cron fills trailing
- * days automatically, so we only need to handle the historical gap.
+ * @param {string} symbol       — TwelveData-formatted symbol (from normalizeSymbol)
+ * @param {string} purchaseDate — YYYY-MM-DD
+ * @returns {Promise<
+ *   { needsFetch: false, reason: string } |
+ *   { needsFetch: true,  fetchStart: string, fetchEnd: string }
+ * >}
+ */
+async function _detectGap(symbol, purchaseDate) {
+  const today = _todayUTC();
+
+  if (purchaseDate > today) {
+    return { needsFetch: false, reason: 'future_purchase_date' };
+  }
+
+  const [{ data: firstRows, error: e1 }, { data: lastRows, error: e2 }] =
+    await Promise.all([
+      supabaseAdmin
+        .from('stocks_snapshot')
+        .select('date')
+        .eq('symbol', symbol)
+        .gte('date', purchaseDate)
+        .lte('date', today)
+        .order('date', { ascending: true })
+        .limit(1),
+      supabaseAdmin
+        .from('stocks_snapshot')
+        .select('date')
+        .eq('symbol', symbol)
+        .gte('date', purchaseDate)
+        .lte('date', today)
+        .order('date', { ascending: false })
+        .limit(1),
+    ]);
+
+  if (e1) throw e1;
+  if (e2) throw e2;
+
+  const earliest = firstRows?.[0]?.date ?? null;
+  const latest   = lastRows?.[0]?.date  ?? null;
+
+  if (earliest && earliest <= purchaseDate && latest >= today) {
+    return { needsFetch: false, reason: 'fully_covered' };
+  }
+
+  return {
+    needsFetch:  true,
+    fetchStart:  purchaseDate,
+    fetchEnd:    today,
+  };
+}
+
+/**
+ * Backfill historical daily prices for a single symbol.
  *
- * @param {object} asset  — must include: id, ticker, asset_type, purchase_date
+ * Issues zero TwelveData API calls when the symbol is already fully covered
+ * in stocks_snapshot. Exported for direct use and testing.
+ *
+ * @param {string} ticker       — raw ticker as stored (e.g. 'AAPL', 'BTC', 'FUNO11')
+ * @param {string} assetType    — 'stock'|'etf'|'reit'|'crypto'|...
+ * @param {string} purchaseDate — YYYY-MM-DD
  * @returns {Promise<{ inserted: number, skipped: number, error: string|null }>}
  */
-async function backfillAsset(asset) {
-  const { id: assetId, ticker, asset_type, purchase_date } = asset;
-
-  if (!purchase_date) {
-    console.log(`[backfillService] ${ticker}: no purchase_date — skipping.`);
+async function backfillSymbol(ticker, assetType, purchaseDate) {
+  if (!purchaseDate) {
     return { inserted: 0, skipped: 0, error: null };
   }
 
-  const today = todayUTC();
+  const symbol = normalizeSymbol(ticker, assetType);
 
   try {
-    // ── 1. Find the earliest + latest snapshot already stored ─────────────────
-    const [{ data: firstRows, error: firstErr }, { data: lastRows, error: lastErr }] =
-      await Promise.all([
-        supabaseAdmin
-          .from('asset_snapshots')
-          .select('date')
-          .eq('asset_id', assetId)
-          .gte('date', purchase_date)
-          .lte('date', today)
-          .order('date', { ascending: true })
-          .limit(1),
-        supabaseAdmin
-          .from('asset_snapshots')
-          .select('date')
-          .eq('asset_id', assetId)
-          .gte('date', purchase_date)
-          .lte('date', today)
-          .order('date', { ascending: false })
-          .limit(1),
-      ]);
+    // ── 1. Gap detection (no API call) ────────────────────────────────────────
+    const gap = await _detectGap(symbol, purchaseDate);
 
-    if (firstErr) throw firstErr;
-    if (lastErr)  throw lastErr;
-
-    const earliestStored = firstRows?.[0]?.date ?? null;
-    const latestStored   = lastRows?.[0]?.date  ?? null;
-
-    // ── 2. Determine the date range to fetch ──────────────────────────────────
-    // If snapshots already cover from purchase_date to today, nothing to do.
-    if (earliestStored && latestStored) {
-      if (earliestStored <= purchase_date && latestStored >= today) {
-        console.log(`[backfillService] ${ticker}: snapshots complete — skipping API call.`);
-        return { inserted: 0, skipped: 0, error: null };
-      }
+    if (!gap.needsFetch) {
+      console.log(`[backfillService] ${symbol}: ${gap.reason} — skipping API call.`);
+      return { inserted: 0, skipped: 1, error: null };
     }
 
-    // Fetch from purchase_date up to the day before the earliest stored snapshot
-    // (if any). The daily cron handles everything from latestStored onwards.
-    const fetchStart = purchase_date;
-    const fetchEnd   = earliestStored
-      ? earliestStored  // upsert will handle the overlap cleanly via ON CONFLICT
-      : today;
+    const { fetchStart, fetchEnd } = gap;
+    console.log(`[backfillService] ${symbol}: fetching ${fetchStart} → ${fetchEnd}`);
 
-    // ── 3. One API call for the full date range ────────────────────────────────
-    console.log(`[backfillService] ${ticker}: fetching ${fetchStart} → ${fetchEnd} ...`);
-
-    const bars = await fetchHistoricalTimeSeries(ticker, asset_type, fetchStart, fetchEnd);
+    // ── 2. Rate-limited API call (NORMAL priority — nightly job takes precedence)
+    const bars = await enqueue(
+      () => fetchHistoricalTimeSeries(ticker, assetType, fetchStart, fetchEnd),
+      { priority: 'normal', creditCost: 1 }
+    );
 
     if (!bars || bars.length === 0) {
-      console.log(`[backfillService] ${ticker}: API returned 0 bars — nothing to store.`);
+      console.log(`[backfillService] ${symbol}: API returned 0 bars — nothing to store.`);
       return { inserted: 0, skipped: 0, error: null };
     }
 
-    // ── 4. Upsert in batches of BATCH_SIZE ────────────────────────────────────
+    // ── 3. Upsert into stocks_snapshot (shared table, keyed by symbol+date) ──
     const rows = bars.map((bar) => ({
-      asset_id:   assetId,
-      date:       bar.date,
-      open:       bar.open   ?? null,
-      high:       bar.high   ?? null,
-      low:        bar.low    ?? null,
-      close:      bar.close,
-      volume:     bar.volume ?? null,
-      market_cap: null,  // Twelve Data time_series does not include market_cap
+      symbol,
+      date:   bar.date,
+      open:   bar.open   ?? null,
+      high:   bar.high   ?? null,
+      low:    bar.low    ?? null,
+      close:  bar.close,
+      volume: bar.volume ?? null,
     }));
 
     let inserted = 0;
@@ -121,55 +143,41 @@ async function backfillAsset(asset) {
       const batch = rows.slice(i, i + BATCH_SIZE);
 
       const { error: upsertErr } = await supabaseAdmin
-        .from('asset_snapshots')
-        .upsert(batch, { onConflict: 'asset_id,date' });
+        .from('stocks_snapshot')
+        .upsert(batch, { onConflict: 'symbol,date' });
 
       if (upsertErr) throw upsertErr;
       inserted += batch.length;
     }
 
-    console.log(`[backfillService] ${ticker}: stored ${inserted} snapshots.`);
+    console.log(`[backfillService] ${symbol}: stored ${inserted} snapshots.`);
     return { inserted, skipped: 0, error: null };
 
   } catch (err) {
     const message = err?.message || String(err);
-    console.error(`[backfillService] ${ticker} backfill failed:`, message);
+    console.error(`[backfillService] ${symbol} backfill failed:`, message);
     return { inserted: 0, skipped: 0, error: message };
-  }
-}
-
-// ─── Sequential backfill queue ────────────────────────────────────────────────
-// Processes one asset at a time with BACKFILL_DELAY_MS between jobs.
-// Prevents rate-limit breaches when multiple holdings are added simultaneously.
-
-const _queue = [];
-let _running = false;
-
-async function _drain() {
-  if (_running) return;
-  _running = true;
-  try {
-    while (_queue.length > 0) {
-      const asset = _queue.shift();
-      await backfillAsset(asset);
-      if (_queue.length > 0) await sleep(BACKFILL_DELAY_MS);
-    }
-  } finally {
-    _running = false;
   }
 }
 
 /**
  * Fire-and-forget backfill scheduler.
  *
- * Adds the asset to the queue and returns immediately — the HTTP response is
- * sent before any backfill work begins. Errors are caught inside backfillAsset.
+ * Drop-in replacement for the previous scheduleBackfill — same call signature.
+ * Returns immediately; backfill runs in the background via requestQueue.
+ * Errors are caught and logged — never propagated to the caller.
  *
- * @param {object} asset  — same shape as backfillAsset (id, ticker, asset_type, purchase_date)
+ * @param {object} asset  — { ticker, asset_type, purchase_date, ... }
  */
 function scheduleBackfill(asset) {
-  _queue.push(asset);
-  setImmediate(_drain);
+  const { ticker, asset_type, purchase_date } = asset;
+  if (!purchase_date) return;
+
+  setImmediate(() => {
+    backfillSymbol(ticker, asset_type, purchase_date).catch((err) => {
+      console.error(`[backfillService] Unhandled error for ${ticker}:`, err.message);
+    });
+  });
 }
 
-module.exports = { backfillAsset, scheduleBackfill };
+module.exports = { backfillSymbol, scheduleBackfill };
