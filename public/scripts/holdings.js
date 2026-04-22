@@ -204,6 +204,23 @@ let _stocksHistory = null;
 let _cryptoHistory = null;
 let _fibrasHistory = null;
 
+// Fake history cache keyed by category — 365 pts generated once per session.
+const _fakeCache = {};
+function _genFake(key, total) {
+  if (!total) return null;
+  if (!_fakeCache[key]) {
+    const pts = [];
+    let p = total * (0.72 + Math.random() * 0.35);
+    for (let i = 0; i < 364; i++) {
+      p = Math.max(p * (1 + (Math.random() - 0.48) * 0.018), 0.01);
+      pts.push(parseFloat(p.toFixed(2)));
+    }
+    pts.push(parseFloat(total.toFixed(2)));
+    _fakeCache[key] = pts;
+  }
+  return _fakeCache[key];
+}
+
 function sortBy(col) {
   sortDir = (sortCol === col) ? -sortDir : 1;
   sortCol = col;
@@ -377,13 +394,9 @@ function filterStocksTable(v) { renderTable(v); }
 function getPortfolioHistory(n) {
   const series = _sliceHistory(_stocksHistory, n);
   if (series) return series.map(([, v]) => v);
-  return Array.from({ length: n }, (_, i) =>
-    stocks.reduce((s, h) => {
-      const hist = h.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || h.currentPrice) * h.shares;
-    }, 0)
-  );
+  const total = stocks.reduce((s, h) => s + h.currentPrice * h.shares, 0);
+  const fake  = _genFake('stocks', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function getDateLabels(n) {
@@ -949,13 +962,9 @@ function filterBonosTable(v) { renderBonosTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getBonosPortfolioHistory(n) {
-  return Array.from({ length: n }, (_, i) =>
-    bonos.reduce((s, b) => {
-      const hist = b.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || b.monto);
-    }, 0)
-  );
+  const total = bonos.reduce((s, b) => s + b.monto, 0);
+  const fake  = _genFake('bonos', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initBonosCharts() {
@@ -1412,13 +1421,9 @@ function filterFondosTable(v) { renderFondosTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getFondosPortfolioHistory(n) {
-  return Array.from({ length: n }, (_, i) =>
-    fondos.reduce((s, x) => {
-      const hist = x.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || x.navActual * x.unidades);
-    }, 0)
-  );
+  const total = fondos.reduce((s, f) => s + f.navActual * f.unidades, 0);
+  const fake  = _genFake('fondos', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initFondosCharts() {
@@ -1802,13 +1807,9 @@ function filterFibrasTable(v) { renderFibrasTable(v); }
 function getFibrasPortfolioHistory(n) {
   const series = _sliceHistory(_fibrasHistory, n);
   if (series) return series.map(([, v]) => v);
-  return Array.from({ length: n }, (_, i) =>
-    fibras.reduce((s, x) => {
-      const hist = x.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || x.precioActual * x.certificados);
-    }, 0)
-  );
+  const total = fibras.reduce((s, f) => s + f.precioActual * f.certificados, 0);
+  const fake  = _genFake('fibras', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initFibrasCharts() {
@@ -2185,13 +2186,9 @@ function filterRetiroTable(v) { renderRetiroTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getRetiroPortfolioHistory(n) {
-  return Array.from({ length: n }, (_, i) =>
-    retiro.reduce((s, r) => {
-      const hist = r.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || r.saldo);
-    }, 0)
-  );
+  const total = retiro.reduce((s, r) => s + r.saldo, 0);
+  const fake  = _genFake('retiro', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initRetiroCharts() {
@@ -2625,13 +2622,9 @@ function filterBienesTable(v) { renderBienesTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getBienesPortfolioHistory(n) {
-  return Array.from({ length: n }, (_, i) =>
-    bienes.reduce((s, b) => {
-      const hist = b.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || computeValorActual(b));
-    }, 0)
-  );
+  const total = bienes.reduce((s, b) => s + computeValorActual(b), 0);
+  const fake  = _genFake('bienes', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initBienesCharts() {
@@ -3050,13 +3043,9 @@ function filterCryptoTable(v) { renderCryptoTable(v); }
 function getCryptoPortfolioHistory(n) {
   const series = _sliceHistory(_cryptoHistory, n);
   if (series) return series.map(([, v]) => v);
-  return Array.from({ length: n }, (_, i) =>
-    cryptos.reduce((s, c) => {
-      const hist = c.history || [];
-      const idx  = Math.max(0, hist.length - n + i);
-      return s + (hist[idx] || c.currentPrice * c.amount);
-    }, 0)
-  );
+  const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0);
+  const fake  = _genFake('crypto', total);
+  return fake ? fake.slice(-n) : Array(n).fill(0);
 }
 
 function initCryptoCharts() {
