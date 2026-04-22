@@ -10,6 +10,8 @@ let _cashTotal = 0;
 
 // Real portfolio history from /api/portfolio/history — [{date, total_value}] or null
 let _portfolioHistoryData = null;
+// Cached fake history (365 pts) used as fallback when no real snapshots exist yet
+let _fakePts = null;
 
 async function refreshPortfolioHistory() {
   const d = new Date();
@@ -542,15 +544,15 @@ function applyCustomRange() {
   const msPerDay  = 86400000;
   const startDate = new Date(startStr);
   const endDate   = new Date(endStr);
-  const n         = Math.min(Math.round((endDate - startDate) / msPerDay) + 1, 90);
+  const n         = Math.min(Math.round((endDate - startDate) / msPerDay) + 1, 365);
   const labels = Array.from({ length: n }, (_, i) => {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
   });
-  const { portfolioHistory, totalValue } = loadWosPortfolio();
+  const { totalValue } = loadWosPortfolio();
   if (!totalValue) return;
-  drawLineChart(portfolioHistory(n), labels);
+  drawLineChart(_getFakePts(totalValue).slice(-n), labels);
 }
 
 function getDateLabels(n) {
@@ -559,6 +561,21 @@ function getDateLabels(n) {
     d.setDate(d.getDate() - (n - 1 - i));
     return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
   });
+}
+
+function _getFakePts(totalValue) {
+  if (!_fakePts) {
+    // Generate 365 pts of varied fake history ending at the current portfolio value
+    const pts = [];
+    let p = totalValue * (0.72 + Math.random() * 0.35);
+    for (let i = 0; i < 364; i++) {
+      p = Math.max(p * (1 + (Math.random() - 0.48) * 0.018), 0.01);
+      pts.push(parseFloat(p.toFixed(2)));
+    }
+    pts.push(parseFloat(totalValue.toFixed(2)));
+    _fakePts = pts;
+  }
+  return _fakePts;
 }
 
 function renderLine(range) {
@@ -576,9 +593,10 @@ function renderLine(range) {
     return;
   }
 
-  const { portfolioHistory, totalValue } = loadWosPortfolio();
+  const { totalValue } = loadWosPortfolio();
   if (!totalValue) return;
-  drawLineChart(portfolioHistory(n), getDateLabels(n));
+  const allPts = _getFakePts(totalValue);
+  drawLineChart(allPts.slice(-n), getDateLabels(n));
 }
 
 function gradientFill(ctx, up) {

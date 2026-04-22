@@ -108,24 +108,17 @@ async function lookupStockTicker() {
     document.getElementById('si-ticker').value = info.ticker;
     document.getElementById('si-name').value   = info.name;
 
-    // Pre-fill avg buy price only in add mode (don't overwrite user's cost in edit mode)
-    const purchasePrice = info.priceAtDate ?? info.price;
-    if (!editingStockId) {
-      document.getElementById('si-cost').value = purchasePrice.toFixed(4);
-    }
-
     // Current price → MXN for the si-price field
     const priceEl = document.getElementById('si-price');
     if (fx) {
       const mxnPrice = info.price * fx.rate;
       priceEl.dataset.usd = info.price;
       priceEl.value       = mxnPrice.toFixed(2);
-      const dateLabel = info.dateActual || date;
-      showToast(`${info.name} · ${dateLabel}: $${purchasePrice.toFixed(2)} USD · Today: $${mxnPrice.toFixed(2)} MXN`);
+      showToast(`${info.name} · Today: $${mxnPrice.toFixed(2)} MXN`);
     } else {
       priceEl.dataset.usd = info.price;
       priceEl.value       = info.price.toFixed(2);
-      showToast(`${info.name} · Purchase price: $${purchasePrice.toFixed(2)} USD`);
+      showToast(`${info.name} · Today: $${info.price.toFixed(2)} USD`);
     }
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the ticker and try again.');
