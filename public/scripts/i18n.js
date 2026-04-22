@@ -30,6 +30,8 @@
 
       // ── Dashboard ───────────────────────────────────────────────────────────
       page_dashboard:         'Dashboard',
+      kpi_liquid:             'Total Cash',
+      kpi_liquid_sub:         'Accounts',
       kpi_net_worth:          'Total Net Worth',
       kpi_daily:              "Today's Gain / Loss",
       kpi_daily_sub:          "vs. yesterday's close",
@@ -228,9 +230,9 @@
       // ── Bank Accounts ────────────────────────────────────────────────────────
       page_accounts:       'Bank Accounts',
       sum_total_balance:   'Total Balance (MXN)',
-      sum_active_accounts: 'Active Accounts',
-      sum_currencies:      'Currencies',
-      sum_countries:       'Countries',
+      sum_cash_in_ytd:     'Total Cash In YTD',
+      sum_cash_out_ytd:    'Total Cash Out YTD',
+      sum_invested_ytd:    'Total Invested YTD',
       kpi_total_cash:      'Total Cash (MXN equiv.)',
       kpi_largest_account: 'Largest Account',
       kpi_currencies_lbl:  'Currencies Tracked',
@@ -421,6 +423,8 @@
 
       // ── Tablero ─────────────────────────────────────────────────────────────
       page_dashboard:         'Tablero',
+      kpi_liquid:             'Total Líquido',
+      kpi_liquid_sub:         'Cuentas',
       kpi_net_worth:          'Patrimonio Neto Total',
       kpi_daily:              'Ganancia / Pérdida Hoy',
       kpi_daily_sub:          'vs. cierre de ayer',
@@ -619,9 +623,9 @@
       // ── Cuentas Bancarias ────────────────────────────────────────────────────
       page_accounts:       'Cuentas Bancarias',
       sum_total_balance:   'Saldo Total (MXN)',
-      sum_active_accounts: 'Cuentas Activas',
-      sum_currencies:      'Divisas',
-      sum_countries:       'Países',
+      sum_cash_in_ytd:     'Total Entradas YTD',
+      sum_cash_out_ytd:    'Total Salidas YTD',
+      sum_invested_ytd:    'Total Invertido YTD',
       kpi_total_cash:      'Efectivo Total (equiv. MXN)',
       kpi_largest_account: 'Cuenta Mayor',
       kpi_currencies_lbl:  'Divisas Rastreadas',
