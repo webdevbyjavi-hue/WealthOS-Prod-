@@ -14,7 +14,6 @@ let sortCol       = 'name';
 let sortDir       = 1;
 let filterText    = '';
 let filterCurrency = '';
-let filterCountry  = '';
 
 /* ─── Chart instances ─────────────────────────────────────────── */
 let chartCurrency = null;
@@ -200,7 +199,7 @@ function openAddTransactionModal() {
   ).join('');
   document.getElementById('ti-type').value = 'in';
   document.getElementById('ti-amount').value = '';
-  document.getElementById('ti-date').valueAsDate = new Date();
+  const _td = new Date(); document.getElementById('ti-date').value = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
   document.getElementById('ti-description').value = '';
   document.getElementById('txn-modal-overlay').classList.add('modal-overlay--visible');
 }
@@ -257,7 +256,6 @@ async function saveTransaction() {
 function filterTable(text) {
   filterText     = text.toLowerCase();
   filterCurrency = document.getElementById('filter-currency').value;
-  filterCountry  = document.getElementById('filter-country').value;
   renderTable();
 }
 
@@ -278,8 +276,7 @@ function getFiltered() {
       a.currency.toLowerCase().includes(filterText) ||
       a.country.toLowerCase().includes(filterText);
     const matchCur  = !filterCurrency || a.currency === filterCurrency;
-    const matchCtr  = !filterCountry  || a.country  === filterCountry;
-    return matchText && matchCur && matchCtr;
+    return matchText && matchCur;
   });
 }
 
@@ -302,14 +299,16 @@ function render() {
 }
 
 function updateSummary() {
-  const total      = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
-  const currencies = new Set(accounts.map(a => a.currency)).size;
-  const countries  = new Set(accounts.map(a => a.country)).size;
+  const total    = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+  const thisYear = new Date().getFullYear().toString();
+  const ytd      = (type) => transactions
+    .filter(t => t.type === type && (t.date || '').startsWith(thisYear))
+    .reduce((s, t) => s + (t.amountMXN || 0), 0);
 
-  document.getElementById('sum-total').textContent      = fmtMXN(total);
-  document.getElementById('sum-accounts').textContent   = accounts.length;
-  document.getElementById('sum-currencies').textContent = currencies;
-  document.getElementById('sum-countries').textContent  = countries;
+  document.getElementById('sum-total').textContent        = fmtMXN(total);
+  document.getElementById('sum-cash-in-ytd').textContent  = fmtMXN(ytd('in'));
+  document.getElementById('sum-cash-out-ytd').textContent = fmtMXN(ytd('out'));
+  document.getElementById('sum-invested-ytd').textContent = fmtMXN(ytd('invested'));
 }
 
 function updateKPIs() {
@@ -337,22 +336,15 @@ function updateKPIs() {
 
 function updateFilterDropdowns() {
   const currencies = [...new Set(accounts.map(a => a.currency))].sort();
-  const countries  = [...new Set(accounts.map(a => a.country))].sort();
 
   const curSel = document.getElementById('filter-currency');
-  const ctrSel = document.getElementById('filter-country');
   const savedCur = curSel.value;
-  const savedCtr = ctrSel.value;
 
   const allCurrLabel = typeof t === 'function' ? t('opt_all_currencies') : 'All currencies';
-  const allCtrLabel  = typeof t === 'function' ? t('opt_all_countries') : 'All countries';
   curSel.innerHTML = `<option value="">${allCurrLabel}</option>` +
     currencies.map(c => `<option value="${c}">${c}</option>`).join('');
-  ctrSel.innerHTML = `<option value="">${allCtrLabel}</option>` +
-    countries.map(c => `<option value="${c}">${c}</option>`).join('');
 
   if (currencies.includes(savedCur)) curSel.value = savedCur;
-  if (countries.includes(savedCtr))  ctrSel.value = savedCtr;
 }
 
 function renderTable() {

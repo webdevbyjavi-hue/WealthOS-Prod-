@@ -79,18 +79,18 @@
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_active_accounts">Active Accounts</span>
-        <span class="summary__value" id="sum-accounts">—</span>
+        <span class="summary__label" data-i18n="sum_cash_in_ytd">Total Cash In YTD</span>
+        <span class="summary__value" id="sum-cash-in-ytd">—</span>
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_currencies">Currencies</span>
-        <span class="summary__value" id="sum-currencies">—</span>
+        <span class="summary__label" data-i18n="sum_cash_out_ytd">Total Cash Out YTD</span>
+        <span class="summary__value" id="sum-cash-out-ytd">—</span>
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_countries">Countries</span>
-        <span class="summary__value" id="sum-countries">—</span>
+        <span class="summary__label" data-i18n="sum_invested_ytd">Total Invested YTD</span>
+        <span class="summary__value" id="sum-invested-ytd">—</span>
       </div>
     </section>
 
@@ -157,11 +157,8 @@
         </div>
         <div class="table-actions">
           <input class="search-input" type="text" data-i18n-placeholder="ph_search_account" placeholder="Search account or bank…" oninput="filterTable(this.value)" />
-          <select class="search-input" id="filter-currency" style="width:130px" onchange="filterTable(document.querySelector('.search-input').value)">
+          <select class="search-input" id="filter-currency" style="width:170px" onchange="filterTable(document.querySelector('.search-input').value)">
             <option value="" data-i18n="opt_all_currencies">All currencies</option>
-          </select>
-          <select class="search-input" id="filter-country" style="width:130px" onchange="filterTable(document.querySelector('.search-input').value)">
-            <option value="" data-i18n="opt_all_countries">All countries</option>
           </select>
         </div>
       </div>
@@ -325,7 +322,10 @@
         </div>
         <div class="form-group">
           <label class="form-label" data-i18n="lbl_date">Date</label>
-          <input class="form-input" id="ti-date" type="date" />
+          <div class="datepicker">
+            <input class="form-input datepicker__input" id="ti-date" type="text" readonly placeholder="Select date…" autocomplete="off" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
         </div>
       </div>
       <div class="form-group">
@@ -366,6 +366,7 @@
 
 <script src="scripts/mobile.js"></script>
 <script src="scripts/sync.js"></script>
+<script src="scripts/datepicker.js"></script>
 <script src="scripts/accounts.js"></script>
 
 </body>
