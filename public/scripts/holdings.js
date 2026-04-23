@@ -221,6 +221,15 @@ function _genFake(key, total) {
   return _fakeCache[key];
 }
 
+// Returns number of calendar days since the earliest purchase date in the array.
+// Returns null when no holding has a purchase date set.
+function _daysSincePurchase(holdings, dateField) {
+  const dates = holdings.filter(h => h[dateField]).map(h => new Date(h[dateField] + 'T12:00:00Z'));
+  if (!dates.length) return null;
+  const earliest = new Date(Math.min(...dates));
+  return Math.max(1, Math.ceil((Date.now() - earliest.getTime()) / 86400000));
+}
+
 function sortBy(col) {
   sortDir = (sortCol === col) ? -sortDir : 1;
   sortCol = col;
@@ -395,8 +404,10 @@ function getPortfolioHistory(n) {
   const series = _sliceHistory(_stocksHistory, n);
   if (series) return series.map(([, v]) => v);
   const total = stocks.reduce((s, h) => s + h.currentPrice * h.shares, 0);
+  const days  = _daysSincePurchase(stocks, 'fechaCompra');
+  const clamp = days ? Math.min(n, days) : n;
   const fake  = _genFake('stocks', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+  return fake ? fake.slice(-clamp) : Array(clamp).fill(0);
 }
 
 function getDateLabels(n) {
@@ -423,8 +434,9 @@ function _sliceHistory(histMap, n) {
 /**
  * Return chart date labels from a real history map when available,
  * falling back to synthetic labels generated from today.
+ * Pass fallbackDays to clamp the fallback range to days since purchase.
  */
-function getRealDateLabels(histMap, n) {
+function getRealDateLabels(histMap, n, fallbackDays) {
   const series = _sliceHistory(histMap, n);
   if (series) {
     return series.map(([date]) => {
@@ -432,7 +444,8 @@ function getRealDateLabels(histMap, n) {
       return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
     });
   }
-  return getDateLabels(n);
+  const clamp = fallbackDays ? Math.min(n, fallbackDays) : n;
+  return getDateLabels(clamp);
 }
 
 /**
@@ -455,9 +468,12 @@ async function loadRealHistory() {
   let allAssets;
   try {
     allAssets = await WOS_API.assets.list();
-  } catch {
+  } catch (err) {
+    console.warn('[WOS] loadRealHistory: assets.list() failed:', err.message);
     return; // assets endpoint unavailable — keep fake data
   }
+
+  console.log('[WOS] loadRealHistory: assets in registry:', allAssets.map(a => a.ticker));
 
   const byTicker = Object.fromEntries(allAssets.map(a => [a.ticker, a]));
 
@@ -472,14 +488,18 @@ async function loadRealHistory() {
     const map = new Map();
     await Promise.all(holdings.map(async (h) => {
       const asset = byTicker[h[tickerKey]];
-      if (!asset) return;
+      if (!asset) {
+        console.log('[WOS] loadRealHistory: no assets entry for', h[tickerKey], '— backfill not yet triggered');
+        return;
+      }
       try {
         const { history } = await WOS_API.assets.history(asset.id, from, today);
+        console.log('[WOS] loadRealHistory:', h[tickerKey], '→', history.length, 'snapshots');
         const fx = fxFn(h);
         history.forEach(p => {
           map.set(p.date, (map.get(p.date) || 0) + p.value * parseFloat(h[quantityKey]) * fx);
         });
-      } catch { /* no snapshots yet */ }
+      } catch (err) { console.warn('[WOS] loadRealHistory: history fetch failed for', h[tickerKey], err.message); }
     }));
     return map.size > 0 ? map : null;
   }
@@ -503,7 +523,7 @@ Chart.defaults.font.size     = 11;
 
 function initCharts() {
   const pts   = getPortfolioHistory(lineRangeDays);
-  const dates = getRealDateLabels(_stocksHistory, lineRangeDays);
+  const dates = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -679,7 +699,7 @@ function updateCharts() {
   if (!lineChart) return;
 
   const pts    = getPortfolioHistory(lineRangeDays);
-  const dates  = getRealDateLabels(_stocksHistory, lineRangeDays);
+  const dates  = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -803,14 +823,20 @@ async function saveStock() {
       renderAll();
 
       // If a purchase date was provided, a backfill is running in the background.
-      // Wait 6 seconds for it to finish, then reload real price history and refresh charts.
+      // Poll at 8s, 20s, and 45s to catch it whenever it finishes.
       if (created.fechaCompra) {
-        showToast('Fetching price history… chart will update shortly.');
-        setTimeout(() => {
-          loadRealHistory().then(() => {
-            updateCharts();
-          }).catch(() => {});
-        }, 6000);
+        showToast('Fetching price history… chart will update in a few seconds.');
+        console.log('[WOS] saveStock: backfill triggered for', created.ticker, 'with date', created.fechaCompra);
+        [8000, 20000, 45000].forEach(delay => {
+          setTimeout(() => {
+            loadRealHistory().then(() => {
+              if (_stocksHistory && _stocksHistory.size > 0) {
+                console.log('[WOS] saveStock: real history loaded after', delay / 1000, 's');
+                updateCharts();
+              }
+            }).catch(() => {});
+          }, delay);
+        });
       }
     } else if (apiAction === 'update' && item) {
       const updated = await WOS_API.holdings.update('stocks', targetId, item);
@@ -1819,13 +1845,15 @@ function getFibrasPortfolioHistory(n) {
   const series = _sliceHistory(_fibrasHistory, n);
   if (series) return series.map(([, v]) => v);
   const total = fibras.reduce((s, f) => s + f.precioActual * f.certificados, 0);
+  const days  = _daysSincePurchase(fibras, 'fechaCompra');
+  const clamp = days ? Math.min(n, days) : n;
   const fake  = _genFake('fibras', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+  return fake ? fake.slice(-clamp) : Array(clamp).fill(0);
 }
 
 function initFibrasCharts() {
   const pts    = getFibrasPortfolioHistory(fibrasLineRangeDays);
-  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays);
+  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays, _daysSincePurchase(fibras, 'fechaCompra'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -1910,7 +1938,7 @@ function initFibrasCharts() {
 function updateFibrasCharts() {
   if (!fibrasLineChart) return;
   const pts    = getFibrasPortfolioHistory(fibrasLineRangeDays);
-  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays);
+  const dates  = getRealDateLabels(_fibrasHistory, fibrasLineRangeDays, _daysSincePurchase(fibras, 'fechaCompra'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -3055,13 +3083,15 @@ function getCryptoPortfolioHistory(n) {
   const series = _sliceHistory(_cryptoHistory, n);
   if (series) return series.map(([, v]) => v);
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0);
+  const days  = _daysSincePurchase(cryptos, 'purchaseDate');
+  const clamp = days ? Math.min(n, days) : n;
   const fake  = _genFake('crypto', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+  return fake ? fake.slice(-clamp) : Array(clamp).fill(0);
 }
 
 function initCryptoCharts() {
   const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays);
+  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays, _daysSincePurchase(cryptos, 'purchaseDate'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
@@ -3151,7 +3181,7 @@ function initCryptoCharts() {
 function updateCryptoCharts() {
   if (!cryptoLineChart) return;
   const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays);
+  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays, _daysSincePurchase(cryptos, 'purchaseDate'));
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
