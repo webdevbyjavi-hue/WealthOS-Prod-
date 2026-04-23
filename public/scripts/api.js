@@ -36,8 +36,8 @@
   // ─── Field mappers (camelCase localStorage ↔ snake_case API) ────────────────
   const mappers = {
     stocks: {
-      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice }),
-      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null }),
+      toApi:   h => ({ ticker: h.ticker, name: h.name, shares: h.shares, avg_cost: h.avgCost, current_price: h.currentPriceUsd ?? h.currentPrice, purchase_date: h.fechaCompra || null }),
+      fromApi: h => ({ id: h.id, ticker: h.ticker, name: h.name, shares: parseFloat(h.shares), avgCost: parseFloat(h.avg_cost), currentPrice: parseFloat(h.current_price), avgCostUsd: h.avg_cost_usd ? parseFloat(h.avg_cost_usd) : null, currentPriceUsd: h.current_price_usd ? parseFloat(h.current_price_usd) : null, tipoDeCambio: h.tipo_de_cambio ? parseFloat(h.tipo_de_cambio) : null, fechaCompra: h.purchase_date || null }),
     },
     bonos: {
       toApi:   b => ({ tipo: b.tipo, plazo: b.plazo, serie_banxico: b.serieBanxico, purchase_date: b.purchaseDate, tasa_compra: b.tasaCompra, monto: b.monto, descripcion: b.descripcion || null }),
@@ -48,8 +48,8 @@
       fromApi: f => ({ id: f.id, clave: f.clave, nombre: f.nombre, operadora: f.operadora, unidades: parseFloat(f.unidades), precioCompra: parseFloat(f.precio_compra), navActual: parseFloat(f.nav_actual), rendimiento: parseFloat(f.rendimiento), tipo: f.tipo, history: _fakeHistory(parseFloat(f.nav_actual) * parseFloat(f.unidades)) }),
     },
     fibras: {
-      toApi:   f => ({ ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: f.certificados, precio_compra: f.precioCompra, precio_actual: f.precioActual, distribucion: f.distribucion, rendimiento: f.rendimiento }),
-      fromApi: f => ({ id: f.id, ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: parseInt(f.certificados), precioCompra: parseFloat(f.precio_compra), precioActual: parseFloat(f.precio_actual), distribucion: parseFloat(f.distribucion), rendimiento: parseFloat(f.rendimiento) }),
+      toApi:   f => ({ ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: f.certificados, precio_compra: f.precioCompra, precio_actual: f.precioActual, distribucion: f.distribucion, rendimiento: f.rendimiento, purchase_date: f.fechaCompra || null }),
+      fromApi: f => ({ id: f.id, ticker: f.ticker, nombre: f.nombre, sector: f.sector, certificados: parseInt(f.certificados), precioCompra: parseFloat(f.precio_compra), precioActual: parseFloat(f.precio_actual), distribucion: parseFloat(f.distribucion), rendimiento: parseFloat(f.rendimiento), fechaCompra: f.purchase_date || null }),
     },
     retiro: {
       toApi:   r => ({ tipo: r.tipo, nombre: r.nombre, institucion: r.institucion, subcuenta: r.subcuenta, saldo: r.saldo, aportacion_ytd: r.aportacionYTD || 0, aportacion_patronal: r.aportacionPatronal || 0, rendimiento: r.rendimiento, proyeccion: r.proyeccion || 0 }),
@@ -60,8 +60,8 @@
       fromApi: b => ({ id: b.id, nombre: b.nombre, tipo: b.tipo, ubicacion: b.ubicacion || '', precioCompra: parseFloat(b.precio_compra), fechaCompra: b.fecha_compra || null, plusvaliaAnual: parseFloat(b.plusvalia_anual) || 0, valorActual: parseFloat(b.valor_actual) || parseFloat(b.precio_compra), gastosNotariales: parseFloat(b.gastos_notariales) || 0, escrituracion: parseFloat(b.escrituracion) || 0, impuestoAdquisicion: parseFloat(b.impuesto_adquisicion) || 0, otrosGastos: parseFloat(b.otros_gastos) || 0, saldoHipoteca: parseFloat(b.saldo_hipoteca) || 0, rentaMensual: parseFloat(b.renta_mensual) || 0, history: _fakeHistory(parseFloat(b.valor_actual) || parseFloat(b.precio_compra)) }),
     },
     crypto: {
-      toApi:   c => ({ symbol: c.symbol, name: c.name, amount: c.amount, avg_cost: c.avgCost, current_price: c.currentPrice }),
-      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price) }),
+      toApi:   c => ({ symbol: c.symbol, name: c.name, amount: c.amount, avg_cost: c.avgCost, current_price: c.currentPrice, purchase_date: c.purchaseDate || null }),
+      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price), purchaseDate: c.purchase_date || null }),
     },
     accounts: {
       toApi:   a => ({ name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency || 'MXN', balance: a.balance, fx_rate: a.fxRate || 1, notes: a.notes }),

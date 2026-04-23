@@ -20,8 +20,8 @@ const { supabaseAdmin: supabase } = require('../services/supabaseClient');
 const { getOrFetchTodayRate }     = require('../services/exchangeRateService');
 const { linkHoldingToAsset }      = require('../services/assetLinker');
 
-/** Round to 4 decimal places (matches NUMERIC(18,4) in the schema). */
-const round4 = (n) => Math.round(n * 10000) / 10000;
+/** Round to 2 decimal places. */
+const round4 = (n) => Math.round(n * 100) / 100;
 
 /**
  * Fetch the exchange rate and convert current_price from USD to MXN.

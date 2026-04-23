@@ -801,6 +801,17 @@ async function saveStock() {
       if (idx !== -1) stocks[idx] = created;
       else item.id = created.id;
       renderAll();
+
+      // If a purchase date was provided, a backfill is running in the background.
+      // Wait 6 seconds for it to finish, then reload real price history and refresh charts.
+      if (created.fechaCompra) {
+        showToast('Fetching price history… chart will update shortly.');
+        setTimeout(() => {
+          loadRealHistory().then(() => {
+            updateCharts();
+          }).catch(() => {});
+        }, 6000);
+      }
     } else if (apiAction === 'update' && item) {
       const updated = await WOS_API.holdings.update('stocks', targetId, item);
       const idx = stocks.findIndex(h => h.id === targetId);
