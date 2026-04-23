@@ -159,10 +159,15 @@
             <button class="tab tab--active" onclick="setLineRange(7, this)">1W</button>
             <button class="tab" onclick="setLineRange(30, this)">1M</button>
             <button class="tab" onclick="setLineRange(90, this)">3M</button>
+            <button class="tab" onclick="setLineRange(365, this)">1Y</button>
           </div>
         </div>
         <div class="stocks-canvas-wrap">
           <canvas id="chart-line"></canvas>
+          <div class="chart-loading-notice" id="stocks-chart-loading" hidden>
+            <span class="chart-loading-spinner"></span>
+            <span data-i18n="chart_loading">Loading price data…</span>
+          </div>
         </div>
       </div>
 
@@ -455,10 +460,15 @@
             <button class="tab tab--active" onclick="setFibrasLineRange(7, this)">1S</button>
             <button class="tab" onclick="setFibrasLineRange(30, this)">1M</button>
             <button class="tab" onclick="setFibrasLineRange(90, this)">3M</button>
+            <button class="tab" onclick="setFibrasLineRange(365, this)">1A</button>
           </div>
         </div>
         <div class="fibras-canvas-wrap">
           <canvas id="chart-fibras-line"></canvas>
+          <div class="chart-loading-notice" id="fibras-chart-loading" hidden>
+            <span class="chart-loading-spinner"></span>
+            <span data-i18n="chart_loading">Loading price data…</span>
+          </div>
         </div>
       </div>
 
@@ -658,10 +668,15 @@
             <button class="tab tab--active" onclick="setCryptoLineRange(7, this)">1W</button>
             <button class="tab" onclick="setCryptoLineRange(30, this)">1M</button>
             <button class="tab" onclick="setCryptoLineRange(90, this)">3M</button>
+            <button class="tab" onclick="setCryptoLineRange(365, this)">1Y</button>
           </div>
         </div>
         <div class="crypto-canvas-wrap">
           <canvas id="chart-crypto-line"></canvas>
+          <div class="chart-loading-notice" id="crypto-chart-loading" hidden>
+            <span class="chart-loading-spinner"></span>
+            <span data-i18n="chart_loading">Loading price data…</span>
+          </div>
         </div>
       </div>
 

@@ -457,11 +457,24 @@ function getRealDateLabels(histMap, n, fallbackDays) {
  *   • No snapshots exist yet for the asset
  *   • The API call fails for any reason
  */
+function _showChartLoading() {
+  ['stocks-chart-loading', 'fibras-chart-loading', 'crypto-chart-loading'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = false;
+  });
+}
+function _hideChartLoading() {
+  ['stocks-chart-loading', 'fibras-chart-loading', 'crypto-chart-loading'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+}
+
 async function loadRealHistory() {
   const today = new Date().toISOString().slice(0, 10);
   const from  = (() => {
     const d = new Date();
-    d.setDate(d.getDate() - 90);
+    d.setDate(d.getDate() - 365);
     return d.toISOString().slice(0, 10);
   })();
 
@@ -522,9 +535,10 @@ Chart.defaults.font.family   = "'DM Sans', system-ui, sans-serif";
 Chart.defaults.font.size     = 11;
 
 function initCharts() {
-  const pts   = getPortfolioHistory(lineRangeDays);
-  const dates = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const hasRealData = _stocksHistory && _stocksHistory.size > 0;
+  const pts   = hasRealData ? getPortfolioHistory(lineRangeDays) : [];
+  const dates = hasRealData ? getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra')) : [];
+  const lineUp = pts.length > 0 && pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
   // ── Line chart ──────────────────────────────────────────────
@@ -639,14 +653,20 @@ function initCharts() {
   });
 
   // ── Bar chart ───────────────────────────────────────────────
-  const barData    = stocks.map(h => parseFloat(((h.currentPrice - h.avgCost) * h.shares).toFixed(2)));
+  const stocksByDate = [...stocks].sort((a, b) => {
+    if (!a.fechaCompra && !b.fechaCompra) return 0;
+    if (!a.fechaCompra) return 1;
+    if (!b.fechaCompra) return -1;
+    return a.fechaCompra.localeCompare(b.fechaCompra);
+  });
+  const barData    = stocksByDate.map(h => parseFloat(((h.currentPrice - h.avgCost) * h.shares).toFixed(2)));
   const barColors  = barData.map(v => v >= 0 ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)');
   const barBorders = barData.map(v => v >= 0 ? '#34d399' : '#f87171');
 
   barChart = new Chart(document.getElementById('chart-bar'), {
     type: 'bar',
     data: {
-      labels: stocks.map(h => h.ticker),
+      labels: stocksByDate.map(h => h.ticker),
       datasets: [{
         label: 'Gain / Loss',
         data: barData,
@@ -698,9 +718,10 @@ function initCharts() {
 function updateCharts() {
   if (!lineChart) return;
 
-  const pts    = getPortfolioHistory(lineRangeDays);
-  const dates  = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const hasRealData = _stocksHistory && _stocksHistory.size > 0;
+  const pts    = hasRealData ? getPortfolioHistory(lineRangeDays) : [];
+  const dates  = hasRealData ? getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra')) : [];
+  const lineUp = pts.length > 0 && pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
   lineChart.data.labels                       = dates;
@@ -713,8 +734,14 @@ function updateCharts() {
   donutChart.data.datasets[0].backgroundColor       = STOCK_COLORS.slice(0, stocks.length);
   donutChart.update();
 
-  const bd     = stocks.map(h => parseFloat(((h.currentPrice - h.avgCost) * h.shares).toFixed(2)));
-  barChart.data.labels                         = stocks.map(h => h.ticker);
+  const stocksByDate = [...stocks].sort((a, b) => {
+    if (!a.fechaCompra && !b.fechaCompra) return 0;
+    if (!a.fechaCompra) return 1;
+    if (!b.fechaCompra) return -1;
+    return a.fechaCompra.localeCompare(b.fechaCompra);
+  });
+  const bd     = stocksByDate.map(h => parseFloat(((h.currentPrice - h.avgCost) * h.shares).toFixed(2)));
+  barChart.data.labels                         = stocksByDate.map(h => h.ticker);
   barChart.data.datasets[0].data               = bd;
   barChart.data.datasets[0].backgroundColor    = bd.map(v => v >= 0 ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)');
   barChart.data.datasets[0].borderColor        = bd.map(v => v >= 0 ? '#34d399' : '#f87171');
@@ -827,14 +854,19 @@ async function saveStock() {
       if (created.fechaCompra) {
         showToast('Fetching price history… chart will update in a few seconds.');
         console.log('[WOS] saveStock: backfill triggered for', created.ticker, 'with date', created.fechaCompra);
-        [8000, 20000, 45000].forEach(delay => {
+        _showChartLoading();
+        const delays = [8000, 20000, 45000];
+        let retryDone = false;
+        delays.forEach((delay, i) => {
           setTimeout(() => {
             loadRealHistory().then(() => {
               if (_stocksHistory && _stocksHistory.size > 0) {
                 console.log('[WOS] saveStock: real history loaded after', delay / 1000, 's');
                 updateCharts();
+                if (!retryDone) { retryDone = true; _hideChartLoading(); }
               }
             }).catch(() => {});
+            if (i === delays.length - 1 && !retryDone) { retryDone = true; _hideChartLoading(); }
           }, delay);
         });
       }
@@ -3345,11 +3377,14 @@ async function initHoldings() {
 
   // Fetch real historical price data from asset_snapshots and refresh charts.
   // Uses .catch() so any failure is silent — charts keep showing fake data.
+  _showChartLoading();
   loadRealHistory().then(() => {
     updateCharts();        // stocks — safe no-op if chart not yet initialised
     updateCryptoCharts();  // crypto — safe no-op if chart not yet initialised
     updateFibrasCharts();  // fibras — safe no-op if chart not yet initialised
-  }).catch(() => {});
+  }).catch(() => {}).finally(() => {
+    _hideChartLoading();
+  });
 }
 
 initHoldings();
