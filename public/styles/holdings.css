@@ -564,6 +564,10 @@
 }
 
 /* ── Chart loading notice ──────────────────────────────────── */
+.chart-loading-notice[hidden] {
+  display: none;
+}
+
 .chart-loading-notice {
   position: absolute;
   top: 50%;
