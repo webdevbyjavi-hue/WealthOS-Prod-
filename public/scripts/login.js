@@ -75,6 +75,8 @@
             const dest = sessionStorage.getItem('wos_redirect') || 'index.html';
             sessionStorage.removeItem('wos_redirect');
             window.location.replace(dest);
+          } else {
+            showBanner('Sign-in succeeded but no session was returned. Check your confirmation email and click the verification link before signing in.', 'error');
           }
         } else {
           await WOS_API.auth.signup(email, password);

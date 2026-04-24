@@ -272,11 +272,8 @@ function renderKPIs() {
   const totalInvested = stocks.reduce((s, h) => s + h.avgCost * h.shares, 0);
   const gain          = totalValue - totalInvested;
   const gainPct       = totalInvested ? (gain / totalInvested) * 100 : 0;
-  const dailyChange   = stocks.reduce((s, h) => {
-    const hist = h.history || [];
-    const prev = hist.length >= 2 ? hist[hist.length - 2] : h.currentPrice;
-    return s + (h.currentPrice - prev) * h.shares;
-  }, 0);
+  const pts         = getPortfolioHistory(lineRangeDays);
+  const dailyChange = pts.length >= 2 ? pts[pts.length - 1] - pts[0] : 0;
 
   document.getElementById('s-total-value').textContent  = fmt(totalValue);
   document.getElementById('s-total-change').textContent = fmtPct(gainPct);
@@ -290,9 +287,11 @@ function renderKPIs() {
   gainEl.className   = 'kpi__value kpi__value--sm ' + (gain >= 0 ? 'kpi__change--up' : 'kpi__change--down');
   document.getElementById('s-gain-pct').textContent = fmtPct(gainPct);
 
-  const dailyEl = document.getElementById('s-daily');
+  const dailyEl    = document.getElementById('s-daily');
+  const dailySubEl = document.getElementById('s-daily-sub');
   dailyEl.textContent = (dailyChange >= 0 ? '+' : '') + fmt(dailyChange);
   dailyEl.className   = 'kpi__value kpi__value--sm ' + (dailyChange >= 0 ? 'kpi__change--up' : 'kpi__change--down');
+  if (dailySubEl) dailySubEl.textContent = _rangeSubLabel(lineRangeDays);
 
   renderSummaryStrip();
 }
@@ -400,6 +399,13 @@ function renderTable(filter = '') {
 function filterStocksTable(v) { renderTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
+function _rangeSubLabel(days) {
+  if (days <= 7)   return 'vs. 1W ago';
+  if (days <= 30)  return 'vs. 1M ago';
+  if (days <= 90)  return 'vs. 3M ago';
+  return 'vs. 1Y ago';
+}
+
 function getPortfolioHistory(n) {
   const series = _sliceHistory(_stocksHistory, n);
   if (series) return series.map(([, v]) => v);
@@ -753,6 +759,7 @@ function setLineRange(days, btn) {
   document.querySelectorAll('#line-range .tab').forEach(t => t.classList.remove('tab--active'));
   btn.classList.add('tab--active');
   updateCharts();
+  renderKPIs();
 }
 
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
@@ -3009,11 +3016,8 @@ function renderCryptoKPIs() {
   const totalInvested = cryptos.reduce((s, c) => s + c.avgCost * c.amount, 0);
   const gain          = totalValue - totalInvested;
   const gainPct       = totalInvested ? (gain / totalInvested) * 100 : 0;
-  const dailyChange   = cryptos.reduce((s, c) => {
-    const hist = c.history || [];
-    const prev = hist.length >= 2 ? hist[hist.length - 2] : c.currentPrice * c.amount;
-    return s + (c.currentPrice * c.amount - prev);
-  }, 0);
+  const cpts        = getCryptoPortfolioHistory(cryptoLineRangeDays);
+  const dailyChange = cpts.length >= 2 ? cpts[cpts.length - 1] - cpts[0] : 0;
 
   document.getElementById('c-total-value').textContent  = fmt(totalValue);
   document.getElementById('c-total-change').textContent = fmtPct(gainPct);
@@ -3027,9 +3031,11 @@ function renderCryptoKPIs() {
   gainEl.className   = 'kpi__value kpi__value--sm ' + (gain >= 0 ? 'kpi__change--up' : 'kpi__change--down');
   document.getElementById('c-gain-pct').textContent = fmtPct(gainPct);
 
-  const dailyEl = document.getElementById('c-daily');
+  const dailyEl    = document.getElementById('c-daily');
+  const dailySubEl = document.getElementById('c-daily-sub');
   dailyEl.textContent = (dailyChange >= 0 ? '+' : '') + fmt(dailyChange);
   dailyEl.className   = 'kpi__value kpi__value--sm ' + (dailyChange >= 0 ? 'kpi__change--up' : 'kpi__change--down');
+  if (dailySubEl) dailySubEl.textContent = _rangeSubLabel(cryptoLineRangeDays);
 
   renderSummaryStrip();
 }
@@ -3247,6 +3253,7 @@ function setCryptoLineRange(days, btn) {
   document.querySelectorAll('#crypto-line-range .tab').forEach(t => t.classList.remove('tab--active'));
   btn.classList.add('tab--active');
   updateCryptoCharts();
+  renderCryptoKPIs();
 }
 
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
