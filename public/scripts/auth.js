@@ -53,7 +53,7 @@
     signout() {
       try { WOS_API.auth.signout(); } catch (_) {}
       WOS_API.clearToken();
-      window.location.replace('login.html');
+      window.location.replace('/login');
     },
   };
 
@@ -61,7 +61,7 @@
   if (!WOS_API.isAuthenticated()) {
     // Save current page so login can redirect back after success
     sessionStorage.setItem('wos_redirect', window.location.href);
-    window.location.replace('login.html');
+    window.location.replace('/login');
     return; // stop executing — page is about to unload
   }
 

@@ -332,7 +332,7 @@ function renderTable() {
     const tr      = document.createElement('tr');
     tr.className  = 'table-row';
     tr.innerHTML  = `
-      <td class="td--name"><span class="asset__dot" style="background:${color}"></span><a class="td--link" href="holdings.html#${tabName}">${name}</a></td>
+      <td class="td--name"><span class="asset__dot" style="background:${color}"></span><a class="td--link" href="/holdings#${tabName}">${name}</a></td>
       <td>${fmt(value)}</td>
       <td>${fmt(invested)}</td>
       <td class="${pnl >= 0 ? 'td--up' : 'td--down'}">${(pnl >= 0 ? '+' : '') + fmt(pnl)}</td>
@@ -345,7 +345,7 @@ function renderTable() {
     const tr = document.createElement('tr');
     tr.className = 'table-row';
     tr.innerHTML = `
-      <td class="td--name"><span class="asset__dot" style="background:#a3e635"></span><a class="td--link" href="accounts.html">${window.WOS_LANG === 'es' ? 'Efectivo' : 'Cash'}</a></td>
+      <td class="td--name"><span class="asset__dot" style="background:#a3e635"></span><a class="td--link" href="/accounts">${window.WOS_LANG === 'es' ? 'Efectivo' : 'Cash'}</a></td>
       <td>${fmt(cashTotal)}</td>
       <td>—</td>
       <td>—</td>
