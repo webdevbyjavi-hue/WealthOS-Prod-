@@ -115,9 +115,10 @@
       create:            (d)      => request('POST',   '/api/accounts', mappers.accounts.toApi(d)).then(r => mappers.accounts.fromApi(r.data)),
       update:            (id, d)  => request('PUT',    `/api/accounts/${id}`, mappers.accounts.toApi(d)).then(r => mappers.accounts.fromApi(r.data)),
       remove:            (id)     => request('DELETE', `/api/accounts/${id}`),
-      listTransactions:  (id)     => request('GET',    `/api/accounts/${id}/transactions`).then(r => r.data.map(mappers.transactions.fromApi)),
-      createTransaction: (id, d)  => request('POST',   `/api/accounts/${id}/transactions`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
-      deleteTransaction: (aid, tid) => request('DELETE', `/api/accounts/${aid}/transactions/${tid}`),
+      listTransactions:  (id)        => request('GET',    `/api/accounts/${id}/transactions`).then(r => r.data.map(mappers.transactions.fromApi)),
+      createTransaction: (id, d)     => request('POST',   `/api/accounts/${id}/transactions`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
+      updateTransaction: (aid, tid, d) => request('PUT',  `/api/accounts/${aid}/transactions/${tid}`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
+      deleteTransaction: (aid, tid)  => request('DELETE', `/api/accounts/${aid}/transactions/${tid}`),
     },
 
     // ── History ───────────────────────────────────────────────────────────────

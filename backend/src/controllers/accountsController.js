@@ -145,6 +145,37 @@ async function createTransaction(req, res, next) {
   }
 }
 
+// PUT /api/accounts/:id/transactions/:txId
+async function updateTransaction(req, res, next) {
+  try {
+    const { txId } = req.params;
+    const { type, amount, currency, fx_rate, description, category, date } = req.body;
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .update({
+        type,
+        amount,
+        currency:    currency    || 'MXN',
+        fx_rate:     fx_rate     || 1,
+        description: description || null,
+        category:    category    || null,
+        date:        date        || new Date().toISOString().split('T')[0],
+      })
+      .eq('id', txId)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ success: false, message: 'Transaction not found.' });
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // DELETE /api/accounts/:id/transactions/:txId
 async function deleteTransaction(req, res, next) {
   try {
@@ -172,5 +203,6 @@ module.exports = {
   deleteAccount,
   listTransactions,
   createTransaction,
+  updateTransaction,
   deleteTransaction,
 };

@@ -56,6 +56,38 @@
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+/* ─── Category chart period filter ──────────────────────────── */
+.cat-period-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cat-filter-select {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.cat-filter-select:hover:not(:disabled),
+.cat-filter-select:focus {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.cat-filter-select:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* ─── Expense category badges ────────────────────────────────── */
 .txn-cat-badge {
   display: inline-block;
@@ -115,6 +147,72 @@
   font-size: 12px;
   text-align: center;
   letter-spacing: 0.3px;
+}
+
+/* ─── Pagination ─────────────────────────────────────────────── */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px 16px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pg-range {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.pg-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pg-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+
+.pg-btn:hover:not(:disabled):not(.pg-btn--active) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.pg-btn--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  cursor: default;
+}
+
+.pg-btn--nav { font-size: 16px; }
+
+.pg-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pg-ellipsis {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 0 4px;
+  user-select: none;
 }
 
 /* ─── Responsive ─────────────────────────────────────────────── */

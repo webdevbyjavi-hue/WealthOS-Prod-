@@ -10,6 +10,7 @@ const {
   deleteAccount,
   listTransactions,
   createTransaction,
+  updateTransaction,
   deleteTransaction,
 } = require('../controllers/accountsController');
 
@@ -37,8 +38,9 @@ router.put('/:id', [uuidParam, validate], updateAccount);
 router.delete('/:id', [uuidParam, validate], deleteAccount);
 
 // Transactions nested under an account
-router.get('/:id/transactions', [uuidParam, validate], listTransactions);
-router.post('/:id/transactions', [uuidParam, ...transactionRules, validate], createTransaction);
-router.delete('/:id/transactions/:txId', [uuidParam, validate], deleteTransaction);
+router.get('/:id/transactions',          [uuidParam, validate],                    listTransactions);
+router.post('/:id/transactions',         [uuidParam, ...transactionRules, validate], createTransaction);
+router.put('/:id/transactions/:txId',    [uuidParam, ...transactionRules, validate], updateTransaction);
+router.delete('/:id/transactions/:txId', [uuidParam, validate],                    deleteTransaction);
 
 module.exports = router;

@@ -141,6 +141,26 @@
       <div class="panel">
         <div class="panel__header">
           <span class="panel__title">Expenses by Category</span>
+          <div class="cat-period-filter">
+            <select class="cat-filter-select" id="cat-filter-year" onchange="updateCatFilter()">
+              <option value="">All Time</option>
+            </select>
+            <select class="cat-filter-select" id="cat-filter-month" onchange="updateCatFilter()" disabled>
+              <option value="">All Months</option>
+              <option value="01">Jan</option>
+              <option value="02">Feb</option>
+              <option value="03">Mar</option>
+              <option value="04">Apr</option>
+              <option value="05">May</option>
+              <option value="06">Jun</option>
+              <option value="07">Jul</option>
+              <option value="08">Aug</option>
+              <option value="09">Sep</option>
+              <option value="10">Oct</option>
+              <option value="11">Nov</option>
+              <option value="12">Dec</option>
+            </select>
+          </div>
           <span class="panel__badge">MXN equiv.</span>
         </div>
         <div class="accounts-canvas-wrap">
@@ -166,7 +186,7 @@
           </select>
         </div>
       </div>
-      <div class="table-wrapper">
+      <div class="table-wrapper" id="txn-table-wrapper">
         <table class="holdings-table txn-table" id="table-txn">
           <thead>
             <tr>
@@ -185,6 +205,7 @@
           </tbody>
         </table>
       </div>
+      <div class="pagination-bar" id="pagination-bar"></div>
     </div>
 
   </main>
@@ -197,7 +218,7 @@
 <div class="modal-overlay" id="txn-modal-overlay" onclick="closeTxnModal(event)">
   <div class="modal">
     <div class="modal__header">
-      <h2 class="modal__title">Add Transaction</h2>
+      <h2 class="modal__title" id="txn-modal-title">Add Transaction</h2>
       <button class="modal__close" onclick="closeTxnModal()">✕</button>
     </div>
     <div class="modal__body">
@@ -244,7 +265,7 @@
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeTxnModal()">Cancel</button>
-        <button class="btn btn--primary" onclick="saveTransaction()">Save Transaction</button>
+        <button class="btn btn--primary" id="txn-modal-save-btn" onclick="saveTransaction()">Save Transaction</button>
       </div>
     </div>
   </div>
