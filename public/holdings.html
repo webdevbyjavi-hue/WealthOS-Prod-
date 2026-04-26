@@ -1329,20 +1329,16 @@
       <!-- Row 3: Position details -->
       <div class="form-row form-row--aligned">
         <div class="form-group">
+          <label class="form-label">Price (MXN)</label>
+          <input class="form-input" id="ci-price" type="number" placeholder="0.00" min="0" step="0.01" oninput="onCryptoPriceInput()" />
+        </div>
+        <div class="form-group">
           <label class="form-label">Amount (tokens)</label>
           <input class="form-input" id="ci-amount" type="number" placeholder="0" min="0" step="0.00000001" oninput="onCryptoAmountInput()" />
         </div>
         <div class="form-group">
-          <label class="form-label">Purchase Amount ($)</label>
+          <label class="form-label">Purchase Amount (MXN)</label>
           <input class="form-input" id="ci-purchase-amount" type="number" placeholder="0.00" min="0" step="0.01" oninput="onCryptoPurchaseAmountInput()" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Avg Buy Price (USD)</label>
-          <input class="form-input" id="ci-cost" type="number" placeholder="0.00" min="0" step="0.0001" oninput="onCryptoCostInput()" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Current Price (MXN)</label>
-          <input class="form-input" id="ci-price" type="number" placeholder="0.00" min="0" step="0.01" oninput="onCryptoPriceInput()" />
         </div>
       </div>
       <div class="modal__actions">
