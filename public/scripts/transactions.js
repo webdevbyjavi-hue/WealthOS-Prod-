@@ -2,13 +2,10 @@
    WealthOS — Transactions Page
 ══════════════════════════════════════════════════════════════ */
 
-/* ─── Expense categories ─────────────────────────────────────── */
-const EXPENSE_CATEGORIES = {
-  fixed:       { label: 'Fixed Expenses',    color: '#fbbf24' },
-  variable:    { label: 'Variable Expenses', color: '#60a5fa' },
-  credit_card: { label: 'Credit Cards',      color: '#f87171' },
-  transfers:   { label: 'Transfers',         color: '#94a3b8' },
-};
+/* ─── Categories (loaded from categories.js) ─────────────────── */
+const CATEGORIES   = window.WOS_CATEGORIES;
+const CATS_BY_TYPE = window.WOS_CATS_BY_TYPE;
+const CAT_LABELS   = window.WOS_CAT_LABELS;
 
 /* ─── State ──────────────────────────────────────────────────── */
 let accounts     = [];
@@ -57,13 +54,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   render();
 });
 
-/* ─── Category visibility helper ─────────────────────────────── */
+/* ─── Category options helper ────────────────────────────────── */
 function updateCategoryVisibility() {
-  const type  = document.getElementById('ti-type').value;
-  const group = document.getElementById('ti-category-group');
-  if (!group) return;
-  group.style.display = type === 'out' ? 'block' : 'none';
-  if (type !== 'out') document.getElementById('ti-category').value = '';
+  const type    = document.getElementById('ti-type').value;
+  const labelEl = document.getElementById('ti-category-label');
+  const sel     = document.getElementById('ti-category');
+  if (!sel) return;
+
+  if (labelEl) labelEl.textContent = CAT_LABELS[type] || 'Category';
+
+  const keys = CATS_BY_TYPE[type] || [];
+  sel.innerHTML = '<option value="">— Select category —</option>' +
+    keys.map(k => `<option value="${k}">${CATEGORIES[k].label}</option>`).join('');
 }
 
 /* ─── Modal helpers ──────────────────────────────────────────── */
@@ -85,8 +87,8 @@ function _fillModalFromTxn(txn) {
   document.getElementById('ti-amount').value      = txn.amount;
   document.getElementById('ti-date').value        = txn.date || '';
   document.getElementById('ti-description').value = txn.description || '';
-  document.getElementById('ti-category').value    = txn.category || '';
-  updateCategoryVisibility();
+  updateCategoryVisibility();                                    // populate options first
+  document.getElementById('ti-category').value    = txn.category || ''; // then select value
 }
 
 function _resetModal() {
@@ -110,7 +112,6 @@ function openAddTransactionModal() {
   document.getElementById('ti-type').value        = 'in';
   document.getElementById('ti-amount').value      = '';
   document.getElementById('ti-description').value = '';
-  document.getElementById('ti-category').value    = '';
   const now = new Date();
   document.getElementById('ti-date').value =
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -142,7 +143,7 @@ async function saveTransaction() {
   const amount      = parseFloat(document.getElementById('ti-amount').value);
   const date        = document.getElementById('ti-date').value;
   const description = document.getElementById('ti-description').value.trim();
-  const category    = type === 'out' ? (document.getElementById('ti-category').value || null) : null;
+  const category    = document.getElementById('ti-category').value || null;
 
   if (!accountId || isNaN(amount) || amount <= 0 || !date) {
     toast('Please fill in account, amount, and date.', 'error');
@@ -395,8 +396,9 @@ function renderTable() {
 
     const typeLabel = t.type === 'in' ? 'Cash In ↑' : t.type === 'out' ? 'Cash Out ↓' : 'Invested ◈';
     const typeCls   = `txn-type-badge txn-type-badge--${t.type}`;
-    const catCell   = t.category && EXPENSE_CATEGORIES[t.category]
-      ? `<span class="txn-cat-badge txn-cat-badge--${t.category}">${EXPENSE_CATEGORIES[t.category].label}</span>`
+    const cat       = t.category && CATEGORIES[t.category];
+    const catCell   = cat
+      ? `<span class="txn-cat-badge" style="color:${cat.color};background:${cat.color}1a;border-color:${cat.color}40">${cat.label}</span>`
       : `<span style="color:var(--text-tertiary);font-family:var(--font-mono);font-size:11px">—</span>`;
     const amtLocal  = fmtLocal(t.amount, t.currency || 'MXN');
     const amtMXN    = fmtMXN(t.amountMXN);
@@ -595,15 +597,15 @@ function renderCategoryChart() {
     groups[key] = (groups[key] || 0) + (t.amountMXN || 0);
   });
 
-  const catOrder   = ['fixed', 'variable', 'credit_card', 'transfers', 'uncategorized'];
-  const uncatColor = '#a78bfa';
+  const outCatOrder = [...CATS_BY_TYPE.out, 'transfers', 'uncategorized'];
+  const uncatColor  = '#a78bfa';
   const labels = [], data = [], colors = [];
 
-  catOrder.forEach(key => {
-    if (groups[key] > 0) {
-      labels.push(key === 'uncategorized' ? 'Uncategorized' : EXPENSE_CATEGORIES[key].label);
+  outCatOrder.forEach(key => {
+    if ((groups[key] || 0) > 0) {
+      labels.push(key === 'uncategorized' ? 'Sin categoría' : CATEGORIES[key].label);
       data.push(groups[key]);
-      colors.push(key === 'uncategorized' ? uncatColor : EXPENSE_CATEGORIES[key].color);
+      colors.push(key === 'uncategorized' ? uncatColor : CATEGORIES[key].color);
     }
   });
 
@@ -647,7 +649,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 /* ─── Formatting helpers ─────────────────────────────────────── */
 function catLabel(cat) {
-  return cat && EXPENSE_CATEGORIES[cat] ? EXPENSE_CATEGORIES[cat].label : '';
+  return cat && CATEGORIES[cat] ? CATEGORIES[cat].label : '';
 }
 
 function fmtMXN(n) {

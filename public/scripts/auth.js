@@ -23,6 +23,20 @@
     return SIGNOUT_LABELS[lang] || 'Sign Out';
   }
 
+  // ─── Sidebar name & avatar ──────────────────────────────────────────────────
+  function updateSidebarName(fullName, initials) {
+    const nameEl   = document.querySelector('.user__name');
+    const avatarEl = document.querySelector('.user__avatar');
+    if (nameEl   && fullName)  nameEl.textContent   = fullName;
+    if (avatarEl && initials)  avatarEl.textContent = initials.toUpperCase().slice(0, 2);
+  }
+
+  function applyStoredName() {
+    const name     = localStorage.getItem('wos_user_name');
+    const initials = localStorage.getItem('wos_user_initials');
+    if (name) updateSidebarName(name, initials || name.slice(0, 2));
+  }
+
   // ─── Sign-out button ────────────────────────────────────────────────────────
   function injectSignOutButton() {
     if (document.getElementById('wos-signout-btn')) return;
@@ -53,6 +67,8 @@
     signout() {
       try { WOS_API.auth.signout(); } catch (_) {}
       WOS_API.clearToken();
+      localStorage.removeItem('wos_user_name');
+      localStorage.removeItem('wos_user_initials');
       window.location.replace('/login');
     },
   };
@@ -65,15 +81,34 @@
     return; // stop executing — page is about to unload
   }
 
-  // Authenticated: inject sign-out button and silently validate token
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectSignOutButton);
-  } else {
+  // Authenticated: inject sign-out button, apply cached name instantly
+  function onReady() {
     injectSignOutButton();
+    applyStoredName();
   }
 
-  WOS_API.auth.me().catch((err) => {
-    if (err.status === 401) WOS_AUTH.signout();
-  });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onReady);
+  } else {
+    onReady();
+  }
+
+  // Silently validate token and refresh name from server
+  WOS_API.auth.me()
+    .then(res => {
+      const meta     = res.data?.user?.user_metadata || {};
+      const first    = (meta.first_name || '').trim();
+      const last     = (meta.last_name  || '').trim();
+      const fullName = [first, last].filter(Boolean).join(' ');
+      const initials = ((first[0] || '') + (last[0] || '')).toUpperCase();
+      if (fullName) {
+        localStorage.setItem('wos_user_name',     fullName);
+        localStorage.setItem('wos_user_initials', initials);
+        updateSidebarName(fullName, initials);
+      }
+    })
+    .catch(err => {
+      if (err.status === 401) WOS_AUTH.signout();
+    });
 
 })();

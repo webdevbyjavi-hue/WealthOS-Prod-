@@ -201,19 +201,25 @@ function openAddTransactionModal() {
   document.getElementById('ti-amount').value = '';
   const _td = new Date(); document.getElementById('ti-date').value = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
   document.getElementById('ti-description').value = '';
-  if (document.getElementById('ti-category')) document.getElementById('ti-category').value = '';
   updateTxnCategoryVisibility();
   document.getElementById('txn-modal-overlay').classList.add('modal-overlay--visible');
 }
 
 function updateTxnCategoryVisibility() {
-  const type  = document.getElementById('ti-type').value;
-  const group = document.getElementById('ti-category-group');
-  if (!group) return;
-  group.style.display = type === 'out' ? 'block' : 'none';
-  if (type !== 'out' && document.getElementById('ti-category')) {
-    document.getElementById('ti-category').value = '';
-  }
+  const type    = document.getElementById('ti-type').value;
+  const labelEl = document.getElementById('ti-category-label');
+  const sel     = document.getElementById('ti-category');
+  if (!sel) return;
+
+  const cats   = window.WOS_CATEGORIES   || {};
+  const byType = window.WOS_CATS_BY_TYPE || {};
+  const lblMap = window.WOS_CAT_LABELS   || {};
+
+  if (labelEl) labelEl.textContent = lblMap[type] || 'Category';
+
+  const keys = byType[type] || [];
+  sel.innerHTML = '<option value="">— Select category —</option>' +
+    keys.map(k => `<option value="${k}">${(cats[k] || {}).label || k}</option>`).join('');
 }
 
 function closeTxnModal(e) {
@@ -227,7 +233,7 @@ async function saveTransaction() {
   const amount      = parseFloat(document.getElementById('ti-amount').value);
   const date        = document.getElementById('ti-date').value;
   const description = document.getElementById('ti-description').value.trim();
-  const category    = type === 'out' && document.getElementById('ti-category')
+  const category    = document.getElementById('ti-category')
     ? (document.getElementById('ti-category').value || null)
     : null;
 

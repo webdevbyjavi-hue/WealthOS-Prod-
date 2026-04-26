@@ -118,6 +118,14 @@
     .auth-field {
       margin-bottom: 18px;
     }
+    .auth-field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .auth-field-row .auth-field {
+      margin-bottom: 18px;
+    }
     .auth-label {
       display: block;
       font-size: 11px;

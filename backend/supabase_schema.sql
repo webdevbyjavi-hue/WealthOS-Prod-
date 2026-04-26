@@ -44,14 +44,23 @@ CREATE TABLE IF NOT EXISTS transactions (
   currency    TEXT NOT NULL DEFAULT 'MXN',
   fx_rate     NUMERIC(12,6) NOT NULL DEFAULT 1,
   description TEXT,
-  category    TEXT CHECK (category IN ('fixed', 'variable', 'credit_card', 'transfers')),
+  category    TEXT CHECK (category IN (
+                'salary','freelance','reimbursement','transfer_in','dividend','other_income',
+                'fixed','variable','credit_card','company','transfer_out','transfers',
+                'stocks','bonds','funds','fibras','retirement','real_estate','crypto','other_inv'
+              )),
   date        DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── Migration (run if table already exists) ───────────────────────────────────
--- ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category TEXT
---   CHECK (category IN ('fixed', 'variable', 'credit_card', 'transfers'));
+-- ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category TEXT;
+-- ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_category_check;
+-- ALTER TABLE transactions ADD CONSTRAINT transactions_category_check CHECK (category IN (
+--   'salary','freelance','reimbursement','transfer_in','dividend','other_income',
+--   'fixed','variable','credit_card','company','transfer_out','transfers',
+--   'stocks','bonds','funds','fibras','retirement','real_estate','crypto','other_inv'
+-- ));
 -- ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
 -- ALTER TABLE transactions ADD CONSTRAINT transactions_type_check
 --   CHECK (type IN ('in', 'out', 'invested'));

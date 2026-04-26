@@ -34,6 +34,20 @@
           <label class="auth-label">Contraseña</label>
           <input id="auth-password" class="auth-input" type="password" placeholder="Min. 8 characters" required autocomplete="current-password" />
         </div>
+        <!-- Name fields — only shown on Sign Up tab -->
+        <div id="field-name" style="display:none">
+          <div class="auth-field-row">
+            <div class="auth-field">
+              <label class="auth-label">Nombre(s)</label>
+              <input id="auth-firstname" class="auth-input" type="text" placeholder="Ej. Javier" autocomplete="given-name" />
+            </div>
+            <div class="auth-field">
+              <label class="auth-label">Apellido(s)</label>
+              <input id="auth-lastname" class="auth-input" type="text" placeholder="Ej. Sepúlveda" autocomplete="family-name" />
+            </div>
+          </div>
+        </div>
+
         <!-- Confirm password — only shown on Sign Up tab -->
         <div class="auth-field" id="field-confirm">
           <label class="auth-label">Confirmar Contraseña</label>

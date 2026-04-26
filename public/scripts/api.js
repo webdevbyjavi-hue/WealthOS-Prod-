@@ -95,7 +95,7 @@
 
     // ── Auth ────────────────────────────────────────────────────────────────
     auth: {
-      signup:        (email, password) => request('POST', '/api/auth/signup',         { email, password }),
+      signup:        (email, password, firstName, lastName) => request('POST', '/api/auth/signup', { email, password, first_name: firstName || '', last_name: lastName || '' }),
       signin:        (email, password) => request('POST', '/api/auth/signin',         { email, password }),
       signout:       ()                => request('POST', '/api/auth/signout'),
       me:            ()                => request('GET',  '/api/auth/me'),

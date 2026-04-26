@@ -28,7 +28,11 @@ const transactionRules = [
   body('type').isIn(['in', 'out', 'invested']).withMessage("type must be 'in', 'out', or 'invested'."),
   body('amount').isFloat({ min: 0.01 }).withMessage('amount must be a positive number.'),
   body('date').optional().isISO8601().withMessage('date must be a valid ISO date.'),
-  body('category').optional({ nullable: true }).isIn(['fixed', 'variable', 'credit_card', 'transfers']).withMessage('invalid category.'),
+  body('category').optional({ nullable: true }).isIn([
+    'salary','freelance','reimbursement','transfer_in','dividend','other_income',
+    'fixed','variable','credit_card','company','transfer_out','transfers',
+    'stocks','bonds','funds','fibras','retirement','real_estate','crypto','other_inv',
+  ]).withMessage('invalid category.'),
 ];
 
 // Accounts
