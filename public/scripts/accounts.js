@@ -201,7 +201,19 @@ function openAddTransactionModal() {
   document.getElementById('ti-amount').value = '';
   const _td = new Date(); document.getElementById('ti-date').value = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
   document.getElementById('ti-description').value = '';
+  if (document.getElementById('ti-category')) document.getElementById('ti-category').value = '';
+  updateTxnCategoryVisibility();
   document.getElementById('txn-modal-overlay').classList.add('modal-overlay--visible');
+}
+
+function updateTxnCategoryVisibility() {
+  const type  = document.getElementById('ti-type').value;
+  const group = document.getElementById('ti-category-group');
+  if (!group) return;
+  group.style.display = type === 'out' ? 'block' : 'none';
+  if (type !== 'out' && document.getElementById('ti-category')) {
+    document.getElementById('ti-category').value = '';
+  }
 }
 
 function closeTxnModal(e) {
@@ -215,6 +227,9 @@ async function saveTransaction() {
   const amount      = parseFloat(document.getElementById('ti-amount').value);
   const date        = document.getElementById('ti-date').value;
   const description = document.getElementById('ti-description').value.trim();
+  const category    = type === 'out' && document.getElementById('ti-category')
+    ? (document.getElementById('ti-category').value || null)
+    : null;
 
   if (!accountId || isNaN(amount) || amount <= 0 || !date) {
     toast(typeof t === 'function' ? t('err_fill_transaction') : 'Please fill in account, amount, and date.', 'error');
@@ -224,7 +239,7 @@ async function saveTransaction() {
   const acct    = accounts.find(a => a.id === accountId);
   const fxRate  = acct ? (acct.fxRate || 1) : 1;
   const tempId  = Date.now().toString();
-  const txnData = { accountId, type, amount, fxRate, amountMXN: amount * fxRate, date, description };
+  const txnData = { accountId, type, amount, fxRate, amountMXN: amount * fxRate, date, description, category };
 
   transactions.push({ id: tempId, ...txnData });
   renderCashFlowChart();

@@ -39,14 +39,22 @@ CREATE TABLE IF NOT EXISTS transactions (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id  UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  type        TEXT NOT NULL CHECK (type IN ('in', 'out')),
+  type        TEXT NOT NULL CHECK (type IN ('in', 'out', 'invested')),
   amount      NUMERIC(18,4) NOT NULL CHECK (amount > 0),
   currency    TEXT NOT NULL DEFAULT 'MXN',
   fx_rate     NUMERIC(12,6) NOT NULL DEFAULT 1,
   description TEXT,
+  category    TEXT CHECK (category IN ('fixed', 'variable', 'credit_card', 'transfers')),
   date        DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ── Migration (run if table already exists) ───────────────────────────────────
+-- ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category TEXT
+--   CHECK (category IN ('fixed', 'variable', 'credit_card', 'transfers'));
+-- ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+-- ALTER TABLE transactions ADD CONSTRAINT transactions_type_check
+--   CHECK (type IN ('in', 'out', 'invested'));
 
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "transactions: own rows only" ON transactions

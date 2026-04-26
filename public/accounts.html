@@ -308,7 +308,7 @@
         </div>
         <div class="form-group">
           <label class="form-label" data-i18n="lbl_txn_type">Type</label>
-          <select class="form-input" id="ti-type">
+          <select class="form-input" id="ti-type" onchange="updateTxnCategoryVisibility()">
             <option value="in" data-i18n="opt_cash_in">Cash In ↑</option>
             <option value="out" data-i18n="opt_cash_out">Cash Out ↓</option>
             <option value="invested" data-i18n="opt_invested">Invested ◈</option>
@@ -331,6 +331,16 @@
       <div class="form-group">
         <label class="form-label" data-i18n="lbl_description">Description (optional)</label>
         <input class="form-input" id="ti-description" type="text" data-i18n-placeholder="ph_description" placeholder="e.g. Salary, Rent payment…" />
+      </div>
+      <div class="form-group" id="ti-category-group" style="display:none">
+        <label class="form-label">Expense Category</label>
+        <select class="form-input" id="ti-category">
+          <option value="">— Uncategorized —</option>
+          <option value="fixed">Fixed Expenses</option>
+          <option value="variable">Variable Expenses</option>
+          <option value="credit_card">Credit Cards</option>
+          <option value="transfers">Transfers</option>
+        </select>
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeTxnModal()" data-i18n="btn_cancel">Cancel</button>

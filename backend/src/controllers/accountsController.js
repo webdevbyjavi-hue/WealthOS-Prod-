@@ -120,18 +120,19 @@ async function listTransactions(req, res, next) {
 async function createTransaction(req, res, next) {
   try {
     const { id } = req.params;
-    const { type, amount, currency, fx_rate, description, date } = req.body;
+    const { type, amount, currency, fx_rate, description, date, category } = req.body;
 
     const { data, error } = await supabase
       .from('transactions')
       .insert({
         user_id: req.user.id,
         account_id: id,
-        type,           // 'in' | 'out'
+        type,
         amount,
         currency: currency || 'MXN',
         fx_rate: fx_rate || 1,
         description: description || null,
+        category: category || null,
         date: date || new Date().toISOString().split('T')[0],
       })
       .select()

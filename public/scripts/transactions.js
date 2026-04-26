@@ -2,6 +2,14 @@
    WealthOS — Transactions Page
 ══════════════════════════════════════════════════════════════ */
 
+/* ─── Expense categories ─────────────────────────────────────── */
+const EXPENSE_CATEGORIES = {
+  fixed:       { label: 'Fixed Expenses',    color: '#fbbf24' },
+  variable:    { label: 'Variable Expenses', color: '#60a5fa' },
+  credit_card: { label: 'Credit Cards',      color: '#f87171' },
+  transfers:   { label: 'Transfers',         color: '#94a3b8' },
+};
+
 /* ─── State ──────────────────────────────────────────────────── */
 let accounts     = [];
 let transactions = [];
@@ -12,8 +20,8 @@ let filterText   = '';
 let filterType   = '';
 
 /* ─── Chart instances ─────────────────────────────────────────── */
-let chartFlow      = null;
-let chartBreakdown = null;
+let chartFlow     = null;
+let chartCategory = null;
 
 /* ─── Init ───────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -44,6 +52,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   render();
 });
 
+/* ─── Category visibility in modal ──────────────────────────── */
+function updateCategoryVisibility() {
+  const type  = document.getElementById('ti-type').value;
+  const group = document.getElementById('ti-category-group');
+  if (!group) return;
+  group.style.display = type === 'out' ? 'block' : 'none';
+  if (type !== 'out') document.getElementById('ti-category').value = '';
+}
+
 /* ─── Transaction Modal ──────────────────────────────────────── */
 function openAddTransactionModal() {
   if (accounts.length === 0) {
@@ -57,9 +74,11 @@ function openAddTransactionModal() {
   document.getElementById('ti-type').value        = 'in';
   document.getElementById('ti-amount').value      = '';
   document.getElementById('ti-description').value = '';
+  document.getElementById('ti-category').value    = '';
   const now = new Date();
   document.getElementById('ti-date').value =
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  updateCategoryVisibility();
   document.getElementById('txn-modal-overlay').classList.add('modal-overlay--visible');
 }
 
@@ -74,6 +93,7 @@ async function saveTransaction() {
   const amount      = parseFloat(document.getElementById('ti-amount').value);
   const date        = document.getElementById('ti-date').value;
   const description = document.getElementById('ti-description').value.trim();
+  const category    = type === 'out' ? (document.getElementById('ti-category').value || null) : null;
 
   if (!accountId || isNaN(amount) || amount <= 0 || !date) {
     toast('Please fill in account, amount, and date.', 'error');
@@ -93,6 +113,7 @@ async function saveTransaction() {
     amountMXN:   amount * fxRate,
     date,
     description,
+    category,
     accountName: acct ? acct.name : '',
     currency:    acct ? acct.currency : 'MXN',
   };
@@ -103,7 +124,7 @@ async function saveTransaction() {
 
   try {
     const created = await WOS_API.accounts.createTransaction(accountId, {
-      type, amount, fxRate, date, description,
+      type, amount, fxRate, date, description, category,
     });
     const idx = transactions.findIndex(t => t.id === tempId);
     if (idx !== -1) {
@@ -174,7 +195,8 @@ function getFiltered() {
     const matchText = !filterText ||
       (t.description  || '').toLowerCase().includes(filterText) ||
       (t.accountName  || '').toLowerCase().includes(filterText) ||
-      (t.type         || '').toLowerCase().includes(filterText);
+      (t.type         || '').toLowerCase().includes(filterText) ||
+      catLabel(t.category).toLowerCase().includes(filterText);
     const matchType = !filterType || t.type === filterType;
     return matchText && matchType;
   });
@@ -255,7 +277,7 @@ function renderTable() {
     const msg = transactions.length === 0
       ? 'No transactions yet. Add your first transaction.'
       : 'No transactions match the current filter.';
-    tbody.innerHTML = `<tr><td colspan="7" class="table__empty">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="table__empty">${msg}</td></tr>`;
     return;
   }
 
@@ -268,9 +290,12 @@ function renderTable() {
 
     const typeLabel = t.type === 'in' ? 'Cash In ↑' : t.type === 'out' ? 'Cash Out ↓' : 'Invested ◈';
     const typeCls   = `txn-type-badge txn-type-badge--${t.type}`;
+    const catCell   = t.category && EXPENSE_CATEGORIES[t.category]
+      ? `<span class="txn-cat-badge txn-cat-badge--${t.category}">${EXPENSE_CATEGORIES[t.category].label}</span>`
+      : `<span style="color:var(--text-tertiary);font-family:var(--font-mono);font-size:11px">—</span>`;
     const amtLocal  = fmtLocal(t.amount, t.currency || 'MXN');
     const amtMXN    = fmtMXN(t.amountMXN);
-    const desc      = t.description ? escHtml(t.description) : '<span style="color:var(--text-tertiary)">—</span>';
+    const desc      = t.description ? escHtml(t.description) : `<span style="color:var(--text-tertiary)">—</span>`;
     const acctName  = escHtml(t.accountName || '—');
 
     return `
@@ -279,6 +304,7 @@ function renderTable() {
       <td class="td--name">${desc}</td>
       <td class="td--ticker">${acctName}</td>
       <td><span class="${typeCls}">${typeLabel}</span></td>
+      <td>${catCell}</td>
       <td class="td--price">${amtLocal}</td>
       <td class="td--price">${amtMXN}</td>
       <td>
@@ -301,7 +327,7 @@ function setFlowView(view) {
 /* ─── Charts ─────────────────────────────────────────────────── */
 function renderCharts() {
   renderFlowChart();
-  renderBreakdownChart();
+  renderCategoryChart();
 }
 
 function renderFlowChart() {
@@ -367,13 +393,13 @@ function renderFlowChart() {
         legend: {
           position: 'top',
           labels: {
-            color:          '#8892a4',
-            font:           { family: "'DM Mono'", size: 11 },
-            usePointStyle:  true,
-            pointStyle:     'circle',
-            boxWidth:       8,
-            boxHeight:      8,
-            padding:        16,
+            color:         '#8892a4',
+            font:          { family: "'DM Mono'", size: 11 },
+            usePointStyle: true,
+            pointStyle:    'circle',
+            boxWidth:      8,
+            boxHeight:     8,
+            padding:       16,
           },
         },
         tooltip: {
@@ -408,32 +434,45 @@ function renderFlowChart() {
   });
 }
 
-function renderBreakdownChart() {
-  const sumType = type => transactions
-    .filter(t => t.type === type)
-    .reduce((s, t) => s + (t.amountMXN || 0), 0);
+function renderCategoryChart() {
+  // Only cash-out transactions — this is the expense breakdown
+  const outTxns = transactions.filter(t => t.type === 'out');
 
-  const totalIn       = sumType('in');
-  const totalOut      = sumType('out');
-  const totalInvested = sumType('invested');
-  const total         = totalIn + totalOut + totalInvested;
+  const ctx = document.getElementById('chart-breakdown').getContext('2d');
+  if (chartCategory) chartCategory.destroy();
 
-  if (total === 0) {
-    const ctx = document.getElementById('chart-breakdown').getContext('2d');
-    if (chartBreakdown) chartBreakdown.destroy();
+  if (outTxns.length === 0) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    chartBreakdown = null;
+    chartCategory = null;
     return;
   }
 
-  const labels = ['Cash In', 'Cash Out', 'Invested'];
-  const data   = [totalIn, totalOut, totalInvested];
-  const colors = ['#34d399', '#f87171', '#6366f1'];
+  // Group by category; null goes to 'uncategorized'
+  const groups = {};
+  outTxns.forEach(t => {
+    const key = t.category || 'uncategorized';
+    groups[key] = (groups[key] || 0) + (t.amountMXN || 0);
+  });
 
-  const ctx = document.getElementById('chart-breakdown').getContext('2d');
-  if (chartBreakdown) chartBreakdown.destroy();
+  // Build ordered labels/data/colors
+  const catOrder = ['fixed', 'variable', 'credit_card', 'transfers', 'uncategorized'];
+  const uncatColor = '#a78bfa';
 
-  chartBreakdown = new Chart(ctx, {
+  const labels = [];
+  const data   = [];
+  const colors = [];
+
+  catOrder.forEach(key => {
+    if (groups[key] > 0) {
+      labels.push(key === 'uncategorized' ? 'Uncategorized' : EXPENSE_CATEGORIES[key].label);
+      data.push(groups[key]);
+      colors.push(key === 'uncategorized' ? uncatColor : EXPENSE_CATEGORIES[key].color);
+    }
+  });
+
+  const total = data.reduce((s, v) => s + v, 0);
+
+  chartCategory = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels,
@@ -472,7 +511,7 @@ function renderBreakdownChart() {
           titleFont:       { family: "'DM Sans'", size: 13 },
           bodyFont:        { family: "'DM Mono'", size: 11 },
           callbacks: {
-            label: ctx => ` ${fmtMXN(ctx.parsed)} (${((ctx.parsed / total) * 100).toFixed(1)}%)`,
+            label: ctx => ` ${fmtMXN(ctx.parsed)} (${total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0}%)`,
           },
         },
       },
@@ -483,16 +522,17 @@ function renderBreakdownChart() {
 /* ─── Export ─────────────────────────────────────────────────── */
 document.getElementById('export-btn').addEventListener('click', () => {
   if (transactions.length === 0) { toast('No transactions to export.', 'warning'); return; }
-  const header = ['Date', 'Description', 'Account', 'Type', 'Amount (local)', 'Currency', 'Amount (MXN)'];
+  const header = ['Date', 'Description', 'Account', 'Type', 'Category', 'Amount (local)', 'Currency', 'Amount (MXN)'];
   const rows   = transactions.map(t =>
     [
-      t.date        || '',
-      t.description || '',
-      t.accountName || '',
+      t.date                              || '',
+      t.description                       || '',
+      t.accountName                       || '',
       t.type,
+      catLabel(t.category),
       t.amount,
-      t.currency    || 'MXN',
-      (t.amountMXN  || 0).toFixed(2),
+      t.currency                          || 'MXN',
+      (t.amountMXN                        || 0).toFixed(2),
     ]
     .map(v => `"${String(v).replace(/"/g, '""')}"`)
     .join(',')
@@ -509,6 +549,10 @@ document.getElementById('export-btn').addEventListener('click', () => {
 });
 
 /* ─── Formatting helpers ─────────────────────────────────────── */
+function catLabel(cat) {
+  return cat && EXPENSE_CATEGORIES[cat] ? EXPENSE_CATEGORIES[cat].label : '';
+}
+
 function fmtMXN(n) {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency', currency: 'MXN', minimumFractionDigits: 2,

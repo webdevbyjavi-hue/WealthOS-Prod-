@@ -68,8 +68,8 @@
       fromApi: a => ({ id: a.id, name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency, balance: parseFloat(a.balance), fxRate: parseFloat(a.fx_rate), balanceMXN: parseFloat(a.balance) * parseFloat(a.fx_rate), notes: a.notes, updatedAt: a.updated_at }),
     },
     transactions: {
-      toApi:   t => ({ type: t.type, amount: t.amount, fx_rate: t.fxRate || 1, description: t.description || null, date: t.date, currency: t.currency || null }),
-      fromApi: t => ({ id: t.id, accountId: t.account_id, type: t.type, amount: parseFloat(t.amount), fxRate: parseFloat(t.fx_rate) || 1, amountMXN: parseFloat(t.amount) * (parseFloat(t.fx_rate) || 1), date: t.date, description: t.description || '', currency: t.currency || null }),
+      toApi:   t => ({ type: t.type, amount: t.amount, fx_rate: t.fxRate || 1, description: t.description || null, date: t.date, currency: t.currency || null, category: t.category || null }),
+      fromApi: t => ({ id: t.id, accountId: t.account_id, type: t.type, amount: parseFloat(t.amount), fxRate: parseFloat(t.fx_rate) || 1, amountMXN: parseFloat(t.amount) * (parseFloat(t.fx_rate) || 1), date: t.date, description: t.description || '', currency: t.currency || null, category: t.category || null }),
     },
   };
 

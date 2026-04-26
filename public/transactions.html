@@ -140,7 +140,7 @@
       </div>
       <div class="panel">
         <div class="panel__header">
-          <span class="panel__title">By Category</span>
+          <span class="panel__title">Expenses by Category</span>
           <span class="panel__badge">MXN equiv.</span>
         </div>
         <div class="accounts-canvas-wrap">
@@ -174,13 +174,14 @@
               <th class="th-sort" data-col="description" onclick="sortBy('description')">Description <span class="sort-icon">↕</span></th>
               <th class="th-sort" data-col="accountName" onclick="sortBy('accountName')">Account <span class="sort-icon">↕</span></th>
               <th class="th-sort" data-col="type" onclick="sortBy('type')">Type <span class="sort-icon">↕</span></th>
+              <th class="th-sort" data-col="category" onclick="sortBy('category')">Category <span class="sort-icon">↕</span></th>
               <th class="th-sort" data-col="amount" onclick="sortBy('amount')">Amount <span class="sort-icon">↕</span></th>
               <th class="th-sort" data-col="amountMXN" onclick="sortBy('amountMXN')">Amount (MXN) <span class="sort-icon">↕</span></th>
               <th></th>
             </tr>
           </thead>
           <tbody id="body-txn">
-            <tr><td colspan="7" class="table__empty">No transactions yet. Add your first transaction.</td></tr>
+            <tr><td colspan="8" class="table__empty">No transactions yet. Add your first transaction.</td></tr>
           </tbody>
         </table>
       </div>
@@ -207,7 +208,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Type</label>
-          <select class="form-input" id="ti-type">
+          <select class="form-input" id="ti-type" onchange="updateCategoryVisibility()">
             <option value="in">Cash In ↑</option>
             <option value="out">Cash Out ↓</option>
             <option value="invested">Invested ◈</option>
@@ -230,6 +231,16 @@
       <div class="form-group">
         <label class="form-label">Description (optional)</label>
         <input class="form-input" id="ti-description" type="text" placeholder="e.g. Salary, Rent payment…" />
+      </div>
+      <div class="form-group" id="ti-category-group" style="display:none">
+        <label class="form-label">Expense Category</label>
+        <select class="form-input" id="ti-category">
+          <option value="">— Uncategorized —</option>
+          <option value="fixed">Fixed Expenses</option>
+          <option value="variable">Variable Expenses</option>
+          <option value="credit_card">Credit Cards</option>
+          <option value="transfers">Transfers</option>
+        </select>
       </div>
       <div class="modal__actions">
         <button class="btn btn--ghost" onclick="closeTxnModal()">Cancel</button>
