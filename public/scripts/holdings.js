@@ -163,12 +163,13 @@ async function lookupCryptoSymbol() {
     document.getElementById('ci-symbol').value = info.symbol;
     document.getElementById('ci-name').value   = info.name;
     document.getElementById('ci-price').value  = info.price.toFixed(2);
+    onCryptoCostInput();
     showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)} USD`);
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the symbol and try again.');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Lookup';
+    btn.textContent = editingCryptoId ? 'Refresh Prices' : 'Lookup';
   }
 }
 
@@ -2536,7 +2537,7 @@ const SAMPLE_BIENES = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let bienes = [];
-let bienesLineRangeDays = 7;
+let bienesLineRangeDays = 0; // 0 = since earliest purchase date
 let bienesLineChart, bienesDonutChart, bienesBarChart;
 let editingBienId = null;
 let bienesSortCol = null, bienesSortDir = 1;
@@ -2699,16 +2700,71 @@ function renderBienesTable(filter = '') {
 function filterBienesTable(v) { renderBienesTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
-function getBienesPortfolioHistory(n) {
-  const total = bienes.reduce((s, b) => s + computeValorActual(b), 0);
-  const fake  = _genFake('bienes', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+
+/**
+ * Compute daily portfolio value from a start date to today using the
+ * appreciation formula stored in each property record.
+ *
+ * @param {number} days  Number of days to look back. 0 = since earliest purchase.
+ * @returns {{ pts: number[], labels: string[] }}
+ */
+function getBienesLineData(days) {
+  const msPerDay = 86400000;
+  const today    = new Date();
+  today.setHours(12, 0, 0, 0);
+
+  let startMs;
+  if (days === 0) {
+    const purchaseMss = bienes
+      .filter(b => b.fechaCompra)
+      .map(b => new Date(b.fechaCompra + 'T12:00:00Z').getTime());
+    startMs = purchaseMss.length
+      ? Math.min(...purchaseMss)
+      : today.getTime() - 365 * msPerDay;
+  } else {
+    const cutoff = today.getTime() - days * msPerDay;
+    const purchaseMss = bienes
+      .filter(b => b.fechaCompra)
+      .map(b => new Date(b.fechaCompra + 'T12:00:00Z').getTime());
+    // Don't go earlier than the earliest purchase date
+    startMs = purchaseMss.length ? Math.max(cutoff, Math.min(...purchaseMss)) : cutoff;
+  }
+
+  const totalDays = Math.max(2, Math.ceil((today.getTime() - startMs) / msPerDay) + 1);
+  const step      = Math.max(1, Math.floor(totalDays / 250));
+  const showYear  = totalDays > 365;
+  const locale    = window.WOS_LOCALE || 'es-MX';
+  const fmtOpts   = showYear
+    ? { month: 'short', day: 'numeric', year: 'numeric' }
+    : { month: 'short', day: 'numeric' };
+
+  const pts    = [];
+  const labels = [];
+
+  for (let i = 0; i < totalDays; i += step) {
+    const dayMs = startMs + i * msPerDay;
+    let total   = 0;
+    for (const b of bienes) {
+      const purMs = b.fechaCompra ? new Date(b.fechaCompra + 'T12:00:00Z').getTime() : startMs;
+      if (dayMs < purMs) continue;
+      const years = Math.max(0, (dayMs - purMs) / (msPerDay * 365.25));
+      total += b.precioCompra * Math.pow(1 + (b.plusvaliaAnual || 0) / 100, years);
+    }
+    pts.push(parseFloat(total.toFixed(0)));
+    labels.push(new Date(dayMs).toLocaleDateString(locale, fmtOpts));
+  }
+
+  // Always close on today's actual value
+  const todayTotal = bienes.reduce((s, b) => s + computeValorActual(b), 0);
+  pts.push(parseFloat(todayTotal.toFixed(0)));
+  labels.push(today.toLocaleDateString(locale, fmtOpts));
+
+  return { pts, labels };
 }
 
 function initBienesCharts() {
-  const pts    = getBienesPortfolioHistory(bienesLineRangeDays);
-  const dates  = getDateLabels(bienesLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const { pts, labels: dates } = getBienesLineData(bienesLineRangeDays);
+  const lineUp = pts.length > 1 ? pts[pts.length - 1] >= pts[0] : true;
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
   // Line chart
@@ -2797,9 +2853,8 @@ function initBienesCharts() {
 
 function updateBienesCharts() {
   if (!bienesLineChart) return;
-  const pts    = getBienesPortfolioHistory(bienesLineRangeDays);
-  const dates  = getDateLabels(bienesLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const { pts, labels: dates } = getBienesLineData(bienesLineRangeDays);
+  const lineUp = pts.length > 1 ? pts[pts.length - 1] >= pts[0] : true;
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
   bienesLineChart.data.labels                  = dates;
@@ -3260,6 +3315,7 @@ function setCryptoLineRange(days, btn) {
 function openCryptoModal(id = null) {
   editingCryptoId = id;
   document.getElementById('crypto-modal-title').textContent = id ? 'Edit Coin' : 'Add Coin';
+  const lookupBtn = document.getElementById('ci-lookup-btn');
   if (id) {
     const c = cryptos.find(x => x.id === id);
     if (!c) return;
@@ -3269,11 +3325,43 @@ function openCryptoModal(id = null) {
     document.getElementById('ci-cost').value   = c.avgCost;
     document.getElementById('ci-price').value  = c.currentPrice;
     document.getElementById('ci-fecha').value  = c.fechaCompra || '';
+    const purchaseAmt = (!isNaN(c.amount) && !isNaN(c.avgCost)) ? (c.amount * c.avgCost).toFixed(2) : '';
+    document.getElementById('ci-purchase-amount').value = purchaseAmt;
+    if (lookupBtn) lookupBtn.textContent = 'Refresh Prices';
   } else {
-    ['ci-symbol','ci-name','ci-amount','ci-cost','ci-price','ci-fecha']
+    ['ci-symbol','ci-name','ci-amount','ci-purchase-amount','ci-cost','ci-price','ci-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
+    if (lookupBtn) lookupBtn.textContent = 'Lookup';
   }
   document.getElementById('crypto-modal-overlay').classList.add('modal-overlay--visible');
+}
+
+function onCryptoAmountInput() {
+  const amount = parseFloat(document.getElementById('ci-amount').value);
+  const cost   = parseFloat(document.getElementById('ci-cost').value);
+  if (!isNaN(amount) && !isNaN(cost) && cost > 0) {
+    document.getElementById('ci-purchase-amount').value = (amount * cost).toFixed(2);
+  }
+}
+
+function onCryptoPurchaseAmountInput() {
+  const purchaseAmt = parseFloat(document.getElementById('ci-purchase-amount').value);
+  const cost        = parseFloat(document.getElementById('ci-cost').value);
+  if (!isNaN(purchaseAmt) && !isNaN(cost) && cost > 0) {
+    document.getElementById('ci-amount').value = (purchaseAmt / cost).toFixed(8);
+  }
+}
+
+function onCryptoCostInput() {
+  const amount      = parseFloat(document.getElementById('ci-amount').value);
+  const cost        = parseFloat(document.getElementById('ci-cost').value);
+  const purchaseAmt = parseFloat(document.getElementById('ci-purchase-amount').value);
+  if (isNaN(cost) || cost <= 0) return;
+  if (!isNaN(amount)) {
+    document.getElementById('ci-purchase-amount').value = (amount * cost).toFixed(2);
+  } else if (!isNaN(purchaseAmt)) {
+    document.getElementById('ci-amount').value = (purchaseAmt / cost).toFixed(8);
+  }
 }
 
 function closeCryptoModal(e) {
@@ -3285,11 +3373,22 @@ function closeCryptoModal(e) {
 
 async function saveCrypto() {
   const symbol       = document.getElementById('ci-symbol').value.trim().toUpperCase();
-  const name         = document.getElementById('ci-name').value.trim();
-  const amount       = parseFloat(document.getElementById('ci-amount').value);
-  const avgCost      = parseFloat(document.getElementById('ci-cost').value);
-  const currentPrice = parseFloat(document.getElementById('ci-price').value);
-  const fechaCompra  = document.getElementById('ci-fecha').value || null;
+  const name          = document.getElementById('ci-name').value.trim();
+  let   amount        = parseFloat(document.getElementById('ci-amount').value);
+  const purchaseAmt   = parseFloat(document.getElementById('ci-purchase-amount').value);
+  let   avgCost       = parseFloat(document.getElementById('ci-cost').value);
+  const currentPrice  = parseFloat(document.getElementById('ci-price').value);
+  const fechaCompra   = document.getElementById('ci-fecha').value || null;
+
+  // Derive missing field if two of the three are known
+  if (isNaN(avgCost) && !isNaN(amount) && amount > 0 && !isNaN(purchaseAmt)) {
+    avgCost = purchaseAmt / amount;
+    document.getElementById('ci-cost').value = avgCost.toFixed(4);
+  }
+  if (isNaN(amount) && !isNaN(avgCost) && avgCost > 0 && !isNaN(purchaseAmt)) {
+    amount = purchaseAmt / avgCost;
+    document.getElementById('ci-amount').value = amount.toFixed(8);
+  }
 
   if (!symbol || !name || isNaN(amount) || isNaN(avgCost) || isNaN(currentPrice)) {
     alert('Please fill in all required fields.');
