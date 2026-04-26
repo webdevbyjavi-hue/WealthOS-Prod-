@@ -1,0 +1,118 @@
+/* ══════════════════════════════════════════════════════════════
+   Transactions Page — Styles
+══════════════════════════════════════════════════════════════ */
+
+/* ─── Transactions Table Panel ───────────────────────────────── */
+.txn-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.txn-panel .panel__header {
+  padding: 20px 24px 0;
+  margin-bottom: 16px;
+}
+
+/* ─── Table first/last cell padding ──────────────────────────── */
+.txn-table th:first-child,
+.txn-table td:first-child {
+  padding-left: 24px;
+}
+
+.txn-table th:last-child,
+.txn-table td:last-child {
+  padding-right: 24px;
+}
+
+/* ─── Transaction type badges ────────────────────────────────── */
+.txn-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  border-radius: 5px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.txn-type-badge--in {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.txn-type-badge--out {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.txn-type-badge--invested {
+  color: var(--accent-light);
+  background: var(--accent-dim);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+/* ─── Net flow color helpers ─────────────────────────────────── */
+.txn-positive { color: var(--up); }
+.txn-negative { color: var(--down); }
+
+/* ─── Delete / row action button ─────────────────────────────── */
+.txn-btn-remove {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.txn-btn-remove:hover {
+  border-color: var(--down);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+/* ─── Empty state hint ───────────────────────────────────────── */
+.txn-empty-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-tertiary);
+}
+
+.txn-empty-hint__icon {
+  font-size: 28px;
+  opacity: 0.4;
+}
+
+.txn-empty-hint__text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .txn-panel .panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .txn-btn-remove {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
