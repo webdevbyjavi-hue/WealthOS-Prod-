@@ -3514,6 +3514,53 @@ initHoldings();
   });
 })();
 
+// ─── Crypto modal: auto-trigger lookup when both Symbol + Date are filled ─────
+let _cryptoLookupInProgress = false;
+
+async function lookupCryptoSymbol() {
+  if (_cryptoLookupInProgress) return;
+  const symbol = document.getElementById('ci-symbol').value.trim().toUpperCase();
+  if (!symbol) return;
+
+  _cryptoLookupInProgress = true;
+  try {
+    if (!_cryptoFxRate) {
+      const fx = await WOS_API.exchangeRate.getUsdMxn().catch(() => null);
+      if (fx) _cryptoFxRate = fx.rate;
+    }
+    const info    = await WOS_API.lookup.crypto(symbol);
+    const priceEl = document.getElementById('ci-price');
+    document.getElementById('ci-symbol').value = info.symbol;
+    document.getElementById('ci-name').value   = info.name;
+    priceEl.dataset.usd = info.price;
+    priceEl.value = (_cryptoFxRate ? info.price * _cryptoFxRate : info.price).toFixed(2);
+    onCryptoCostInput();
+    showToast(`${info.name} · $${(_cryptoFxRate ? info.price * _cryptoFxRate : info.price).toFixed(2)} MXN`);
+  } catch (err) {
+    showToast(err.message || 'Lookup failed. Check the symbol and try again.');
+  } finally {
+    _cryptoLookupInProgress = false;
+  }
+}
+
+(function () {
+  const symbolEl = document.getElementById('ci-symbol');
+  const fechaEl  = document.getElementById('ci-fecha');
+  if (!symbolEl || !fechaEl) return;
+
+  symbolEl.addEventListener('blur', () => {
+    if (!editingCryptoId && symbolEl.value.trim() && fechaEl.value) {
+      lookupCryptoSymbol();
+    }
+  });
+
+  fechaEl.addEventListener('change', () => {
+    if (!editingCryptoId && symbolEl.value.trim() && fechaEl.value) {
+      lookupCryptoSymbol();
+    }
+  });
+})();
+
 window.addEventListener('resize', () => {
   if (lineChart) lineChart.resize();
   if (donutChart) donutChart.resize();
