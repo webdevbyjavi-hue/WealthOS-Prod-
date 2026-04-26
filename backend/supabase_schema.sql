@@ -252,6 +252,7 @@ CREATE TABLE IF NOT EXISTS crypto (
   amount          NUMERIC(24,8) NOT NULL CHECK (amount >= 0),
   avg_cost        NUMERIC(18,4) NOT NULL CHECK (avg_cost >= 0),
   current_price   NUMERIC(18,4) NOT NULL CHECK (current_price >= 0),
+  purchase_date   DATE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, symbol)
