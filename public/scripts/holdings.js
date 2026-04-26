@@ -150,28 +150,6 @@ async function lookupFibraTicker() {
   }
 }
 
-async function lookupCryptoSymbol() {
-  const symbol = document.getElementById('ci-symbol').value.trim().toUpperCase();
-  if (!symbol) { showToast('Enter a symbol first.'); return; }
-
-  const btn = document.getElementById('ci-lookup-btn');
-  btn.disabled = true;
-  btn.textContent = 'Looking up…';
-
-  try {
-    const info = await WOS_API.lookup.crypto(symbol);
-    document.getElementById('ci-symbol').value = info.symbol;
-    document.getElementById('ci-name').value   = info.name;
-    document.getElementById('ci-price').value  = info.price.toFixed(2);
-    onCryptoCostInput();
-    showToast(`Loaded: ${info.name} @ $${info.price.toFixed(2)} USD`);
-  } catch (err) {
-    showToast(err.message || 'Lookup failed. Check the symbol and try again.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = editingCryptoId ? 'Refresh Prices' : 'Lookup';
-  }
-}
 
 // ══════════════════════════════════════════════════════════════
 //  STOCKS DASHBOARD
@@ -3035,6 +3013,7 @@ let cryptos = [];
 let cryptoLineRangeDays = 7;
 let cryptoLineChart, cryptoDonutChart, cryptoBarChart;
 let editingCryptoId = null;
+let _cryptoFxRate   = null;
 let cryptoSortCol = null, cryptoSortDir = 1;
 
 function persistCrypto() { /* no-op — data goes directly to API */ }
@@ -3312,10 +3291,15 @@ function setCryptoLineRange(days, btn) {
 }
 
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
-function openCryptoModal(id = null) {
+async function openCryptoModal(id = null) {
   editingCryptoId = id;
   document.getElementById('crypto-modal-title').textContent = id ? 'Edit Coin' : 'Add Coin';
-  const lookupBtn = document.getElementById('ci-lookup-btn');
+
+  if (!_cryptoFxRate) {
+    try { const fx = await WOS_API.exchangeRate.getUsdMxn(); _cryptoFxRate = fx.rate; } catch (_) {}
+  }
+
+  const priceEl = document.getElementById('ci-price');
   if (id) {
     const c = cryptos.find(x => x.id === id);
     if (!c) return;
@@ -3323,15 +3307,17 @@ function openCryptoModal(id = null) {
     document.getElementById('ci-name').value   = c.name;
     document.getElementById('ci-amount').value = c.amount;
     document.getElementById('ci-cost').value   = c.avgCost;
-    document.getElementById('ci-price').value  = c.currentPrice;
     document.getElementById('ci-fecha').value  = c.fechaCompra || '';
     const purchaseAmt = (!isNaN(c.amount) && !isNaN(c.avgCost)) ? (c.amount * c.avgCost).toFixed(2) : '';
     document.getElementById('ci-purchase-amount').value = purchaseAmt;
-    if (lookupBtn) lookupBtn.textContent = 'Refresh Prices';
+    // Show stored USD price converted to MXN; keep USD in dataset for saveCrypto
+    priceEl.dataset.usd = c.currentPrice;
+    priceEl.value = (_cryptoFxRate && c.currentPrice) ? (c.currentPrice * _cryptoFxRate).toFixed(2) : (c.currentPrice || '');
   } else {
-    ['ci-symbol','ci-name','ci-amount','ci-purchase-amount','ci-cost','ci-price','ci-fecha']
+    ['ci-symbol','ci-name','ci-amount','ci-purchase-amount','ci-cost','ci-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
-    if (lookupBtn) lookupBtn.textContent = 'Lookup';
+    priceEl.value = '';
+    delete priceEl.dataset.usd;
   }
   document.getElementById('crypto-modal-overlay').classList.add('modal-overlay--visible');
 }
@@ -3364,6 +3350,16 @@ function onCryptoCostInput() {
   }
 }
 
+function onCryptoPriceInput() {
+  const priceEl  = document.getElementById('ci-price');
+  const priceMxn = parseFloat(priceEl.value);
+  if (!isNaN(priceMxn) && _cryptoFxRate) {
+    priceEl.dataset.usd = (priceMxn / _cryptoFxRate).toFixed(6);
+  } else {
+    delete priceEl.dataset.usd;
+  }
+}
+
 function closeCryptoModal(e) {
   if (!e || e.target === document.getElementById('crypto-modal-overlay')) {
     document.getElementById('crypto-modal-overlay').classList.remove('modal-overlay--visible');
@@ -3377,7 +3373,9 @@ async function saveCrypto() {
   let   amount        = parseFloat(document.getElementById('ci-amount').value);
   const purchaseAmt   = parseFloat(document.getElementById('ci-purchase-amount').value);
   let   avgCost       = parseFloat(document.getElementById('ci-cost').value);
-  const currentPrice  = parseFloat(document.getElementById('ci-price').value);
+  const priceEl       = document.getElementById('ci-price');
+  const priceMxn      = parseFloat(priceEl.value);
+  const currentPrice  = parseFloat(priceEl.dataset.usd ?? (_cryptoFxRate ? priceMxn / _cryptoFxRate : priceMxn));
   const fechaCompra   = document.getElementById('ci-fecha').value || null;
 
   // Derive missing field if two of the three are known
