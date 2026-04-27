@@ -3026,20 +3026,17 @@ function sortCrypto(col) {
 }
 
 function getCryptoSortValue(c, col) {
-  const mv   = c.currentPrice * c.amount;
-  const gain = (c.currentPrice - c.avgCost) * c.amount;
+  const fx   = _cryptoFxRate || 1;
+  const gain = (c.currentPrice - c.avgCost) * c.amount * fx;
   const ret  = c.avgCost ? (c.currentPrice - c.avgCost) / c.avgCost : 0;
-  const totalValue = cryptos.reduce((s, x) => s + x.currentPrice * x.amount, 0);
   switch (col) {
     case 'symbol':       return c.symbol;
     case 'name':         return c.name;
     case 'amount':       return c.amount;
-    case 'avgCost':      return c.avgCost;
-    case 'currentPrice': return c.currentPrice;
-    case 'value':        return mv;
+    case 'avgCost':      return c.avgCost * fx;
+    case 'currentPrice': return c.currentPrice * fx;
     case 'gain':         return gain;
     case 'return':       return ret;
-    case 'weight':       return totalValue ? mv / totalValue : 0;
     default:             return 0;
   }
 }
@@ -3108,17 +3105,19 @@ function renderCryptoTable(filter = '') {
     `${cryptos.length} position${cryptos.length !== 1 ? 's' : ''}`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="table__empty">No crypto positions yet — add your first.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="table__empty">No crypto positions yet — add your first.</td></tr>`;
     return;
   }
 
   filtered.forEach(c => {
-    const color  = cryptoColor(c.symbol);
-    const mv     = c.currentPrice * c.amount;
-    const gain   = (c.currentPrice - c.avgCost) * c.amount;
-    const ret    = c.avgCost ? (c.currentPrice - c.avgCost) / c.avgCost * 100 : 0;
-    const weight = totalValue ? (mv / totalValue * 100) : 0;
-    const up     = gain >= 0;
+    const color        = cryptoColor(c.symbol);
+    const fx           = _cryptoFxRate || 1;
+    const avgCostMxn   = c.avgCost * fx;
+    const currPriceMxn = c.currentPrice * fx;
+    const gain         = (currPriceMxn - avgCostMxn) * c.amount;
+    const invested     = avgCostMxn * c.amount;
+    const ret          = invested ? (gain / invested) * 100 : 0;
+    const up           = gain >= 0;
 
     // Format amount — show up to 8 decimals, trim trailing zeros
     const amtStr = c.amount < 1
@@ -3132,12 +3131,10 @@ function renderCryptoTable(filter = '') {
       <td class="td--ticker" style="color:${color}">${c.symbol}</td>
       <td class="s-td-company">${c.name}</td>
       <td>${amtStr}</td>
-      <td>${fmt(c.avgCost)}</td>
-      <td class="td--price">${fmt(c.currentPrice)}</td>
-      <td>${fmt(mv)}</td>
+      <td>${fmt(avgCostMxn)}</td>
+      <td class="td--price">${fmt(currPriceMxn)}</td>
       <td class="${up ? 'td--up' : 'td--down'}">${(up ? '+' : '') + fmt(gain)}</td>
       <td class="${up ? 'td--up' : 'td--down'}">${fmtPct(ret)}</td>
-      <td>${weight.toFixed(1)}%</td>
       <td>
         <div class="s-row-actions">
           <button class="s-btn-edit" onclick="openCryptoModal('${c.id}')" title="Edit">✎</button>
@@ -3224,7 +3221,7 @@ function initCryptoCharts() {
       labels: cryptos.map(c => c.symbol),
       datasets: [{
         label: 'Gain / Loss',
-        data: cryptos.map(c => parseFloat(((c.currentPrice - c.avgCost) * c.amount).toFixed(2))),
+        data: cryptos.map(c => parseFloat(((c.currentPrice - c.avgCost) * c.amount * (_cryptoFxRate || 1)).toFixed(2))),
         backgroundColor: cryptos.map(c => {
           const g = (c.currentPrice - c.avgCost) * c.amount >= 0;
           return g ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)';
@@ -3270,7 +3267,7 @@ function updateCryptoCharts() {
   cryptoDonutChart.update();
 
   cryptoBarChart.data.labels = cryptos.map(c => c.symbol);
-  cryptoBarChart.data.datasets[0].data = cryptos.map(c => parseFloat(((c.currentPrice - c.avgCost) * c.amount).toFixed(2)));
+  cryptoBarChart.data.datasets[0].data = cryptos.map(c => parseFloat(((c.currentPrice - c.avgCost) * c.amount * (_cryptoFxRate || 1)).toFixed(2)));
   cryptoBarChart.data.datasets[0].backgroundColor = cryptos.map(c => {
     const g = (c.currentPrice - c.avgCost) * c.amount >= 0;
     return g ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)';

@@ -11,11 +11,13 @@ const CAT_LABELS   = window.WOS_CAT_LABELS;
 let accounts     = [];
 let transactions = [];
 let editingTxnId = null;
-let flowView     = null; // null = all, 'in', 'out', 'invested'
+let flowView        = null; // null = all, 'in', 'out', 'invested'
+let timeframeFilter = 'all'; // 'all' | '1m' | '3m' | 'ytd' | '1y'
 let sortCol      = 'date';
 let sortDir      = -1;
 let filterText     = '';
 let filterType     = '';
+let catFilterType  = 'out';
 let catFilterYear  = '';
 let catFilterMonth = '';
 let currentPage    = 1;
@@ -265,6 +267,75 @@ async function deleteTxn(txnId) {
   }
 }
 
+/* ─── Timeframe filter ───────────────────────────────────────── */
+function txnsInTimeframe(txns) {
+  if (timeframeFilter === 'all') return txns;
+  const now = new Date();
+  const yr  = now.getFullYear();
+  const mo  = now.getMonth();
+  if (timeframeFilter === '1m') {
+    const prefix = `${yr}-${String(mo + 1).padStart(2, '0')}`;
+    return txns.filter(t => (t.date || '').startsWith(prefix));
+  }
+  let cutoff;
+  if (timeframeFilter === '3m')  cutoff = new Date(yr, mo - 2, 1);
+  if (timeframeFilter === 'ytd') cutoff = new Date(yr, 0, 1);
+  if (timeframeFilter === '1y')  cutoff = new Date(yr, mo - 11, 1);
+  const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`;
+  return txns.filter(t => (t.date || '') >= cutoffStr);
+}
+
+function getFlowMonths() {
+  const now = new Date();
+  const yr  = now.getFullYear();
+  const mo  = now.getMonth();
+  const months = [];
+
+  function pushMonth(d) {
+    months.push({
+      label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    });
+  }
+
+  if (timeframeFilter === 'ytd') {
+    for (let m = 0; m <= mo; m++) pushMonth(new Date(yr, m, 1));
+  } else if (timeframeFilter === '1m') {
+    pushMonth(new Date(yr, mo, 1));
+  } else if (timeframeFilter === '3m') {
+    for (let i = 2; i >= 0; i--) pushMonth(new Date(yr, mo - i, 1));
+  } else if (timeframeFilter === '1y') {
+    for (let i = 11; i >= 0; i--) pushMonth(new Date(yr, mo - i, 1));
+  } else {
+    // 'all' — span from earliest transaction, capped at 24 months back
+    const dates = transactions.map(t => t.date || '').filter(Boolean).sort();
+    let start;
+    if (dates.length > 0) {
+      const firstYr = parseInt(dates[0].slice(0, 4));
+      const firstMo = parseInt(dates[0].slice(5, 7)) - 1;
+      const cap     = new Date(yr, mo - 23, 1);
+      start = new Date(Math.max(new Date(firstYr, firstMo, 1).getTime(), cap.getTime()));
+    } else {
+      start = new Date(yr, mo - 5, 1);
+    }
+    let d = new Date(start);
+    while (d.getFullYear() < yr || (d.getFullYear() === yr && d.getMonth() <= mo)) {
+      pushMonth(new Date(d));
+      d.setMonth(d.getMonth() + 1);
+    }
+  }
+  return months;
+}
+
+function setTimeframe(tf) {
+  timeframeFilter = tf;
+  currentPage     = 1;
+  document.querySelectorAll('.tf-filter__btn').forEach(btn => {
+    btn.classList.toggle('tf-filter__btn--active', btn.dataset.tf === tf);
+  });
+  render();
+}
+
 /* ─── Filter / Sort ──────────────────────────────────────────── */
 function filterTable(text) {
   filterText  = text.toLowerCase();
@@ -288,7 +359,7 @@ function sortBy(col) {
 }
 
 function getFiltered() {
-  return transactions.filter(t => {
+  return txnsInTimeframe(transactions).filter(t => {
     const matchText = !filterText ||
       (t.description  || '').toLowerCase().includes(filterText) ||
       (t.accountName  || '').toLowerCase().includes(filterText) ||
@@ -337,10 +408,9 @@ function updateSummary() {
 }
 
 function updateKPIs() {
-  const sumType   = type => transactions
-    .filter(t => t.type === type)
-    .reduce((s, t) => s + (t.amountMXN || 0), 0);
-  const countType = type => transactions.filter(t => t.type === type).length;
+  const scoped    = txnsInTimeframe(transactions);
+  const sumType   = type => scoped.filter(t => t.type === type).reduce((s, t) => s + (t.amountMXN || 0), 0);
+  const countType = type => scoped.filter(t => t.type === type).length;
 
   const totalIn  = sumType('in');
   const totalOut = sumType('out');
@@ -361,6 +431,10 @@ function updateKPIs() {
   const netEl = document.getElementById('k-net-flow');
   netEl.textContent = fmtMXN(netFlow);
   netEl.style.color = netFlow >= 0 ? 'var(--up)' : 'var(--down)';
+
+  const tfLabels = { all: 'All Time', '1m': 'This Month', '3m': 'Last 3M', ytd: 'YTD', '1y': 'Last 12M' };
+  const labelEl  = document.getElementById('k-net-flow-label');
+  if (labelEl) labelEl.textContent = `Net Flow (${tfLabels[timeframeFilter] || 'All Time'})`;
 }
 
 function renderTable() {
@@ -473,13 +547,14 @@ function renderPagination(page, totalPages, total) {
 }
 
 /* ─── Category chart period filter ──────────────────────────── */
-function populateCatFilterYears() {
+function populateCatFilterYears(scopedTxns) {
   const sel = document.getElementById('cat-filter-year');
   if (!sel) return;
 
+  const src   = scopedTxns || transactions;
   const years = [...new Set(
-    transactions
-      .filter(t => t.type === 'out' && t.date)
+    src
+      .filter(t => t.type === catFilterType && t.date)
       .map(t => t.date.slice(0, 4))
   )].sort().reverse();
 
@@ -499,6 +574,7 @@ function populateCatFilterYears() {
 }
 
 function updateCatFilter() {
+  catFilterType = document.getElementById('cat-filter-type').value;
   catFilterYear = document.getElementById('cat-filter-year').value;
   const monthSel = document.getElementById('cat-filter-month');
 
@@ -530,15 +606,7 @@ function renderCharts() {
 }
 
 function renderFlowChart() {
-  const months = [];
-  const now    = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-    });
-  }
+  const months = getFlowMonths();
 
   const sumType = (type, key) => transactions
     .filter(t => t.type === type && (t.date || '').startsWith(key))
@@ -546,7 +614,7 @@ function renderFlowChart() {
 
   const allDatasets = [
     { id: 'in',       label: 'Cash In',  data: months.map(m => sumType('in',       m.key)), backgroundColor: 'rgba(52,211,153,0.65)',  borderColor: '#34d399', borderWidth: 1, borderRadius: 4, stack: 'inflow'  },
-    { id: 'out',      label: 'Cash Out', data: months.map(m => sumType('out',      m.key)), backgroundColor: 'rgba(248,113,113,0.65)', borderColor: '#f87171', borderWidth: 1, borderRadius: 0, stack: 'outflow' },
+    { id: 'out',      label: 'Cash Out', data: months.map(m => sumType('out',      m.key)), backgroundColor: 'rgba(248,113,113,0.65)', borderColor: '#f87171', borderWidth: 1, borderRadius: 4, stack: 'outflow' },
     { id: 'invested', label: 'Invested', data: months.map(m => sumType('invested', m.key)), backgroundColor: 'rgba(99,102,241,0.65)',  borderColor: '#6366f1', borderWidth: 1, borderRadius: 4, stack: 'outflow' },
   ];
 
@@ -572,36 +640,37 @@ function renderFlowChart() {
 }
 
 function renderCategoryChart() {
-  populateCatFilterYears();
+  const scoped = txnsInTimeframe(transactions);
+  populateCatFilterYears(scoped);
 
-  let outTxns = transactions.filter(t => t.type === 'out');
+  let typeTxns = scoped.filter(t => t.type === catFilterType);
   if (catFilterYear) {
-    outTxns = outTxns.filter(t => (t.date || '').startsWith(catFilterYear));
+    typeTxns = typeTxns.filter(t => (t.date || '').startsWith(catFilterYear));
     if (catFilterMonth) {
-      outTxns = outTxns.filter(t => (t.date || '').slice(5, 7) === catFilterMonth);
+      typeTxns = typeTxns.filter(t => (t.date || '').slice(5, 7) === catFilterMonth);
     }
   }
 
   const ctx = document.getElementById('chart-breakdown').getContext('2d');
   if (chartCategory) chartCategory.destroy();
 
-  if (outTxns.length === 0) {
+  if (typeTxns.length === 0) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     chartCategory = null;
     return;
   }
 
   const groups = {};
-  outTxns.forEach(t => {
+  typeTxns.forEach(t => {
     const key = t.category || 'uncategorized';
     groups[key] = (groups[key] || 0) + (t.amountMXN || 0);
   });
 
-  const outCatOrder = [...CATS_BY_TYPE.out, 'transfers', 'uncategorized'];
-  const uncatColor  = '#a78bfa';
+  const catOrder   = [...(CATS_BY_TYPE[catFilterType] || []), 'transfers', 'uncategorized'];
+  const uncatColor = '#a78bfa';
   const labels = [], data = [], colors = [];
 
-  outCatOrder.forEach(key => {
+  catOrder.forEach(key => {
     if ((groups[key] || 0) > 0) {
       labels.push(key === 'uncategorized' ? 'Sin categoría' : CATEGORIES[key].label);
       data.push(groups[key]);

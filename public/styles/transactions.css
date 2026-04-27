@@ -2,6 +2,46 @@
    Transactions Page — Styles
 ══════════════════════════════════════════════════════════════ */
 
+/* ─── Global Timeframe Filter (topbar) ───────────────────────── */
+.tf-filter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.tf-filter__btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.tf-filter__btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.tf-filter__btn--active {
+  color: var(--text-primary);
+  background: var(--bg-panel-alt);
+}
+
+@media (max-width: 480px) {
+  .tf-filter { width: 100%; justify-content: space-between; }
+  .tf-filter__btn { flex: 1; text-align: center; padding: 5px 6px; }
+}
+
 /* ─── Transactions Table Panel ───────────────────────────────── */
 .txn-panel {
   padding: 0;

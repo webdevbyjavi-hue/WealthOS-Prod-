@@ -70,6 +70,13 @@
           <span class="page__date" id="current-date"></span>
         </div>
       </div>
+      <div class="tf-filter" id="tf-filter">
+        <button class="tf-filter__btn tf-filter__btn--active" data-tf="all"  onclick="setTimeframe('all')">All</button>
+        <button class="tf-filter__btn" data-tf="1m"  onclick="setTimeframe('1m')">1M</button>
+        <button class="tf-filter__btn" data-tf="3m"  onclick="setTimeframe('3m')">3M</button>
+        <button class="tf-filter__btn" data-tf="ytd" onclick="setTimeframe('ytd')">YTD</button>
+        <button class="tf-filter__btn" data-tf="1y"  onclick="setTimeframe('1y')">1Y</button>
+      </div>
       <div class="topbar__right">
         <button class="btn btn--ghost" id="export-btn">↓ Export</button>
         <button class="btn btn--primary btn--large" onclick="openAddTransactionModal()">+ Transaction</button>
@@ -117,7 +124,7 @@
         <span class="kpi__sub" id="k-invested-count">0 transactions</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi__label">Net Flow (All Time)</span>
+        <span class="kpi__label" id="k-net-flow-label">Net Flow (All Time)</span>
         <span class="kpi__value kpi__value--sm" id="k-net-flow">MX$0.00</span>
         <span class="kpi__sub">cash in minus cash out</span>
       </div>
@@ -143,6 +150,11 @@
         <div class="panel__header">
           <span class="panel__title">Expenses by Category</span>
           <div class="cat-period-filter">
+            <select class="cat-filter-select" id="cat-filter-type" onchange="updateCatFilter()">
+              <option value="in">Cash In</option>
+              <option value="out" selected>Cash Out</option>
+              <option value="invested">Invested</option>
+            </select>
             <select class="cat-filter-select" id="cat-filter-year" onchange="updateCatFilter()">
               <option value="">All Time</option>
             </select>

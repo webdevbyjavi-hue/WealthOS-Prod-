@@ -415,7 +415,7 @@
                 <th class="th-sort" data-col="unidades" onclick="sortFondos('unidades')">Unidades <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="precioCompra" onclick="sortFondos('precioCompra')">Precio Compra <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="navActual" onclick="sortFondos('navActual')">NAV Actual <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="value" onclick="sortFondos('value')">Valor de Mercado <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="value" onclick="sortFondos('value')">Valor Actual (MXN) <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="gain" onclick="sortFondos('gain')">Ganancia / Pérdida <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="rendimiento" onclick="sortFondos('rendimiento')">Rendimiento <span class="sort-icon">↕</span></th>
                 <th></th>
@@ -434,7 +434,7 @@
       <!-- KPI STRIP -->
       <div class="fibras-kpi-grid">
         <div class="kpi-card kpi-card--primary">
-          <span class="kpi__label">Valor de Mercado</span>
+          <span class="kpi__label">Valor Actual (MXN)</span>
           <span class="kpi__value" id="fib-total-value">$0.00</span>
           <span class="kpi__change kpi__change--up" id="fib-total-change">+0.00%</span>
         </div>
@@ -520,7 +520,7 @@
                 <th class="th-sort" data-col="certificados" onclick="sortFibras('certificados')">Certificados <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="precioCompra" onclick="sortFibras('precioCompra')">Precio Compra <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="precioActual" onclick="sortFibras('precioActual')">Precio Actual <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="value" onclick="sortFibras('value')">Valor de Mercado <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="value" onclick="sortFibras('value')">Valor Actual (MXN) <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="gain" onclick="sortFibras('gain')">Ganancia / Pérdida <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="rendimiento" onclick="sortFibras('rendimiento')">Rendimiento <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="divYield" onclick="sortFibras('divYield')">Div. Yield <span class="sort-icon">↕</span></th>
@@ -697,7 +697,7 @@
         <div class="panel">
           <div class="panel__header">
             <span class="panel__title" data-i18n="panel_gain_loss_coin">Gain / Loss per Coin</span>
-            <span class="panel__badge" data-i18n="badge_usd">USD</span>
+            <span class="panel__badge">MXN</span>
           </div>
           <div class="crypto-canvas-wrap crypto-canvas-wrap--sm">
             <canvas id="chart-crypto-bar"></canvas>
@@ -725,12 +725,10 @@
                 <th class="th-sort" data-col="symbol" onclick="sortCrypto('symbol')"><span data-i18n="th_symbol">Symbol</span> <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="name" onclick="sortCrypto('name')"><span data-i18n="th_coin">Coin</span> <span class="sort-icon">↕</span></th>
                 <th class="th-sort" data-col="amount" onclick="sortCrypto('amount')"><span data-i18n="th_amount">Amount</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="avgCost" onclick="sortCrypto('avgCost')"><span data-i18n="th_avg_cost">Avg Cost</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="currentPrice" onclick="sortCrypto('currentPrice')"><span data-i18n="th_curr_price">Current Price</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="value" onclick="sortCrypto('value')"><span data-i18n="th_market_value">Market Value</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="gain" onclick="sortCrypto('gain')"><span data-i18n="th_gain_loss">Gain / Loss</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="return" onclick="sortCrypto('return')"><span data-i18n="th_return">Return</span> <span class="sort-icon">↕</span></th>
-                <th class="th-sort" data-col="weight" onclick="sortCrypto('weight')"><span data-i18n="th_weight">Weight</span> <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="avgCost" onclick="sortCrypto('avgCost')"><span data-i18n="th_avg_cost">Costo Prom.</span> (MXN) <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="currentPrice" onclick="sortCrypto('currentPrice')"><span data-i18n="th_curr_price">Precio Actual</span> (MXN) <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="gain" onclick="sortCrypto('gain')"><span data-i18n="th_gain_loss">Ganancia / Pérdida</span> <span class="sort-icon">↕</span></th>
+                <th class="th-sort" data-col="return" onclick="sortCrypto('return')"><span data-i18n="th_return">Rendimiento</span> <span class="sort-icon">↕</span></th>
                 <th></th>
               </tr>
             </thead>

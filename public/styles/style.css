@@ -1229,6 +1229,7 @@ button.nav__item {
   /* ── Topbar: stack on very small screens ──────────────────── */
   .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
   .topbar__right { width: 100%; justify-content: flex-end; }
+  .topbar .tf-filter { width: 100%; }
 
   /* ── Donut: cap size so it never wider than available area ── */
   .donut-wrapper { width: min(200px, 100%); height: min(200px, 100%); }
