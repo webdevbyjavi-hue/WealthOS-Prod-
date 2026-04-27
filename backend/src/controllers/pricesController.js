@@ -108,4 +108,45 @@ async function getPortfolioHistory(req, res, next) {
   }
 }
 
-module.exports = { getPriceHistory, getPortfolioHistory };
+// ─── GET /api/portfolio/history/mxn ──────────────────────────────────────────
+
+/**
+ * @auth   Required — Bearer JWT
+ * @query  from  Start date YYYY-MM-DD, default 90 days ago
+ * @query  to    End date YYYY-MM-DD, default today
+ * @returns 200 { success: true, data: [{ date, value_usd, value_mxn, fx_rate }] }
+ *
+ * Reads from portfolio_value_snapshots — pre-computed daily portfolio values
+ * written by the nightly snapshot job. Each row uses the exchange rate from
+ * that day, giving historically accurate MXN values.
+ */
+async function getPortfolioHistoryMxn(req, res, next) {
+  try {
+    const from   = req.query.from || _daysAgo(365);
+    const to     = req.query.to   || _todayUTC();
+    const userId = req.user.id;
+
+    const { data, error } = await supabase
+      .from('portfolio_value_snapshots')
+      .select('date, value_usd, value_mxn, fx_rate')
+      .eq('user_id', userId)
+      .gte('date', from)
+      .lte('date', to)
+      .order('date', { ascending: true });
+
+    if (error) throw error;
+
+    const history = (data || []).map((r) => ({
+      date:      r.date,
+      value_usd: parseFloat(r.value_usd),
+      value_mxn: parseFloat(r.value_mxn),
+      fx_rate:   parseFloat(r.fx_rate),
+    }));
+
+    res.json({ success: true, data: history });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getPriceHistory, getPortfolioHistory, getPortfolioHistoryMxn };

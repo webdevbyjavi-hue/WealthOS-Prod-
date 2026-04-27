@@ -457,61 +457,48 @@ function _hideChartLoading() {
 
 async function loadRealHistory() {
   const today = new Date().toISOString().slice(0, 10);
-  const from  = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 365);
-    return d.toISOString().slice(0, 10);
-  })();
-
-  let allAssets;
-  try {
-    allAssets = await WOS_API.assets.list();
-  } catch (err) {
-    console.warn('[WOS] loadRealHistory: assets.list() failed:', err.message);
-    return; // assets endpoint unavailable — keep fake data
-  }
-
-  console.log('[WOS] loadRealHistory: assets in registry:', allAssets.map(a => a.ticker));
-
-  const byTicker = Object.fromEntries(allAssets.map(a => [a.ticker, a]));
+  const from  = (() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); })();
 
   /**
-   * Build a date→value Map for a set of holdings.
-   * @param {Array}  holdings    — array of holding objects
-   * @param {string} tickerKey   — field name for the ticker/symbol
-   * @param {string} quantityKey — field name for the quantity
-   * @param {Function} fxFn     — (holding) → exchange rate multiplier
+   * Build a date→value Map by fetching close prices from stocks_snapshot
+   * for each holding and multiplying by its quantity.
+   * Values are in the currency of the stocks_snapshot symbol (USD for stocks
+   * and crypto, MXN for fibras .MX). MXN conversion for crypto/stocks happens
+   * at chart-render time via _cryptoFxRate.
    */
-  async function buildMap(holdings, tickerKey, quantityKey, fxFn) {
+  async function buildMap(holdings, tickerKey, quantityKey, symbolFn) {
     const map = new Map();
     await Promise.all(holdings.map(async (h) => {
-      const asset = byTicker[h[tickerKey]];
-      if (!asset) {
-        console.log('[WOS] loadRealHistory: no assets entry for', h[tickerKey], '— backfill not yet triggered');
-        return;
-      }
+      const symbol = symbolFn(h[tickerKey]);
       try {
-        const { history } = await WOS_API.assets.history(asset.id, from, today);
-        console.log('[WOS] loadRealHistory:', h[tickerKey], '→', history.length, 'snapshots');
-        const fx = fxFn(h);
-        history.forEach(p => {
-          map.set(p.date, (map.get(p.date) || 0) + p.value * parseFloat(h[quantityKey]) * fx);
+        const priceHistory = await WOS_API.prices.history(symbol, from, today);
+        priceHistory.forEach(p => {
+          map.set(p.date, (map.get(p.date) || 0) + p.close * parseFloat(h[quantityKey]));
         });
-      } catch (err) { console.warn('[WOS] loadRealHistory: history fetch failed for', h[tickerKey], err.message); }
+      } catch (_) {}
     }));
     return map.size > 0 ? map : null;
   }
 
-  // Run all three fetches in parallel
   const [sm, cm, fm] = await Promise.all([
-    buildMap(stocks,  'ticker', 'shares',      h => h.tipoDeCambio || 1),
-    buildMap(cryptos, 'symbol', 'amount',       () => 1),
-    buildMap(fibras,  'ticker', 'certificados', () => 1),
+    buildMap(stocks,  'ticker', 'shares',       t => t),
+    buildMap(cryptos, 'symbol', 'amount',        t => `${t}/USD`),
+    buildMap(fibras,  'ticker', 'certificados',  t => `${t}.MX`),
   ]);
 
   _stocksHistory = sm;
   _cryptoHistory = cm;
   _fibrasHistory = fm;
+
+  // Load stored MXN portfolio value history for the portfolio-value chart
+  try {
+    const mxnHistory = await WOS_API.portfolio.historyMxn(from, today);
+    if (mxnHistory && mxnHistory.length > 0) {
+      const mxnMap = new Map(mxnHistory.map(r => [r.date, r.value_mxn]));
+      // Expose as a sorted array of [date, value] pairs for chart consumption
+      window._portfolioMxnHistory = [...mxnMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    }
+  } catch (_) {}
 }
 
 Chart.defaults.color         = '#8892a4';
@@ -3154,6 +3141,11 @@ function filterCryptoTable(v) { renderCryptoTable(v); }
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getCryptoPortfolioHistory(n) {
   const fx     = _cryptoFxRate || 1;
+  // Prefer stored MXN history (historically accurate exchange rates)
+  if (window._portfolioMxnHistory && window._portfolioMxnHistory.length > 0) {
+    const sliced = window._portfolioMxnHistory.slice(-n);
+    return sliced.map(([, v]) => v);
+  }
   const series = _sliceHistory(_cryptoHistory, n);
   if (series) return series.map(([, v]) => v * fx);
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
@@ -3462,7 +3454,7 @@ async function initHoldings() {
   initCharts();
 
   try {
-    const [s, b, f, fb, r, c, bi] = await Promise.all([
+    const [s, b, f, fb, r, c, bi, fx] = await Promise.all([
       WOS_API.holdings.list('stocks'),
       WOS_API.holdings.list('bonos'),
       WOS_API.holdings.list('fondos'),
@@ -3470,8 +3462,10 @@ async function initHoldings() {
       WOS_API.holdings.list('retiro'),
       WOS_API.holdings.list('crypto'),
       WOS_API.holdings.list('bienes'),
+      WOS_API.exchangeRate.getUsdMxn().catch(() => null),
     ]);
     stocks = s; bonos = b; fondos = f; fibras = fb; retiro = r; cryptos = c; bienes = bi;
+    if (fx) _cryptoFxRate = fx.rate;
   } catch (err) {
     // arrays remain empty — show empty state
   }

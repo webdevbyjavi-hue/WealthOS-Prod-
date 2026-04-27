@@ -178,15 +178,18 @@
 
     // ── Portfolio (total value trendline) ─────────────────────────────────────
     portfolio: {
-      /**
-       * Returns [{ date, total_value }] — sum of all stocks/fibras/crypto
-       * holdings valued at daily close, derived from the portfolio_daily_value view.
-       */
       history: (from, to) => {
         const p = new URLSearchParams();
         if (from) p.set('from', from);
         if (to)   p.set('to',   to);
         return request('GET', `/api/portfolio/history?${p}`).then(r => r.data);
+      },
+      /** Returns [{ date, value_usd, value_mxn, fx_rate }] from portfolio_value_snapshots. */
+      historyMxn: (from, to) => {
+        const p = new URLSearchParams();
+        if (from) p.set('from', from);
+        if (to)   p.set('to',   to);
+        return request('GET', `/api/portfolio/history/mxn?${p}`).then(r => r.data);
       },
     },
 

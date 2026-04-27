@@ -156,7 +156,69 @@ async function runSnapshots() {
     `out of ${symbols.length} unique symbol(s).`
   );
 
+  // ── 4. Persist per-user portfolio values in MXN ───────────────────────────
+  if (succeeded > 0) {
+    await savePortfolioSnapshots(runDate).catch((err) =>
+      console.error('[snapshotService] Portfolio snapshot failed:', err.message)
+    );
+  }
+
   return { date: runDate, total: symbols.length, succeeded, failed, results };
 }
 
-module.exports = { runSnapshots };
+/**
+ * Compute each user's total portfolio value (stocks + fibras + crypto) for
+ * `date`, apply that day's USD/MXN rate, and upsert into
+ * portfolio_value_snapshots. Idempotent — safe to re-run for the same date.
+ *
+ * @param {string} date — YYYY-MM-DD
+ */
+async function savePortfolioSnapshots(date) {
+  // 1. Get the exchange rate for this date
+  const { data: fxRow, error: fxErr } = await supabaseAdmin
+    .from('exchange_rates')
+    .select('rate')
+    .eq('pair', 'USD/MXN')
+    .lte('date', date)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fxErr) throw new Error(`[snapshotService] FX rate lookup failed: ${fxErr.message}`);
+  if (!fxRow) {
+    console.warn(`[snapshotService] No USD/MXN rate available for ${date} — skipping portfolio snapshots.`);
+    return;
+  }
+  const fxRate = parseFloat(fxRow.rate);
+
+  // 2. Query the portfolio_daily_value view for this date (all users)
+  const { data: rows, error: viewErr } = await supabaseAdmin
+    .from('portfolio_daily_value')
+    .select('user_id, total_value')
+    .eq('date', date);
+
+  if (viewErr) throw new Error(`[snapshotService] Portfolio view query failed: ${viewErr.message}`);
+  if (!rows || rows.length === 0) {
+    console.log(`[snapshotService] No portfolio values found for ${date}.`);
+    return;
+  }
+
+  // 3. Build upsert payload
+  const snapshots = rows.map((r) => ({
+    user_id:   r.user_id,
+    date,
+    value_usd: parseFloat(r.total_value),
+    value_mxn: parseFloat(r.total_value) * fxRate,
+    fx_rate:   fxRate,
+  }));
+
+  const { error: upsertErr } = await supabaseAdmin
+    .from('portfolio_value_snapshots')
+    .upsert(snapshots, { onConflict: 'user_id,date' });
+
+  if (upsertErr) throw new Error(`[snapshotService] Portfolio snapshot upsert failed: ${upsertErr.message}`);
+
+  console.log(`[snapshotService] Saved portfolio snapshots for ${rows.length} user(s) on ${date} (rate: ${fxRate}).`);
+}
+
+module.exports = { runSnapshots, savePortfolioSnapshots };

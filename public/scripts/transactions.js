@@ -619,6 +619,19 @@ function renderFlowChart() {
   ];
 
   const datasets = flowView ? allDatasets.filter(d => d.id === flowView) : allDatasets;
+
+  // When showing all types, extend the y ceiling to 122% of the tallest stack so
+  // net labels live inside the plot area and never touch the chart legend above it.
+  let yMax;
+  if (!flowView) {
+    const stackedPeak = months.reduce((max, _, i) => {
+      const inflow  = allDatasets[0].data[i] || 0;
+      const outflow = (allDatasets[1].data[i] || 0) + (allDatasets[2].data[i] || 0);
+      return Math.max(max, inflow, outflow);
+    }, 0);
+    if (stackedPeak > 0) yMax = stackedPeak * 1.22;
+  }
+
   const ctx = document.getElementById('chart-flow').getContext('2d');
   if (chartFlow) chartFlow.destroy();
 
@@ -638,6 +651,8 @@ function renderFlowChart() {
       const outMeta = outIdx !== -1 ? chart.getDatasetMeta(outIdx) : null;
       const invMeta = invIdx !== -1 ? chart.getDatasetMeta(invIdx) : null;
       const zero    = scales.y.getPixelForValue(0);
+      // Hard floor: labels must stay within the plot area, never in the legend zone
+      const floor   = chart.chartArea.top + 4;
 
       ds[inIdx].data.forEach((inVal, i) => {
         const outVal = outIdx !== -1 ? (ds[outIdx].data[i] || 0) : 0;
@@ -661,7 +676,7 @@ function renderFlowChart() {
                     :              `${sign}${Math.round(abs)}`;
 
         const color = net >= 0 ? '#34d399' : '#f87171';
-        const lineY = highY - 10;
+        const lineY = Math.max(highY - 10, floor);
 
         c.save();
         c.beginPath();
@@ -687,14 +702,13 @@ function renderFlowChart() {
     plugins: [netPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 28 } },
       plugins: {
         legend: { position: 'top', labels: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
         tooltip: { backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1, titleColor: '#eef0ff', bodyColor: '#8892a4', titleFont: { family: "'DM Sans'", size: 13 }, bodyFont: { family: "'DM Mono'", size: 11 }, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}` } },
       },
       scales: {
         x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 } } },
-        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, border: { dash: [3,3] }, ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 10 }, callback: v => v === 0 ? '0' : fmtMXN(v) } },
+        y: { stacked: true, max: yMax, grid: { color: 'rgba(255,255,255,0.04)' }, border: { dash: [3,3] }, ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 10 }, callback: v => v === 0 ? '0' : fmtMXN(v) } },
       },
     },
   });
