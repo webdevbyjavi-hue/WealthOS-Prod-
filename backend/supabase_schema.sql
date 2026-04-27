@@ -267,10 +267,11 @@ CREATE TABLE IF NOT EXISTS crypto (
   symbol          TEXT NOT NULL,
   name            TEXT NOT NULL,
   amount          NUMERIC(24,8) NOT NULL CHECK (amount >= 0),
-  avg_cost        NUMERIC(18,4) NOT NULL CHECK (avg_cost >= 0),
-  current_price   NUMERIC(18,4) NOT NULL CHECK (current_price >= 0),
-  purchase_date   DATE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  avg_cost         NUMERIC(18,4) NOT NULL CHECK (avg_cost >= 0),
+  current_price    NUMERIC(18,4) NOT NULL CHECK (current_price >= 0),
+  purchase_date    DATE,
+  purchase_fx_rate NUMERIC(12,6),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, symbol)
 );

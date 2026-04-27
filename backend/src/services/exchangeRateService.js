@@ -173,4 +173,109 @@ async function runExchangeRateUpdate() {
   return { date: today, rate };
 }
 
-module.exports = { getOrFetchTodayRate, runExchangeRateUpdate };
+/**
+ * Fetch a daily USD/MXN close rate from Twelve Data's time_series endpoint
+ * for a window ending on `date`. Returns the most-recent close in that window
+ * (handles weekends/holidays by looking back up to 7 days).
+ *
+ * @param {string} date — YYYY-MM-DD
+ * @returns {Promise<number>}
+ */
+async function fetchHistoricalRateFromApi(date) {
+  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+  if (!apiKey) {
+    throw new Error('[exchangeRateService] ALPHA_VANTAGE_API_KEY not set.');
+  }
+
+  // Request up to 7 days ending on `date` to handle weekends/holidays
+  const endDate   = date;
+  const startDate = new Date(date);
+  startDate.setDate(startDate.getDate() - 7);
+  const startDateStr = startDate.toISOString().slice(0, 10);
+
+  const url = new URL(`${TD_BASE}/time_series`);
+  url.searchParams.set('symbol',     FX_PAIR);
+  url.searchParams.set('interval',   '1day');
+  url.searchParams.set('start_date', startDateStr);
+  url.searchParams.set('end_date',   endDate);
+  url.searchParams.set('outputsize', '10');
+  url.searchParams.set('apikey',     apiKey);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    throw new Error(`[exchangeRateService] Twelve Data HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  if (json.status === 'error') {
+    throw new Error(`[exchangeRateService] Twelve Data error: ${json.message}`);
+  }
+
+  const values = json.values;
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`[exchangeRateService] No historical data for ${date}`);
+  }
+
+  // values[0] is the most-recent day (ascending false by default)
+  const rate = parseFloat(values[0].close);
+  if (isNaN(rate) || rate <= 0) {
+    throw new Error(`[exchangeRateService] Unexpected rate value: ${values[0].close}`);
+  }
+
+  return { rate, actualDate: values[0].datetime };
+}
+
+/**
+ * Returns the USD/MXN rate for a specific date.
+ *
+ * Strategy:
+ *   1. Check Supabase for an exact match on `date`.
+ *   2. If missing, fetch from Twelve Data time_series (looks back up to 7 days
+ *      so weekends/holidays resolve to the nearest prior trading day).
+ *   3. Save the found rate under the requested `date` for future cache hits.
+ *   4. Fall back to the nearest prior cached rate if the API fails.
+ *
+ * @param {string} date — YYYY-MM-DD
+ * @returns {Promise<{ date: string, rate: number, cached: boolean }>}
+ */
+async function getRateForDate(date) {
+  const supabase = getAdminClient();
+
+  // 1. Check DB for exact date
+  const { data: row, error } = await supabase
+    .from('exchange_rates')
+    .select('date, rate')
+    .eq('pair', FX_PAIR)
+    .eq('date', date)
+    .maybeSingle();
+
+  if (error) throw new Error(`[exchangeRateService] DB read failed: ${error.message}`);
+  if (row) return { date: row.date, rate: row.rate, cached: true };
+
+  // 2. Not cached — fetch from Twelve Data
+  try {
+    const { rate, actualDate } = await fetchHistoricalRateFromApi(date);
+    // Cache under the requested date (not actualDate) so lookups always hit
+    await saveRate(date, rate);
+    return { date, rate, cached: false };
+  } catch (apiErr) {
+    console.warn(`[exchangeRateService] Historical fetch failed (${apiErr.message}), falling back to nearest cached rate.`);
+
+    // 3. Fall back to the closest prior cached rate
+    const { data: fallback, error: fbErr } = await supabase
+      .from('exchange_rates')
+      .select('date, rate')
+      .eq('pair', FX_PAIR)
+      .lte('date', date)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fbErr) throw new Error(`[exchangeRateService] DB fallback failed: ${fbErr.message}`);
+    if (fallback) return { date: fallback.date, rate: fallback.rate, cached: true };
+
+    throw new Error('[exchangeRateService] No exchange rate available for ' + date);
+  }
+}
+
+module.exports = { getOrFetchTodayRate, getRateForDate, runExchangeRateUpdate };

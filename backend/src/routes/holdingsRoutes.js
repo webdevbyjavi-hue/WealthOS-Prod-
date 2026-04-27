@@ -98,7 +98,7 @@ const bienesRules = [
   positiveNumber('valor_actual'),
 ];
 
-// ─── Crypto  { symbol, name, amount, avg_cost, current_price, purchase_date? } ─
+// ─── Crypto  { symbol, name, amount, avg_cost, current_price, purchase_date?, purchase_fx_rate? } ─
 const cryptoRules = [
   body('symbol').trim().notEmpty().withMessage('symbol is required.').toUpperCase(),
   body('name').trim().notEmpty().withMessage('name is required.'),
@@ -106,6 +106,7 @@ const cryptoRules = [
   positiveNumber('avg_cost'),
   positiveNumber('current_price'),
   body('purchase_date').optional().isISO8601().withMessage('purchase_date must be YYYY-MM-DD.'),
+  body('purchase_fx_rate').optional().isFloat({ min: 0.0001 }).toFloat().withMessage('purchase_fx_rate must be a positive number.'),
 ];
 
 // ─── withAssetLink — wrap a holdings `create` handler to auto-link to assets ──

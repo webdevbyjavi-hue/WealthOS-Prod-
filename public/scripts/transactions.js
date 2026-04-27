@@ -622,11 +622,72 @@ function renderFlowChart() {
   const ctx = document.getElementById('chart-flow').getContext('2d');
   if (chartFlow) chartFlow.destroy();
 
+  // Inline plugin: draws compact net (Cash In − Cash Out − Invested) above each column
+  const netPlugin = {
+    id: 'netFlowLabels',
+    afterDraw(chart) {
+      if (flowView !== null) return;
+      const { ctx: c, scales, data } = chart;
+      const ds     = data.datasets;
+      const inIdx  = ds.findIndex(d => d.id === 'in');
+      const outIdx = ds.findIndex(d => d.id === 'out');
+      const invIdx = ds.findIndex(d => d.id === 'invested');
+      if (inIdx === -1) return;
+
+      const inMeta  = chart.getDatasetMeta(inIdx);
+      const outMeta = outIdx !== -1 ? chart.getDatasetMeta(outIdx) : null;
+      const invMeta = invIdx !== -1 ? chart.getDatasetMeta(invIdx) : null;
+      const zero    = scales.y.getPixelForValue(0);
+
+      ds[inIdx].data.forEach((inVal, i) => {
+        const outVal = outIdx !== -1 ? (ds[outIdx].data[i] || 0) : 0;
+        const invVal = invIdx !== -1 ? (ds[invIdx].data[i] || 0) : 0;
+        if (inVal === 0 && outVal === 0 && invVal === 0) return;
+
+        const net     = inVal - (outVal + invVal);
+        const inTopY  = inVal > 0 ? inMeta.data[i].y : zero;
+        const outTopY = invMeta ? invMeta.data[i].y : (outMeta ? outMeta.data[i].y : zero);
+        const highY   = Math.min(inTopY, outTopY);
+
+        // center x between the two bar groups
+        const inX  = inMeta.data[i].x;
+        const outX = invMeta ? invMeta.data[i].x : (outMeta ? outMeta.data[i].x : inX);
+        const x    = (inX + outX) / 2;
+
+        const abs   = Math.abs(net);
+        const sign  = net >= 0 ? '+' : '−';
+        const label = abs >= 1e6 ? `${sign}${(abs / 1e6).toFixed(1)}M`
+                    : abs >= 1e3 ? `${sign}${(abs / 1e3).toFixed(1)}k`
+                    :              `${sign}${Math.round(abs)}`;
+
+        const color = net >= 0 ? '#34d399' : '#f87171';
+        const lineY = highY - 10;
+
+        c.save();
+        c.beginPath();
+        c.strokeStyle = color + '60';
+        c.lineWidth   = 1.5;
+        c.moveTo(x - 14, lineY);
+        c.lineTo(x + 14, lineY);
+        c.stroke();
+
+        c.font         = "500 9.5px 'DM Mono', monospace";
+        c.fillStyle    = color + 'cc';
+        c.textAlign    = 'center';
+        c.textBaseline = 'bottom';
+        c.fillText(label, x, lineY - 2);
+        c.restore();
+      });
+    },
+  };
+
   chartFlow = new Chart(ctx, {
     type: 'bar',
     data: { labels: months.map(m => m.label), datasets },
+    plugins: [netPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 28 } },
       plugins: {
         legend: { position: 'top', labels: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
         tooltip: { backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1, titleColor: '#eef0ff', bodyColor: '#8892a4', titleFont: { family: "'DM Sans'", size: 13 }, bodyFont: { family: "'DM Mono'", size: 11 }, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}` } },

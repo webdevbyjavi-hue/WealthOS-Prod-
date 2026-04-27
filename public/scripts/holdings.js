@@ -3013,7 +3013,8 @@ let cryptos = [];
 let cryptoLineRangeDays = 7;
 let cryptoLineChart, cryptoDonutChart, cryptoBarChart;
 let editingCryptoId = null;
-let _cryptoFxRate   = null;
+let _cryptoFxRate         = null; // today's USD/MXN rate (for table display)
+let _cryptoPurchaseFxRate = null; // rate for the selected purchase date (modal)
 let cryptoSortCol = null, cryptoSortDir = 1;
 
 function persistCrypto() { /* no-op — data goes directly to API */ }
@@ -3300,22 +3301,27 @@ async function openCryptoModal(id = null) {
   if (id) {
     const c = cryptos.find(x => x.id === id);
     if (!c) return;
+    // Restore the purchase-date rate saved with this position
+    _cryptoPurchaseFxRate = c.purchaseFxRate || _cryptoFxRate;
     document.getElementById('ci-symbol').value = c.symbol;
     document.getElementById('ci-name').value   = c.name;
     document.getElementById('ci-amount').value = c.amount;
     document.getElementById('ci-fecha').value  = c.fechaCompra || '';
-    // Show avg cost (USD) converted to MXN as the "Price" field
+    // Show avg cost (USD) converted to MXN using the purchase-date rate
+    const fxForEdit = _cryptoPurchaseFxRate || _cryptoFxRate;
     priceEl.dataset.usd = c.avgCost;
-    priceEl.value = (_cryptoFxRate && c.avgCost) ? (c.avgCost * _cryptoFxRate).toFixed(2) : (c.avgCost || '');
+    priceEl.value = (fxForEdit && c.avgCost) ? (c.avgCost * fxForEdit).toFixed(2) : (c.avgCost || '');
     const priceMxn = parseFloat(priceEl.value);
     const purchaseAmt = (!isNaN(c.amount) && !isNaN(priceMxn)) ? (c.amount * priceMxn).toFixed(2) : '';
     document.getElementById('ci-purchase-amount').value = purchaseAmt;
   } else {
+    _cryptoPurchaseFxRate = null;
     ['ci-symbol','ci-name','ci-amount','ci-purchase-amount','ci-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
     priceEl.value = '';
     delete priceEl.dataset.usd;
   }
+  _updateCryptoFxHint();
   document.getElementById('crypto-modal-overlay').classList.add('modal-overlay--visible');
 }
 
@@ -3338,8 +3344,9 @@ function onCryptoPurchaseAmountInput() {
 function onCryptoPriceInput() {
   const priceEl  = document.getElementById('ci-price');
   const priceMxn = parseFloat(priceEl.value);
-  if (!isNaN(priceMxn) && _cryptoFxRate) {
-    priceEl.dataset.usd = (priceMxn / _cryptoFxRate).toFixed(6);
+  const fx       = _cryptoPurchaseFxRate || _cryptoFxRate;
+  if (!isNaN(priceMxn) && fx) {
+    priceEl.dataset.usd = (priceMxn / fx).toFixed(6);
   } else {
     delete priceEl.dataset.usd;
   }
@@ -3381,7 +3388,8 @@ async function saveCrypto() {
   }
 
   // avgCost stored as USD per token for internal gain/return calculations
-  const avgCost     = _cryptoFxRate ? priceMxn / _cryptoFxRate : priceMxn;
+  const purchaseFxRate = _cryptoPurchaseFxRate || _cryptoFxRate;
+  const avgCost        = purchaseFxRate ? priceMxn / purchaseFxRate : priceMxn;
   // Keep existing live currentPrice in edit mode; for new entries use purchase price
   const existingC   = editingCryptoId ? cryptos.find(x => x.id === editingCryptoId) : null;
   const currentPrice = existingC ? existingC.currentPrice : avgCost;
@@ -3392,11 +3400,11 @@ async function saveCrypto() {
   if (editId) {
     const c = cryptos.find(x => x.id === editId);
     backup = { ...c };
-    if (c) Object.assign(c, { symbol, name, amount, avgCost, currentPrice, fechaCompra });
+    if (c) Object.assign(c, { symbol, name, amount, avgCost, currentPrice, fechaCompra, purchaseFxRate });
     apiAction = 'update'; targetId = editId;
   } else {
     targetId = Date.now();
-    cryptos.push({ id: targetId, symbol, name, amount, avgCost, currentPrice, fechaCompra, history: generateHistory(currentPrice * amount) });
+    cryptos.push({ id: targetId, symbol, name, amount, avgCost, currentPrice, fechaCompra, purchaseFxRate, history: generateHistory(currentPrice * amount) });
   }
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🪙', title: `${editId ? 'Updated' : 'Added'} Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} avg cost · ${name}`, amount: currentPrice * amount });
@@ -3507,6 +3515,35 @@ initHoldings();
   });
 })();
 
+// ─── Crypto modal: FX rate hint + historical rate fetch ──────────────────────
+
+function _updateCryptoFxHint() {
+  const el   = document.getElementById('ci-fx-hint');
+  if (!el) return;
+  const rate = _cryptoPurchaseFxRate || _cryptoFxRate;
+  el.textContent = rate ? `Tipo de cambio: $${rate.toFixed(4)} MXN/USD` : '';
+}
+
+async function _fetchPurchaseFxRate(date) {
+  if (!date) {
+    _cryptoPurchaseFxRate = null;
+    _updateCryptoFxHint();
+    return;
+  }
+  const el = document.getElementById('ci-fx-hint');
+  if (el) el.textContent = 'Obteniendo tipo de cambio…';
+  try {
+    const fx = await WOS_API.exchangeRate.getUsdMxnForDate(date);
+    _cryptoPurchaseFxRate = fx.rate;
+  } catch (_) {
+    _cryptoPurchaseFxRate = _cryptoFxRate;
+  }
+  _updateCryptoFxHint();
+  // Re-run price conversion if a price is already filled
+  const priceEl = document.getElementById('ci-price');
+  if (priceEl && priceEl.value) onCryptoPriceInput();
+}
+
 // ─── Crypto modal: auto-trigger lookup when both Symbol + Date are filled ─────
 let _cryptoLookupInProgress = false;
 
@@ -3526,9 +3563,10 @@ async function lookupCryptoSymbol() {
     document.getElementById('ci-symbol').value = info.symbol;
     document.getElementById('ci-name').value   = info.name;
     priceEl.dataset.usd = info.price;
-    priceEl.value = (_cryptoFxRate ? info.price * _cryptoFxRate : info.price).toFixed(2);
+    const fx = _cryptoPurchaseFxRate || _cryptoFxRate;
+    priceEl.value = (fx ? info.price * fx : info.price).toFixed(2);
     onCryptoPriceInput();
-    showToast(`${info.name} · $${(_cryptoFxRate ? info.price * _cryptoFxRate : info.price).toFixed(2)} MXN`);
+    showToast(`${info.name} · $${(fx ? info.price * fx : info.price).toFixed(2)} MXN`);
   } catch (err) {
     showToast(err.message || 'Lookup failed. Check the symbol and try again.');
   } finally {
@@ -3547,8 +3585,10 @@ async function lookupCryptoSymbol() {
     }
   });
 
-  fechaEl.addEventListener('change', () => {
-    if (!editingCryptoId && symbolEl.value.trim() && fechaEl.value) {
+  fechaEl.addEventListener('change', async () => {
+    const date = fechaEl.value;
+    await _fetchPurchaseFxRate(date);
+    if (!editingCryptoId && symbolEl.value.trim() && date) {
       lookupCryptoSymbol();
     }
   });

@@ -1,6 +1,6 @@
 'use strict';
 
-const { getOrFetchTodayRate } = require('../services/exchangeRateService');
+const { getOrFetchTodayRate, getRateForDate } = require('../services/exchangeRateService');
 
 /**
  * GET /api/exchange-rates/usd-mxn
@@ -29,4 +29,31 @@ async function getUsdMxn(req, res, next) {
   }
 }
 
-module.exports = { getUsdMxn };
+/**
+ * GET /api/exchange-rates/usd-mxn/:date
+ *
+ * Returns the USD → MXN rate for the given YYYY-MM-DD date.
+ * Falls back to the nearest prior trading day if no rate exists for that date.
+ */
+async function getUsdMxnForDate(req, res, next) {
+  try {
+    const { date } = req.params;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, message: 'date must be YYYY-MM-DD' });
+    }
+    const result = await getRateForDate(date);
+    res.json({
+      success: true,
+      data: {
+        date:   result.date,
+        pair:   'USD/MXN',
+        rate:   result.rate,
+        cached: result.cached,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getUsdMxn, getUsdMxnForDate };

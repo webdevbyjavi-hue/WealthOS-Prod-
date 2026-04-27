@@ -60,8 +60,8 @@
       fromApi: b => ({ id: b.id, nombre: b.nombre, tipo: b.tipo, ubicacion: b.ubicacion || '', precioCompra: parseFloat(b.precio_compra), fechaCompra: b.fecha_compra || null, plusvaliaAnual: parseFloat(b.plusvalia_anual) || 0, valorActual: parseFloat(b.valor_actual) || parseFloat(b.precio_compra), gastosNotariales: parseFloat(b.gastos_notariales) || 0, escrituracion: parseFloat(b.escrituracion) || 0, impuestoAdquisicion: parseFloat(b.impuesto_adquisicion) || 0, otrosGastos: parseFloat(b.otros_gastos) || 0, saldoHipoteca: parseFloat(b.saldo_hipoteca) || 0, rentaMensual: parseFloat(b.renta_mensual) || 0, history: _fakeHistory(parseFloat(b.valor_actual) || parseFloat(b.precio_compra)) }),
     },
     crypto: {
-      toApi:   c => ({ symbol: c.symbol, name: c.name, amount: c.amount, avg_cost: c.avgCost, current_price: c.currentPrice, purchase_date: c.fechaCompra || null }),
-      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price), fechaCompra: c.purchase_date || null }),
+      toApi:   c => ({ symbol: c.symbol, name: c.name, amount: c.amount, avg_cost: c.avgCost, current_price: c.currentPrice, purchase_date: c.fechaCompra || null, purchase_fx_rate: c.purchaseFxRate || null }),
+      fromApi: c => ({ id: c.id, symbol: c.symbol, name: c.name, amount: parseFloat(c.amount), avgCost: parseFloat(c.avg_cost), currentPrice: parseFloat(c.current_price), fechaCompra: c.purchase_date || null, purchaseFxRate: parseFloat(c.purchase_fx_rate) || null }),
     },
     accounts: {
       toApi:   a => ({ name: a.name, bank: a.bank, country: a.country, type: a.type, currency: a.currency || 'MXN', balance: a.balance, fx_rate: a.fxRate || 1, notes: a.notes }),
@@ -192,7 +192,8 @@
 
     // ── Exchange rates ────────────────────────────────────────────────────────
     exchangeRate: {
-      getUsdMxn: () => request('GET', '/api/exchange-rates/usd-mxn').then(r => r.data),
+      getUsdMxn:        ()     => request('GET', `/api/exchange-rates/usd-mxn`).then(r => r.data),
+      getUsdMxnForDate: (date) => request('GET', `/api/exchange-rates/usd-mxn/${date}`).then(r => r.data),
     },
 
     // Expose mappers for sync.js
