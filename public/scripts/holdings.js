@@ -3036,6 +3036,7 @@ function getCryptoSortValue(c, col) {
     case 'amount':       return c.amount;
     case 'avgCost':      return c.avgCost * fx;
     case 'currentPrice': return c.currentPrice * fx;
+    case 'value':        return c.currentPrice * c.amount * fx;
     case 'gain':         return gain;
     case 'return':       return ret;
     default:             return 0;
@@ -3044,8 +3045,9 @@ function getCryptoSortValue(c, col) {
 
 // ─── KPI Rendering ────────────────────────────────────────────────────────────
 function renderCryptoKPIs() {
-  const totalValue    = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0);
-  const totalInvested = cryptos.reduce((s, c) => s + c.avgCost * c.amount, 0);
+  const fx            = _cryptoFxRate || 1;
+  const totalValue    = cryptos.reduce((s, c) => s + c.currentPrice * c.amount * fx, 0);
+  const totalInvested = cryptos.reduce((s, c) => s + c.avgCost * c.amount * fx, 0);
   const gain          = totalValue - totalInvested;
   const gainPct       = totalInvested ? (gain / totalInvested) * 100 : 0;
   const cpts        = getCryptoPortfolioHistory(cryptoLineRangeDays);
@@ -3106,7 +3108,7 @@ function renderCryptoTable(filter = '') {
     `${cryptos.length} position${cryptos.length !== 1 ? 's' : ''}`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="table__empty">No crypto positions yet — add your first.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="table__empty">No crypto positions yet — add your first.</td></tr>`;
     return;
   }
 
@@ -3134,6 +3136,7 @@ function renderCryptoTable(filter = '') {
       <td>${amtStr}</td>
       <td>${fmt(avgCostMxn)}</td>
       <td class="td--price">${fmt(currPriceMxn)}</td>
+      <td>${fmt(currPriceMxn * c.amount)}</td>
       <td class="${up ? 'td--up' : 'td--down'}">${(up ? '+' : '') + fmt(gain)}</td>
       <td class="${up ? 'td--up' : 'td--down'}">${fmtPct(ret)}</td>
       <td>
@@ -3150,9 +3153,10 @@ function filterCryptoTable(v) { renderCryptoTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 function getCryptoPortfolioHistory(n) {
+  const fx     = _cryptoFxRate || 1;
   const series = _sliceHistory(_cryptoHistory, n);
-  if (series) return series.map(([, v]) => v);
-  const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0);
+  if (series) return series.map(([, v]) => v * fx);
+  const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
   const days  = _daysSincePurchase(cryptos, 'purchaseDate');
   const clamp = days ? Math.min(n, days) : n;
   const fake  = _genFake('crypto', total);
@@ -3199,7 +3203,7 @@ function initCryptoCharts() {
 
   // Donut — allocation by coin
   const dLabels = cryptos.map(c => c.symbol);
-  const dData   = cryptos.map(c => parseFloat((c.currentPrice * c.amount).toFixed(2)));
+  const dData   = cryptos.map(c => parseFloat((c.currentPrice * c.amount * (_cryptoFxRate || 1)).toFixed(2)));
   cryptoDonutChart = new Chart(document.getElementById('chart-crypto-donut'), {
     type: 'doughnut',
     data: {
@@ -3261,7 +3265,7 @@ function updateCryptoCharts() {
   cryptoLineChart.update();
 
   const dLabels = cryptos.map(c => c.symbol);
-  const dData   = cryptos.map(c => parseFloat((c.currentPrice * c.amount).toFixed(2)));
+  const dData   = cryptos.map(c => parseFloat((c.currentPrice * c.amount * (_cryptoFxRate || 1)).toFixed(2)));
   cryptoDonutChart.data.labels                  = dLabels;
   cryptoDonutChart.data.datasets[0].data        = dData;
   cryptoDonutChart.data.datasets[0].backgroundColor = dLabels.map(cryptoColor);
