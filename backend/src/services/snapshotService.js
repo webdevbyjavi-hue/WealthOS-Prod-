@@ -8,8 +8,9 @@
  * (batched to minimise API credits), and upserts into stocks_snapshot.
  *
  * Key design:
- *   • Reads distinct (ticker, asset_type) from the assets registry — one
- *     symbol appears once regardless of how many users hold it.
+ *   • Reads distinct symbols directly from stocks, fibras, and crypto tables —
+ *     one symbol appears once regardless of how many users hold it. This mirrors
+ *     the portfolio_daily_value VIEW and requires no intermediate assets registry.
  *   • Uses fetchBatchQuote() — one HTTP request per batch of symbols.
  *     With 8 credits/minute and batch size 8, 80 symbols = 10 HTTP requests.
  *   • All API calls go through requestQueue.js as HIGH priority so the
@@ -48,28 +49,43 @@ async function runSnapshots() {
   const runDate = _todayUTC();
   console.log(`[snapshotService] Starting snapshot run for ${runDate}`);
 
-  // ── 1. Load all (ticker, asset_type) pairs from the assets registry ──────────
-  //    supabaseAdmin bypasses RLS so we get every user's assets in one query.
-  const { data: assetRows, error: fetchErr } = await supabaseAdmin
-    .from('assets')
-    .select('ticker, asset_type')
-    .order('ticker');
+  // ── 1. Collect all held symbols directly from the three holdings tables ────────
+  //    This mirrors the portfolio_daily_value VIEW and removes any dependency on
+  //    the assets registry being populated. supabaseAdmin bypasses RLS so we
+  //    see every user's holdings in one set of queries.
+  const [stocksRes, fibrasRes, cryptoRes] = await Promise.all([
+    supabaseAdmin.from('stocks').select('ticker'),
+    supabaseAdmin.from('fibras').select('ticker'),
+    supabaseAdmin.from('crypto').select('symbol'),
+  ]);
 
-  if (fetchErr) {
-    throw new Error(`[snapshotService] Failed to load assets: ${fetchErr.message}`);
-  }
+  if (stocksRes.error) throw new Error(`[snapshotService] Failed to load stocks: ${stocksRes.error.message}`);
+  if (fibrasRes.error) throw new Error(`[snapshotService] Failed to load fibras: ${fibrasRes.error.message}`);
+  if (cryptoRes.error) throw new Error(`[snapshotService] Failed to load crypto: ${cryptoRes.error.message}`);
 
-  if (!assetRows || assetRows.length === 0) {
-    console.log('[snapshotService] No assets found. Nothing to snapshot.');
-    return { date: runDate, total: 0, succeeded: 0, failed: 0, results: [] };
-  }
-
-  // ── 2. Deduplicate: one entry per TwelveData-formatted symbol ─────────────────
+  // ── 2. Deduplicate: one TwelveData-formatted symbol per holding type ──────────
   //    Multiple users holding AAPL → one 'AAPL' entry. BTC → 'BTC/USD'.
-  const symbolMap = new Map(); // tdSymbol → (unused, just for dedup)
-  for (const row of assetRows) {
-    const tdSym = normalizeSymbol(row.ticker, row.asset_type);
-    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, row.asset_type);
+  //    Symbol format matches portfolio_daily_value VIEW:
+  //      stocks:  ticker          → 'AAPL'
+  //      fibras:  ticker + '.MX'  → 'FUNO11.MX'
+  //      crypto:  symbol + '/USD' → 'BTC/USD'
+  const symbolMap = new Map();
+  for (const row of (stocksRes.data || [])) {
+    const tdSym = normalizeSymbol(row.ticker, 'stock');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, 'stock');
+  }
+  for (const row of (fibrasRes.data || [])) {
+    const tdSym = normalizeSymbol(row.ticker, 'reit');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, 'reit');
+  }
+  for (const row of (cryptoRes.data || [])) {
+    const tdSym = normalizeSymbol(row.symbol, 'crypto');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, 'crypto');
+  }
+
+  if (symbolMap.size === 0) {
+    console.log('[snapshotService] No holdings found across stocks, fibras, or crypto. Nothing to snapshot.');
+    return { date: runDate, total: 0, succeeded: 0, failed: 0, results: [] };
   }
 
   const symbols = [...symbolMap.keys()];
