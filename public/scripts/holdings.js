@@ -63,6 +63,7 @@ function syncLineChartToFilter() {
   if (tab === 'fibras') { fibrasLineRangeDays = d; if (fibrasLineChart) updateFibrasCharts(); }
   if (tab === 'retiro') { retiroLineRangeDays = d; if (retiroLineChart) updateRetiroCharts(); }
   if (tab === 'crypto') { cryptoLineRangeDays = d; if (cryptoLineChart) updateCryptoCharts(); }
+  if (tab === 'bienes') { bienesLineRangeDays = d; if (bienesLineChart) updateBienesCharts(); }
 }
 
 // ─── Tab Switching ────────────────────────────────────────────────────────────
@@ -86,7 +87,7 @@ function switchTab(name, btn) {
   if (name === 'fibras') { fibrasLineRangeDays = d; if (!fibrasLineChart) initFibrasCharts(); else updateFibrasCharts(); }
   if (name === 'retiro') { retiroLineRangeDays = d; if (!retiroLineChart) initRetiroCharts(); else updateRetiroCharts(); }
   if (name === 'crypto') { cryptoLineRangeDays = d; if (!cryptoLineChart) initCryptoCharts(); else updateCryptoCharts(); }
-  if (name === 'bienes') { if (!bienesLineChart) initBienesCharts(); else updateBienesCharts(); }
+  if (name === 'bienes') { bienesLineRangeDays = d; if (!bienesLineChart) initBienesCharts(); else updateBienesCharts(); }
 }
 
 // ─── Add Position (topbar button) ────────────────────────────────────────────
@@ -579,9 +580,8 @@ Chart.defaults.font.family   = "'DM Sans', system-ui, sans-serif";
 Chart.defaults.font.size     = 11;
 
 function initCharts() {
-  const hasRealData = _stocksHistory && _stocksHistory.size > 0;
-  const pts   = hasRealData ? getPortfolioHistory(lineRangeDays) : [];
-  const dates = hasRealData ? getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra')) : [];
+  const pts   = getPortfolioHistory(lineRangeDays);
+  const dates = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
   const lineUp = pts.length > 0 && pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -762,9 +762,8 @@ function initCharts() {
 function updateCharts() {
   if (!lineChart) return;
 
-  const hasRealData = _stocksHistory && _stocksHistory.size > 0;
-  const pts    = hasRealData ? getPortfolioHistory(lineRangeDays) : [];
-  const dates  = hasRealData ? getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra')) : [];
+  const pts    = getPortfolioHistory(lineRangeDays);
+  const dates  = getRealDateLabels(_stocksHistory, lineRangeDays, _daysSincePurchase(stocks, 'fechaCompra'));
   const lineUp = pts.length > 0 && pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
@@ -3211,6 +3210,27 @@ function renderCryptoTable(filter = '') {
 function filterCryptoTable(v) { renderCryptoTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
+function getCryptoChartData(n) {
+  const locale = window.WOS_LOCALE || 'en-US';
+  const fmtDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+
+  if (window._portfolioMxnHistory && window._portfolioMxnHistory.length > 0) {
+    const sliced = window._portfolioMxnHistory.slice(-n);
+    return { pts: sliced.map(([, v]) => v), dates: sliced.map(([d]) => fmtDate(d)) };
+  }
+  const fx = _cryptoFxRate || 1;
+  const series = _sliceHistory(_cryptoHistory, n);
+  if (series) {
+    return { pts: series.map(([, v]) => v * fx), dates: series.map(([d]) => fmtDate(d)) };
+  }
+  const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
+  const days  = _daysSincePurchase(cryptos, 'purchaseDate');
+  const clamp = days ? Math.min(n, days) : n;
+  const fake  = _genFake('crypto', total);
+  const pts   = fake ? fake.slice(-clamp) : Array(clamp).fill(0);
+  return { pts, dates: getDateLabels(pts.length) };
+}
+
 function getCryptoPortfolioHistory(n) {
   const fx     = _cryptoFxRate || 1;
   // Prefer stored MXN history (historically accurate exchange rates)
@@ -3228,8 +3248,7 @@ function getCryptoPortfolioHistory(n) {
 }
 
 function initCryptoCharts() {
-  const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays, _daysSincePurchase(cryptos, 'purchaseDate'));
+  const { pts, dates } = getCryptoChartData(cryptoLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
@@ -3318,8 +3337,7 @@ function initCryptoCharts() {
 
 function updateCryptoCharts() {
   if (!cryptoLineChart) return;
-  const pts    = getCryptoPortfolioHistory(cryptoLineRangeDays);
-  const dates  = getRealDateLabels(_cryptoHistory, cryptoLineRangeDays, _daysSincePurchase(cryptos, 'purchaseDate'));
+  const { pts, dates } = getCryptoChartData(cryptoLineRangeDays);
   const lineUp = pts[pts.length - 1] >= pts[0];
   const lc     = lineUp ? '#f7931a' : '#f87171';
 
@@ -3527,6 +3545,7 @@ async function initHoldings() {
   fibrasLineRangeDays = filterDays;
   retiroLineRangeDays = filterDays;
   cryptoLineRangeDays = filterDays;
+  bienesLineRangeDays = filterDays;
 
   // Render empty state immediately so the page isn't blank
   renderAll();
