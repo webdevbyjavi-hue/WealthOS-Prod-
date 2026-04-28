@@ -101,6 +101,12 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.filter-custom-range--disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .filter-date-input {
@@ -114,6 +120,8 @@
   transition: border-color 0.15s;
   min-width: 120px;
 }
+
+.filter-date-input::placeholder { color: var(--text-tertiary); }
 
 .filter-date-input:focus {
   outline: none;

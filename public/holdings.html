@@ -133,7 +133,7 @@
         <button class="filter-pill filter-pill--active" id="fp-ytd" onclick="setHoldingsDateFilter('ytd')">YTD</button>
         <button class="filter-pill" id="fp-custom" onclick="setHoldingsDateFilter('custom')">Custom</button>
       </div>
-      <div class="filter-custom-range" id="h-filter-custom-range" hidden>
+      <div class="filter-custom-range filter-custom-range--disabled" id="h-filter-custom-range">
         <div class="datepicker">
           <input class="filter-date-input datepicker__input" type="text" readonly id="h-filter-date-from" placeholder="From…" autocomplete="off" onchange="applyHoldingsCustomRange()" />
           <div class="datepicker__popup" hidden></div>

@@ -369,7 +369,7 @@ function setDateFilter(period) {
   const btn = document.getElementById(`fp-${period}`);
   if (btn) btn.classList.add('filter-pill--active');
   const customRange = document.getElementById('filter-custom-range');
-  if (customRange) customRange.hidden = period !== 'custom';
+  if (customRange) customRange.classList.toggle('filter-custom-range--disabled', period !== 'custom');
   updateSummary();
   renderCashFlowChart();
 }
@@ -665,7 +665,7 @@ function renderCashFlowChart() {
       backgroundColor: 'rgba(248, 113, 113, 0.65)',
       borderColor: '#f87171',
       borderWidth: 1,
-      borderRadius: 0,
+      borderRadius: 4,
       stack: 'outflow',
     },
     {

@@ -43,7 +43,7 @@ function setHoldingsDateFilter(period) {
   const btn = document.getElementById(`fp-${period}`);
   if (btn) btn.classList.add('filter-pill--active');
   const customRange = document.getElementById('h-filter-custom-range');
-  if (customRange) customRange.hidden = period !== 'custom';
+  if (customRange) customRange.classList.toggle('filter-custom-range--disabled', period !== 'custom');
   syncLineChartToFilter();
 }
 

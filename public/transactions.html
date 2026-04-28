@@ -106,17 +106,23 @@
         <button class="filter-pill" data-period="ytd"    onclick="setPeriod('ytd')">YTD</button>
         <button class="filter-pill" data-period="custom" onclick="setPeriod('custom')">Custom Range</button>
       </div>
-      <div class="filter-custom-range" id="filter-date-range" hidden>
-        <input type="date" class="filter-date-input" id="filter-date-from" onchange="applyCustomRange()" />
+      <div class="filter-custom-range filter-custom-range--disabled" id="filter-date-range">
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-from" placeholder="From…" autocomplete="off" onchange="applyCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
         <span class="filter-date-sep">→</span>
-        <input type="date" class="filter-date-input" id="filter-date-to" onchange="applyCustomRange()" />
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-to" placeholder="To…" autocomplete="off" onchange="applyCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
       </div>
+      <div class="filters-bar__divider"></div>
       <div class="filter-pills" role="group" aria-label="Transaction type">
         <button class="filter-pill" data-flow="in"       onclick="setFlowFilter('in')">Cash In</button>
         <button class="filter-pill" data-flow="out"      onclick="setFlowFilter('out')">Cash Out</button>
         <button class="filter-pill" data-flow="invested" onclick="setFlowFilter('invested')">Invested</button>
       </div>
-      <div class="filters-bar__divider"></div>
       <input class="search-input filter-search" type="text" id="filter-search"
              placeholder="Search description or account…"
              oninput="filterTable(this.value)" />

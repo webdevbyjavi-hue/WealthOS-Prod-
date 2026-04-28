@@ -11,6 +11,7 @@
     'July','August','September','October','November','December',
   ];
   const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const _closers = [];
 
   function pad(n)       { return String(n).padStart(2, '0'); }
   function toYMD(y,m,d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
@@ -122,6 +123,7 @@
     }
 
     function open() {
+      _closers.forEach(fn => fn());
       if (selYMD) { const p = parseYMD(selYMD); vy = p.y; vm = p.m; }
       render();
       // Teleport popup to <body> so it escapes any ancestor transform/stacking
@@ -149,6 +151,8 @@
 
     // Close when clicking anywhere outside this picker
     document.addEventListener('click', () => close());
+
+    _closers.push(close);
   }
 
   document.addEventListener('DOMContentLoaded', () => {

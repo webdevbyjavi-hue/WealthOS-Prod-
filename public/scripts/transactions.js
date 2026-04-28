@@ -372,15 +372,15 @@ function setPeriod(period) {
 
   if (period === 'custom') {
     if (isActive) {
-      dateRange.hidden = true;
+      dateRange.classList.add('filter-custom-range--disabled');
       timeframeFilter  = 'all';
     } else {
       activeBtn.classList.add('filter-pill--active');
-      dateRange.hidden = false;
+      dateRange.classList.remove('filter-custom-range--disabled');
       timeframeFilter  = 'custom';
     }
   } else {
-    dateRange.hidden = true;
+    dateRange.classList.add('filter-custom-range--disabled');
     if (isActive) {
       timeframeFilter = 'all';
     } else {

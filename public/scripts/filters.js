@@ -54,7 +54,7 @@ const WOS_FILTERS = (() => {
     const btn = document.getElementById(pillPrefix + period);
     if (btn) btn.classList.add('filter-pill--active');
     const rangeEl = document.getElementById(customRangeId);
-    if (rangeEl) rangeEl.hidden = period !== 'custom';
+    if (rangeEl) rangeEl.classList.toggle('filter-custom-range--disabled', period !== 'custom');
     if (period === 'custom') {
       const fromEl = document.getElementById(dateFromId);
       const toEl   = document.getElementById(dateToId);
