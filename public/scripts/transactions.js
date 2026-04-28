@@ -17,6 +17,8 @@ let sortCol      = 'date';
 let sortDir      = -1;
 let filterText     = '';
 let filterType     = '';
+let filterDateFrom = '';
+let filterDateTo   = '';
 let catFilterType  = 'out';
 let catFilterYear  = '';
 let catFilterMonth = '';
@@ -269,6 +271,14 @@ async function deleteTxn(txnId) {
 
 /* ─── Timeframe filter ───────────────────────────────────────── */
 function txnsInTimeframe(txns) {
+  if (timeframeFilter === 'custom') {
+    return txns.filter(t => {
+      const d = t.date || '';
+      if (filterDateFrom && d < filterDateFrom) return false;
+      if (filterDateTo   && d > filterDateTo)   return false;
+      return true;
+    });
+  }
   if (timeframeFilter === 'all') return txns;
   const now = new Date();
   const yr  = now.getFullYear();
@@ -336,10 +346,58 @@ function setTimeframe(tf) {
   render();
 }
 
+/* ─── Filter Bar controls ────────────────────────────────────── */
+function setPeriod(period) {
+  const pills      = document.querySelectorAll('.filter-pill[data-period]');
+  const dateRange  = document.getElementById('filter-date-range');
+  const activeBtn  = document.querySelector(`.filter-pill[data-period="${period}"]`);
+  const isActive   = activeBtn && activeBtn.classList.contains('filter-pill--active');
+
+  pills.forEach(b => b.classList.remove('filter-pill--active'));
+
+  if (period === 'custom') {
+    if (isActive) {
+      dateRange.hidden = true;
+      timeframeFilter  = 'all';
+    } else {
+      activeBtn.classList.add('filter-pill--active');
+      dateRange.hidden = false;
+      timeframeFilter  = 'custom';
+    }
+  } else {
+    dateRange.hidden = true;
+    if (isActive) {
+      timeframeFilter = 'all';
+    } else {
+      activeBtn.classList.add('filter-pill--active');
+      timeframeFilter = period;
+    }
+  }
+
+  currentPage = 1;
+  render();
+}
+
+function setFlowFilter(type) {
+  filterType  = filterType === type ? '' : type;
+  currentPage = 1;
+  document.querySelectorAll('.filter-pill[data-flow]').forEach(btn => {
+    btn.classList.toggle('filter-pill--active', btn.dataset.flow === filterType);
+  });
+  renderTable();
+}
+
+function applyCustomRange() {
+  filterDateFrom  = document.getElementById('filter-date-from').value;
+  filterDateTo    = document.getElementById('filter-date-to').value;
+  timeframeFilter = 'custom';
+  currentPage     = 1;
+  render();
+}
+
 /* ─── Filter / Sort ──────────────────────────────────────────── */
 function filterTable(text) {
-  filterText  = text.toLowerCase();
-  filterType  = document.getElementById('filter-type').value;
+  filterText  = (text || '').toLowerCase();
   currentPage = 1;
   renderTable();
 }

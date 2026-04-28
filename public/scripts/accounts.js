@@ -12,8 +12,11 @@ let editingId     = null;
 let cashflowView  = null; // null = all, 'in', 'out', 'invested'
 let sortCol       = 'name';
 let sortDir       = 1;
-let filterText    = '';
+let filterText     = '';
 let filterCurrency = '';
+let filterPeriod   = 'ytd';
+let filterDateFrom = '';
+let filterDateTo   = '';
 
 /* ─── Chart instances ─────────────────────────────────────────── */
 let chartCurrency = null;
@@ -319,17 +322,83 @@ function render() {
   renderTable();
 }
 
+function getPeriodDateRange() {
+  const now = new Date();
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  let from = null, to = todayEnd;
+
+  if (filterPeriod === 'week') {
+    const day = now.getDay();
+    const daysToMon = day === 0 ? 6 : day - 1;
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMon);
+  } else if (filterPeriod === 'month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (filterPeriod === 'ytd') {
+    from = new Date(now.getFullYear(), 0, 1);
+  } else if (filterPeriod === 'custom') {
+    from = filterDateFrom ? new Date(filterDateFrom + 'T00:00:00') : null;
+    to   = filterDateTo   ? new Date(filterDateTo   + 'T23:59:59') : todayEnd;
+  }
+
+  return { from, to };
+}
+
+function getPeriodLabel() {
+  if (filterPeriod === 'week')  return 'This Week';
+  if (filterPeriod === 'month') return 'This Month';
+  if (filterPeriod === 'ytd')   return 'YTD';
+  if (filterPeriod === 'custom') {
+    if (filterDateFrom && filterDateTo) return `${filterDateFrom} – ${filterDateTo}`;
+    if (filterDateFrom) return `From ${filterDateFrom}`;
+    if (filterDateTo)   return `To ${filterDateTo}`;
+    return 'Range';
+  }
+  return 'YTD';
+}
+
+function setDateFilter(period) {
+  filterPeriod = period;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+  const btn = document.getElementById(`fp-${period}`);
+  if (btn) btn.classList.add('filter-pill--active');
+  const customRange = document.getElementById('filter-custom-range');
+  if (customRange) customRange.hidden = period !== 'custom';
+  updateSummary();
+}
+
+function applyCustomRange() {
+  filterDateFrom = document.getElementById('filter-date-from').value;
+  filterDateTo   = document.getElementById('filter-date-to').value;
+  updateSummary();
+}
+
 function updateSummary() {
-  const total    = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
-  const thisYear = new Date().getFullYear().toString();
-  const ytd      = (type) => transactions
-    .filter(t => t.type === type && (t.date || '').startsWith(thisYear))
+  const total = accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
+  const { from, to } = getPeriodDateRange();
+
+  const periodSum = (type) => transactions
+    .filter(t => {
+      if (t.type !== type) return false;
+      const d = t.date ? new Date(t.date + 'T00:00:00') : null;
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    })
     .reduce((s, t) => s + (t.amountMXN || 0), 0);
 
-  document.getElementById('sum-total').textContent        = fmtMXN(total);
-  document.getElementById('sum-cash-in-ytd').textContent  = fmtMXN(ytd('in'));
-  document.getElementById('sum-cash-out-ytd').textContent = fmtMXN(ytd('out'));
-  document.getElementById('sum-invested-ytd').textContent = fmtMXN(ytd('invested'));
+  document.getElementById('sum-total').textContent         = fmtMXN(total);
+  document.getElementById('sum-cash-in-ytd').textContent  = fmtMXN(periodSum('in'));
+  document.getElementById('sum-cash-out-ytd').textContent = fmtMXN(periodSum('out'));
+  document.getElementById('sum-invested-ytd').textContent = fmtMXN(periodSum('invested'));
+
+  const label = getPeriodLabel();
+  const inLbl       = document.getElementById('sum-cash-in-label');
+  const outLbl      = document.getElementById('sum-cash-out-label');
+  const investedLbl = document.getElementById('sum-invested-label');
+  if (inLbl)       inLbl.textContent       = `Total Cash In ${label}`;
+  if (outLbl)      outLbl.textContent      = `Total Cash Out ${label}`;
+  if (investedLbl) investedLbl.textContent = `Total Invested ${label}`;
 }
 
 function updateKPIs() {

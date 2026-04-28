@@ -2,12 +2,68 @@
 document.getElementById('current-date').textContent =
   new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+// ─── Filters Bar ─────────────────────────────────────────────────────────────
+let holdingsFilterPeriod   = 'ytd';
+let holdingsFilterDateFrom = '';
+let holdingsFilterDateTo   = '';
+
+const TAB_SEARCH_PLACEHOLDERS = {
+  stocks: 'Search ticker or name…',
+  bonos:  'Buscar tipo o plazo…',
+  fondos: 'Buscar fondo o clave…',
+  fibras: 'Buscar ticker o nombre…',
+  retiro: 'Buscar fondo o institución…',
+  crypto: 'Search coin or symbol…',
+  bienes: 'Buscar propiedad o ubicación…',
+};
+
+function getActiveTab() {
+  return (document.querySelector('.cat-tab--active') || {}).dataset?.tab || 'stocks';
+}
+
+function filterActiveTab(v) {
+  const tab = getActiveTab();
+  const dispatch = {
+    stocks: filterStocksTable,
+    bonos:  filterBonosTable,
+    fondos: filterFondosTable,
+    fibras: filterFibrasTable,
+    retiro: filterRetiroTable,
+    crypto: filterCryptoTable,
+    bienes: filterBienesTable,
+  };
+  const fn = dispatch[tab];
+  if (fn) fn(v || '');
+}
+
+function setHoldingsDateFilter(period) {
+  holdingsFilterPeriod = period;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+  const btn = document.getElementById(`fp-${period}`);
+  if (btn) btn.classList.add('filter-pill--active');
+  const customRange = document.getElementById('h-filter-custom-range');
+  if (customRange) customRange.hidden = period !== 'custom';
+}
+
+function applyHoldingsCustomRange() {
+  holdingsFilterDateFrom = document.getElementById('h-filter-date-from').value;
+  holdingsFilterDateTo   = document.getElementById('h-filter-date-to').value;
+}
+
 // ─── Tab Switching ────────────────────────────────────────────────────────────
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('cat-tab--active'));
   document.getElementById('tab-' + name).classList.remove('hidden');
   btn.classList.add('cat-tab--active');
+
+  const searchEl = document.getElementById('h-filter-search');
+  if (searchEl) {
+    searchEl.placeholder = TAB_SEARCH_PLACEHOLDERS[name] || 'Search…';
+    searchEl.value = '';
+    filterActiveTab('');
+  }
+
   if (name === 'stocks') updateCharts();
   if (name === 'bonos')  { if (!bonosLineChart)  initBonosCharts();  else updateBonosCharts(); }
   if (name === 'fondos') { if (!fondosLineChart) initFondosCharts(); else updateFondosCharts(); }

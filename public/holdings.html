@@ -125,6 +125,25 @@
       </button>
     </nav>
 
+    <!-- FILTERS BAR -->
+    <div class="filters-bar">
+      <div class="filter-pills" role="group" aria-label="Date range">
+        <button class="filter-pill" id="fp-week"   onclick="setHoldingsDateFilter('week')">This Week</button>
+        <button class="filter-pill" id="fp-month"  onclick="setHoldingsDateFilter('month')">This Month</button>
+        <button class="filter-pill filter-pill--active" id="fp-ytd" onclick="setHoldingsDateFilter('ytd')">YTD</button>
+        <button class="filter-pill" id="fp-custom" onclick="setHoldingsDateFilter('custom')">Custom</button>
+      </div>
+      <div class="filter-custom-range" id="h-filter-custom-range" hidden>
+        <input type="date" class="filter-date-input" id="h-filter-date-from" onchange="applyHoldingsCustomRange()" />
+        <span class="filter-date-sep">→</span>
+        <input type="date" class="filter-date-input" id="h-filter-date-to" onchange="applyHoldingsCustomRange()" />
+      </div>
+      <div class="filters-bar__divider"></div>
+      <input class="search-input filter-search" id="h-filter-search" type="text"
+             placeholder="Search ticker or name…"
+             oninput="filterActiveTab(this.value)" />
+    </div>
+
     <!-- ── TAB PANELS ────────────────────────────────────── -->
 
     <!-- STOCKS -->
@@ -204,7 +223,6 @@
             <span class="holdings-count" id="stocks-count">0 positions</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" data-i18n-placeholder="ph_search_ticker" placeholder="Search ticker or name…" oninput="filterStocksTable(this.value)" />
             <button class="btn btn--primary" onclick="openStockModal()" data-i18n="btn_add_stock">+ Add Stock/ETFs</button>
           </div>
         </div>
@@ -303,7 +321,6 @@
             <span class="holdings-count" id="bonos-count">0 posiciones</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar tipo o plazo…" oninput="filterBonosTable(this.value)" />
             <button class="btn btn--primary" onclick="openBonoModal()">+ Agregar Bono</button>
           </div>
         </div>
@@ -400,7 +417,6 @@
             <span class="holdings-count" id="fondos-count">0 posiciones</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar fondo o clave…" oninput="filterFondosTable(this.value)" />
             <button class="btn btn--primary" onclick="openFondoModal()">+ Agregar Fondo</button>
           </div>
         </div>
@@ -505,7 +521,6 @@
             <span class="holdings-count" id="fibras-count">0 posiciones</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar ticker o nombre…" oninput="filterFibrasTable(this.value)" />
             <button class="btn btn--primary" onclick="openFibraModal()">+ Agregar Fibra</button>
           </div>
         </div>
@@ -606,7 +621,6 @@
             <span class="holdings-count" id="retiro-count">0 posiciones</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar fondo o institución…" oninput="filterRetiroTable(this.value)" />
             <button class="btn btn--primary" onclick="openRetiroModal()">+ Agregar Fondo</button>
           </div>
         </div>
@@ -713,7 +727,6 @@
             <span class="holdings-count" id="crypto-count">0 positions</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" data-i18n-placeholder="ph_search_crypto" placeholder="Search coin or symbol…" oninput="filterCryptoTable(this.value)" />
             <button class="btn btn--primary" onclick="openCryptoModal()" data-i18n="btn_add_coin">+ Add Coin</button>
           </div>
         </div>
@@ -812,7 +825,6 @@
             <span class="holdings-count" id="bienes-count">0 propiedades</span>
           </div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="Buscar propiedad o ubicación…" oninput="filterBienesTable(this.value)" />
             <button class="btn btn--primary" onclick="openBienesModal()">+ Agregar Propiedad</button>
           </div>
         </div>

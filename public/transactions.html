@@ -99,6 +99,37 @@
       </div>
     </section>
 
+    <!-- FILTER BAR -->
+    <section class="filter-bar">
+      <div class="filter-bar__inner">
+        <div class="filter-group">
+          <span class="filter-group__label">Period</span>
+          <div class="filter-pills">
+            <button class="filter-pill" data-period="1m"     onclick="setPeriod('1m')">Current Month</button>
+            <button class="filter-pill" data-period="ytd"    onclick="setPeriod('ytd')">YTD</button>
+            <button class="filter-pill" data-period="custom" onclick="setPeriod('custom')">Custom Range</button>
+          </div>
+          <div class="filter-date-range" id="filter-date-range" hidden>
+            <input class="filter-date-input" type="date" id="filter-date-from" onchange="applyCustomRange()" />
+            <span class="filter-date-sep">→</span>
+            <input class="filter-date-input" type="date" id="filter-date-to" onchange="applyCustomRange()" />
+          </div>
+        </div>
+        <div class="filter-group filter-group--sep">
+          <span class="filter-group__label">Type</span>
+          <div class="filter-pills">
+            <button class="filter-pill" data-flow="in"       onclick="setFlowFilter('in')">Cash In</button>
+            <button class="filter-pill" data-flow="out"      onclick="setFlowFilter('out')">Cash Out</button>
+            <button class="filter-pill" data-flow="invested" onclick="setFlowFilter('invested')">Invested</button>
+          </div>
+        </div>
+        <div class="filter-group filter-group--sep filter-group--search">
+          <span class="filter-group__label">Search</span>
+          <input class="filter-search-input" type="text" id="filter-search" placeholder="Search description or account…" oninput="filterTable(this.value)" />
+        </div>
+      </div>
+    </section>
+
     <!-- KPI GRID -->
     <div class="accounts-kpi-grid">
       <div class="kpi-card kpi-card--primary">
@@ -181,22 +212,6 @@
         <div class="panel-title-group">
           <span class="panel__title">All Transactions</span>
           <span class="accounts-count" id="table-count">0 transactions</span>
-        </div>
-        <div class="tf-filter" id="tf-filter">
-          <button class="tf-filter__btn tf-filter__btn--active" data-tf="all"  onclick="setTimeframe('all')">All</button>
-          <button class="tf-filter__btn" data-tf="1m"  onclick="setTimeframe('1m')">1M</button>
-          <button class="tf-filter__btn" data-tf="3m"  onclick="setTimeframe('3m')">3M</button>
-          <button class="tf-filter__btn" data-tf="ytd" onclick="setTimeframe('ytd')">YTD</button>
-          <button class="tf-filter__btn" data-tf="1y"  onclick="setTimeframe('1y')">1Y</button>
-        </div>
-        <div class="table-actions">
-          <input class="search-input" type="text" id="search-input" placeholder="Search description or account…" oninput="filterTable(this.value)" />
-          <select class="search-input" id="filter-type" style="width:160px" onchange="filterTable(document.getElementById('search-input').value)">
-            <option value="">All types</option>
-            <option value="in">Cash In</option>
-            <option value="out">Cash Out</option>
-            <option value="invested">Invested</option>
-          </select>
         </div>
       </div>
       <div class="table-wrapper" id="txn-table-wrapper">

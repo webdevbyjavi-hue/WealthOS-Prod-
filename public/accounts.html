@@ -83,20 +83,40 @@
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_cash_in_ytd">Total Cash In YTD</span>
+        <span class="summary__label" id="sum-cash-in-label">Total Cash In YTD</span>
         <span class="summary__value" id="sum-cash-in-ytd">—</span>
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_cash_out_ytd">Total Cash Out YTD</span>
+        <span class="summary__label" id="sum-cash-out-label">Total Cash Out YTD</span>
         <span class="summary__value" id="sum-cash-out-ytd">—</span>
       </div>
       <div class="summary-divider"></div>
       <div class="summary-item">
-        <span class="summary__label" data-i18n="sum_invested_ytd">Total Invested YTD</span>
+        <span class="summary__label" id="sum-invested-label">Total Invested YTD</span>
         <span class="summary__value" id="sum-invested-ytd">—</span>
       </div>
     </section>
+
+    <!-- FILTERS BAR -->
+    <div class="filters-bar">
+      <div class="filter-pills" role="group" aria-label="Date range">
+        <button class="filter-pill" id="fp-week"   onclick="setDateFilter('week')">This Week</button>
+        <button class="filter-pill" id="fp-month"  onclick="setDateFilter('month')">This Month</button>
+        <button class="filter-pill filter-pill--active" id="fp-ytd" onclick="setDateFilter('ytd')">YTD</button>
+        <button class="filter-pill" id="fp-custom" onclick="setDateFilter('custom')">Custom</button>
+      </div>
+      <div class="filter-custom-range" id="filter-custom-range" hidden>
+        <input type="date" class="filter-date-input" id="filter-date-from" onchange="applyCustomRange()" />
+        <span class="filter-date-sep">→</span>
+        <input type="date" class="filter-date-input" id="filter-date-to" onchange="applyCustomRange()" />
+      </div>
+      <div class="filters-bar__divider"></div>
+      <input class="search-input filter-search" id="filter-search" type="text"
+             data-i18n-placeholder="ph_search_account"
+             placeholder="Search account or bank…"
+             oninput="filterTable(this.value)" />
+    </div>
 
     <!-- KPI GRID -->
     <div class="accounts-kpi-grid">
@@ -157,8 +177,7 @@
           <span class="accounts-count" id="table-count">0 accounts</span>
         </div>
         <div class="table-actions">
-          <input class="search-input" type="text" data-i18n-placeholder="ph_search_account" placeholder="Search account or bank…" oninput="filterTable(this.value)" />
-          <select class="search-input" id="filter-currency" style="width:170px" onchange="filterTable(document.querySelector('.search-input').value)">
+          <select class="search-input" id="filter-currency" style="width:170px" onchange="filterTable(document.getElementById('filter-search').value)">
             <option value="" data-i18n="opt_all_currencies">All currencies</option>
           </select>
         </div>
