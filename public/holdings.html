@@ -134,9 +134,15 @@
         <button class="filter-pill" id="fp-custom" onclick="setHoldingsDateFilter('custom')">Custom</button>
       </div>
       <div class="filter-custom-range" id="h-filter-custom-range" hidden>
-        <input type="date" class="filter-date-input" id="h-filter-date-from" onchange="applyHoldingsCustomRange()" />
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="h-filter-date-from" placeholder="From…" autocomplete="off" onchange="applyHoldingsCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
         <span class="filter-date-sep">→</span>
-        <input type="date" class="filter-date-input" id="h-filter-date-to" onchange="applyHoldingsCustomRange()" />
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="h-filter-date-to" placeholder="To…" autocomplete="off" onchange="applyHoldingsCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
       </div>
       <div class="filters-bar__divider"></div>
       <input class="search-input filter-search" id="h-filter-search" type="text"
@@ -1368,6 +1374,7 @@
 <script src="scripts/logger.js"></script>
 <script src="scripts/numberFormat.js"></script>
 <script src="scripts/datepicker.js"></script>
+<script src="scripts/filters.js"></script>
 <script src="scripts/holdings.js"></script>
 <script src="scripts/sync.js"></script>
 

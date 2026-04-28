@@ -111,8 +111,8 @@
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 6px 10px;
-  cursor: pointer;
   transition: border-color 0.15s;
+  min-width: 120px;
 }
 
 .filter-date-input:focus {
@@ -131,6 +131,7 @@
   height: 22px;
   background: var(--border);
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .filter-search {

@@ -107,9 +107,15 @@
         <button class="filter-pill" id="fp-custom" onclick="setDateFilter('custom')">Custom</button>
       </div>
       <div class="filter-custom-range" id="filter-custom-range" hidden>
-        <input type="date" class="filter-date-input" id="filter-date-from" onchange="applyCustomRange()" />
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-from" placeholder="From…" autocomplete="off" onchange="applyCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
         <span class="filter-date-sep">→</span>
-        <input type="date" class="filter-date-input" id="filter-date-to" onchange="applyCustomRange()" />
+        <div class="datepicker">
+          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-to" placeholder="To…" autocomplete="off" onchange="applyCustomRange()" />
+          <div class="datepicker__popup" hidden></div>
+        </div>
       </div>
       <div class="filters-bar__divider"></div>
       <input class="search-input filter-search" id="filter-search" type="text"
@@ -397,6 +403,7 @@
 <script src="scripts/mobile.js"></script>
 <script src="scripts/sync.js"></script>
 <script src="scripts/datepicker.js"></script>
+<script src="scripts/filters.js"></script>
 <script src="scripts/accounts.js"></script>
 
 </body>

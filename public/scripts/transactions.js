@@ -316,6 +316,21 @@ function getFlowMonths() {
     for (let i = 2; i >= 0; i--) pushMonth(new Date(yr, mo - i, 1));
   } else if (timeframeFilter === '1y') {
     for (let i = 11; i >= 0; i--) pushMonth(new Date(yr, mo - i, 1));
+  } else if (timeframeFilter === 'custom' && (filterDateFrom || filterDateTo)) {
+    const start = filterDateFrom
+      ? new Date(filterDateFrom + 'T00:00:00')
+      : new Date(yr, mo - 23, 1);
+    const end   = filterDateTo
+      ? new Date(filterDateTo + 'T00:00:00')
+      : new Date(yr, mo, 1);
+    let d = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+    while (months.length < 60) {
+      pushMonth(new Date(d));
+      const curKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (curKey >= endKey) break;
+      d.setMonth(d.getMonth() + 1);
+    }
   } else {
     // 'all' — span from earliest transaction, capped at 24 months back
     const dates = transactions.map(t => t.date || '').filter(Boolean).sort();
@@ -379,12 +394,19 @@ function setPeriod(period) {
 }
 
 function setFlowFilter(type) {
-  filterType  = filterType === type ? '' : type;
+  filterType = filterType === type ? '' : type;
+  flowView   = filterType || null;
   currentPage = 1;
+
   document.querySelectorAll('.filter-pill[data-flow]').forEach(btn => {
     btn.classList.toggle('filter-pill--active', btn.dataset.flow === filterType);
   });
-  renderTable();
+  ['all', 'in', 'out', 'invested'].forEach(v => {
+    const btn = document.getElementById(`cf-btn-${v}`);
+    if (btn) btn.classList.toggle('cf-filter__btn--active', v === 'all' ? flowView === null : v === flowView);
+  });
+
+  render();
 }
 
 function applyCustomRange() {
@@ -467,8 +489,9 @@ function updateSummary() {
 
 function updateKPIs() {
   const scoped    = txnsInTimeframe(transactions);
-  const sumType   = type => scoped.filter(t => t.type === type).reduce((s, t) => s + (t.amountMXN || 0), 0);
-  const countType = type => scoped.filter(t => t.type === type).length;
+  const filtered  = filterType ? scoped.filter(t => t.type === filterType) : scoped;
+  const sumType   = type => filtered.filter(t => t.type === type).reduce((s, t) => s + (t.amountMXN || 0), 0);
+  const countType = type => filtered.filter(t => t.type === type).length;
 
   const totalIn  = sumType('in');
   const totalOut = sumType('out');
@@ -605,14 +628,15 @@ function renderPagination(page, totalPages, total) {
 }
 
 /* ─── Category chart period filter ──────────────────────────── */
-function populateCatFilterYears(scopedTxns) {
+function populateCatFilterYears(scopedTxns, typeOverride) {
   const sel = document.getElementById('cat-filter-year');
   if (!sel) return;
 
-  const src   = scopedTxns || transactions;
+  const src        = scopedTxns || transactions;
+  const effectType = typeOverride || catFilterType;
   const years = [...new Set(
     src
-      .filter(t => t.type === catFilterType && t.date)
+      .filter(t => t.type === effectType && t.date)
       .map(t => t.date.slice(0, 4))
   )].sort().reverse();
 
@@ -773,10 +797,11 @@ function renderFlowChart() {
 }
 
 function renderCategoryChart() {
-  const scoped = txnsInTimeframe(transactions);
-  populateCatFilterYears(scoped);
+  const scoped       = txnsInTimeframe(transactions);
+  const effectType   = filterType || catFilterType;
+  populateCatFilterYears(scoped, effectType);
 
-  let typeTxns = scoped.filter(t => t.type === catFilterType);
+  let typeTxns = scoped.filter(t => t.type === effectType);
   if (catFilterYear) {
     typeTxns = typeTxns.filter(t => (t.date || '').startsWith(catFilterYear));
     if (catFilterMonth) {

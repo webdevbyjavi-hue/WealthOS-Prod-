@@ -99,36 +99,28 @@
       </div>
     </section>
 
-    <!-- FILTER BAR -->
-    <section class="filter-bar">
-      <div class="filter-bar__inner">
-        <div class="filter-group">
-          <span class="filter-group__label">Period</span>
-          <div class="filter-pills">
-            <button class="filter-pill" data-period="1m"     onclick="setPeriod('1m')">Current Month</button>
-            <button class="filter-pill" data-period="ytd"    onclick="setPeriod('ytd')">YTD</button>
-            <button class="filter-pill" data-period="custom" onclick="setPeriod('custom')">Custom Range</button>
-          </div>
-          <div class="filter-date-range" id="filter-date-range" hidden>
-            <input class="filter-date-input" type="date" id="filter-date-from" onchange="applyCustomRange()" />
-            <span class="filter-date-sep">→</span>
-            <input class="filter-date-input" type="date" id="filter-date-to" onchange="applyCustomRange()" />
-          </div>
-        </div>
-        <div class="filter-group filter-group--sep">
-          <span class="filter-group__label">Type</span>
-          <div class="filter-pills">
-            <button class="filter-pill" data-flow="in"       onclick="setFlowFilter('in')">Cash In</button>
-            <button class="filter-pill" data-flow="out"      onclick="setFlowFilter('out')">Cash Out</button>
-            <button class="filter-pill" data-flow="invested" onclick="setFlowFilter('invested')">Invested</button>
-          </div>
-        </div>
-        <div class="filter-group filter-group--sep filter-group--search">
-          <span class="filter-group__label">Search</span>
-          <input class="filter-search-input" type="text" id="filter-search" placeholder="Search description or account…" oninput="filterTable(this.value)" />
-        </div>
+    <!-- FILTERS BAR -->
+    <div class="filters-bar">
+      <div class="filter-pills" role="group" aria-label="Date range">
+        <button class="filter-pill" data-period="1m"     onclick="setPeriod('1m')">Current Month</button>
+        <button class="filter-pill" data-period="ytd"    onclick="setPeriod('ytd')">YTD</button>
+        <button class="filter-pill" data-period="custom" onclick="setPeriod('custom')">Custom Range</button>
       </div>
-    </section>
+      <div class="filter-custom-range" id="filter-date-range" hidden>
+        <input type="date" class="filter-date-input" id="filter-date-from" onchange="applyCustomRange()" />
+        <span class="filter-date-sep">→</span>
+        <input type="date" class="filter-date-input" id="filter-date-to" onchange="applyCustomRange()" />
+      </div>
+      <div class="filter-pills" role="group" aria-label="Transaction type">
+        <button class="filter-pill" data-flow="in"       onclick="setFlowFilter('in')">Cash In</button>
+        <button class="filter-pill" data-flow="out"      onclick="setFlowFilter('out')">Cash Out</button>
+        <button class="filter-pill" data-flow="invested" onclick="setFlowFilter('invested')">Invested</button>
+      </div>
+      <div class="filters-bar__divider"></div>
+      <input class="search-input filter-search" type="text" id="filter-search"
+             placeholder="Search description or account…"
+             oninput="filterTable(this.value)" />
+    </div>
 
     <!-- KPI GRID -->
     <div class="accounts-kpi-grid">

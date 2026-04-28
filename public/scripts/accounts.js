@@ -60,6 +60,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     accounts = [];
     transactions = [];
   }
+
+  const saved = WOS_FILTERS.restoreUI('fp-', 'filter-custom-range', 'filter-date-from', 'filter-date-to');
+  filterPeriod   = saved.period;
+  filterDateFrom = saved.dateFrom;
+  filterDateTo   = saved.dateTo;
+
   render();
 });
 
@@ -358,18 +364,22 @@ function getPeriodLabel() {
 
 function setDateFilter(period) {
   filterPeriod = period;
+  WOS_FILTERS.save(period, filterDateFrom, filterDateTo);
   document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
   const btn = document.getElementById(`fp-${period}`);
   if (btn) btn.classList.add('filter-pill--active');
   const customRange = document.getElementById('filter-custom-range');
   if (customRange) customRange.hidden = period !== 'custom';
   updateSummary();
+  renderCashFlowChart();
 }
 
 function applyCustomRange() {
   filterDateFrom = document.getElementById('filter-date-from').value;
   filterDateTo   = document.getElementById('filter-date-to').value;
+  WOS_FILTERS.save('custom', filterDateFrom, filterDateTo);
   updateSummary();
+  renderCashFlowChart();
 }
 
 function updateSummary() {
@@ -569,24 +579,73 @@ function renderCurrencyChart() {
 }
 
 function renderCashFlowChart() {
-  // Build last 6 months
-  const months = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-      key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    });
+  const { period, from, to } = WOS_FILTERS.getDateRange();
+  const now    = new Date();
+  const buckets = [];
+
+  if (period === 'week') {
+    const day      = now.getDay();
+    const daysToMon = day === 0 ? 6 : day - 1;
+    for (let i = daysToMon; i >= 0; i--) {
+      const d  = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      buckets.push({ label: d.toLocaleDateString('en-US', { weekday: 'short' }), key: `${d.getFullYear()}-${mo}-${da}` });
+    }
+  } else if (period === 'month') {
+    for (let i = 1; i <= now.getDate(); i++) {
+      const d  = new Date(now.getFullYear(), now.getMonth(), i);
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(i).padStart(2, '0');
+      buckets.push({ label: String(i), key: `${d.getFullYear()}-${mo}-${da}` });
+    }
+  } else if (period === 'ytd') {
+    for (let m = 0; m <= now.getMonth(); m++) {
+      const d = new Date(now.getFullYear(), m, 1);
+      buckets.push({
+        label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+        key:   `${d.getFullYear()}-${String(m + 1).padStart(2, '0')}`,
+      });
+    }
+  } else {
+    if (!from) {
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        buckets.push({
+          label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+          key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        });
+      }
+    } else {
+      const diffDays = Math.ceil((to - from) / 86400000);
+      if (diffDays <= 31) {
+        for (let cur = new Date(from); cur <= to; cur = new Date(cur.getTime() + 86400000)) {
+          const mo = String(cur.getMonth() + 1).padStart(2, '0');
+          const da = String(cur.getDate()).padStart(2, '0');
+          buckets.push({ label: cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), key: `${cur.getFullYear()}-${mo}-${da}` });
+        }
+      } else {
+        let cur = new Date(from.getFullYear(), from.getMonth(), 1);
+        const toMo = new Date(to.getFullYear(), to.getMonth(), 1);
+        while (cur <= toMo) {
+          buckets.push({
+            label: cur.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
+            key:   `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`,
+          });
+          cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+        }
+      }
+    }
   }
 
-  const sumType = (type, m) => transactions
-    .filter(t => t.type === type && t.date.startsWith(m.key))
+  const isDay = period === 'week' || period === 'month' || (period === 'custom' && from && Math.ceil((to - from) / 86400000) <= 31);
+  const sumType = (type, b) => transactions
+    .filter(t => t.type === type && t.date && (isDay ? t.date === b.key : t.date.startsWith(b.key)))
     .reduce((s, t) => s + (t.amountMXN || 0), 0);
 
-  const inData       = months.map(m => sumType('in', m));
-  const outData      = months.map(m => sumType('out', m));
-  const investedData = months.map(m => sumType('invested', m));
+  const inData       = buckets.map(b => sumType('in', b));
+  const outData      = buckets.map(b => sumType('out', b));
+  const investedData = buckets.map(b => sumType('invested', b));
 
   const allDatasets = [
     {
@@ -631,7 +690,7 @@ function renderCashFlowChart() {
   chartCashflow = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: months.map(m => m.label),
+      labels: buckets.map(b => b.label),
       datasets
     },
     options: {

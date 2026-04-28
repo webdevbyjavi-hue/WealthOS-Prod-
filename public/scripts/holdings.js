@@ -38,16 +38,31 @@ function filterActiveTab(v) {
 
 function setHoldingsDateFilter(period) {
   holdingsFilterPeriod = period;
+  WOS_FILTERS.save(period, holdingsFilterDateFrom, holdingsFilterDateTo);
   document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
   const btn = document.getElementById(`fp-${period}`);
   if (btn) btn.classList.add('filter-pill--active');
   const customRange = document.getElementById('h-filter-custom-range');
   if (customRange) customRange.hidden = period !== 'custom';
+  syncLineChartToFilter();
 }
 
 function applyHoldingsCustomRange() {
   holdingsFilterDateFrom = document.getElementById('h-filter-date-from').value;
   holdingsFilterDateTo   = document.getElementById('h-filter-date-to').value;
+  WOS_FILTERS.save('custom', holdingsFilterDateFrom, holdingsFilterDateTo);
+  syncLineChartToFilter();
+}
+
+function syncLineChartToFilter() {
+  const d   = WOS_FILTERS.getDays();
+  const tab = getActiveTab();
+  if (tab === 'stocks') { lineRangeDays       = d; if (lineChart)       updateCharts(); }
+  if (tab === 'bonos')  { bonosLineRangeDays  = d; if (bonosLineChart)  updateBonosCharts(); }
+  if (tab === 'fondos') { fondosLineRangeDays = d; if (fondosLineChart) updateFondosCharts(); }
+  if (tab === 'fibras') { fibrasLineRangeDays = d; if (fibrasLineChart) updateFibrasCharts(); }
+  if (tab === 'retiro') { retiroLineRangeDays = d; if (retiroLineChart) updateRetiroCharts(); }
+  if (tab === 'crypto') { cryptoLineRangeDays = d; if (cryptoLineChart) updateCryptoCharts(); }
 }
 
 // ─── Tab Switching ────────────────────────────────────────────────────────────
@@ -64,12 +79,13 @@ function switchTab(name, btn) {
     filterActiveTab('');
   }
 
-  if (name === 'stocks') updateCharts();
-  if (name === 'bonos')  { if (!bonosLineChart)  initBonosCharts();  else updateBonosCharts(); }
-  if (name === 'fondos') { if (!fondosLineChart) initFondosCharts(); else updateFondosCharts(); }
-  if (name === 'fibras') { if (!fibrasLineChart) initFibrasCharts(); else updateFibrasCharts(); }
-  if (name === 'retiro') { if (!retiroLineChart) initRetiroCharts(); else updateRetiroCharts(); }
-  if (name === 'crypto') { if (!cryptoLineChart) initCryptoCharts(); else updateCryptoCharts(); }
+  const d = WOS_FILTERS.getDays();
+  if (name === 'stocks') { lineRangeDays       = d; updateCharts(); }
+  if (name === 'bonos')  { bonosLineRangeDays  = d; if (!bonosLineChart)  initBonosCharts();  else updateBonosCharts(); }
+  if (name === 'fondos') { fondosLineRangeDays = d; if (!fondosLineChart) initFondosCharts(); else updateFondosCharts(); }
+  if (name === 'fibras') { fibrasLineRangeDays = d; if (!fibrasLineChart) initFibrasCharts(); else updateFibrasCharts(); }
+  if (name === 'retiro') { retiroLineRangeDays = d; if (!retiroLineChart) initRetiroCharts(); else updateRetiroCharts(); }
+  if (name === 'crypto') { cryptoLineRangeDays = d; if (!cryptoLineChart) initCryptoCharts(); else updateCryptoCharts(); }
   if (name === 'bienes') { if (!bienesLineChart) initBienesCharts(); else updateBienesCharts(); }
 }
 
@@ -3499,6 +3515,19 @@ function renderAllCrypto() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function initHoldings() {
+  // Restore shared filter state and sync line chart range variables
+  const saved = WOS_FILTERS.restoreUI('fp-', 'h-filter-custom-range', 'h-filter-date-from', 'h-filter-date-to');
+  holdingsFilterPeriod   = saved.period;
+  holdingsFilterDateFrom = saved.dateFrom;
+  holdingsFilterDateTo   = saved.dateTo;
+  const filterDays = WOS_FILTERS.getDays();
+  lineRangeDays       = filterDays;
+  bonosLineRangeDays  = filterDays;
+  fondosLineRangeDays = filterDays;
+  fibrasLineRangeDays = filterDays;
+  retiroLineRangeDays = filterDays;
+  cryptoLineRangeDays = filterDays;
+
   // Render empty state immediately so the page isn't blank
   renderAll();
   renderAllBonos();
