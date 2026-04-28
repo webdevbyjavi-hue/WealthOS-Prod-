@@ -157,12 +157,6 @@
       <div class="panel">
         <div class="panel__header">
           <span class="panel__title">Monthly Flow</span>
-          <div class="cf-filter">
-            <button class="cf-filter__btn cf-filter__btn--active" id="cf-btn-all" onclick="setFlowView(null)">All</button>
-            <button class="cf-filter__btn" id="cf-btn-in" onclick="setFlowView('in')">Cash In</button>
-            <button class="cf-filter__btn" id="cf-btn-out" onclick="setFlowView('out')">Cash Out</button>
-            <button class="cf-filter__btn" id="cf-btn-invested" onclick="setFlowView('invested')">Invested</button>
-          </div>
         </div>
         <div class="accounts-canvas-wrap">
           <canvas id="chart-flow"></canvas>
@@ -171,31 +165,6 @@
       <div class="panel">
         <div class="panel__header">
           <span class="panel__title">Expenses by Category</span>
-          <div class="cat-period-filter">
-            <select class="cat-filter-select" id="cat-filter-type" onchange="updateCatFilter()">
-              <option value="in">Cash In</option>
-              <option value="out" selected>Cash Out</option>
-              <option value="invested">Invested</option>
-            </select>
-            <select class="cat-filter-select" id="cat-filter-year" onchange="updateCatFilter()">
-              <option value="">All Time</option>
-            </select>
-            <select class="cat-filter-select" id="cat-filter-month" onchange="updateCatFilter()" disabled>
-              <option value="">All Months</option>
-              <option value="01">Jan</option>
-              <option value="02">Feb</option>
-              <option value="03">Mar</option>
-              <option value="04">Apr</option>
-              <option value="05">May</option>
-              <option value="06">Jun</option>
-              <option value="07">Jul</option>
-              <option value="08">Aug</option>
-              <option value="09">Sep</option>
-              <option value="10">Oct</option>
-              <option value="11">Nov</option>
-              <option value="12">Dec</option>
-            </select>
-          </div>
           <span class="panel__badge">MXN equiv.</span>
         </div>
         <div class="accounts-canvas-wrap">
