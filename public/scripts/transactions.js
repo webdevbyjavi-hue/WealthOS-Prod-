@@ -23,7 +23,7 @@ let catFilterType  = 'out';
 let catFilterYear  = '';
 let catFilterMonth = '';
 let currentPage    = 1;
-const PAGE_SIZE    = 20;
+const PAGE_SIZE    = 10;
 
 /* ─── Chart instances ─────────────────────────────────────────── */
 let chartFlow     = null;
@@ -785,7 +785,7 @@ function renderFlowChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top', labels: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
+        legend: { position: 'bottom', labels: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
         tooltip: { backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1, titleColor: '#eef0ff', bodyColor: '#8892a4', titleFont: { family: "'DM Sans'", size: 13 }, bodyFont: { family: "'DM Mono'", size: 11 }, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}` } },
       },
       scales: {

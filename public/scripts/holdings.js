@@ -2169,11 +2169,11 @@ function retiroColor(tipo) { return RETIRO_TIPO_COLORS[tipo] || '#8b5cf6'; }
 
 // ─── Sample data ──────────────────────────────────────────────────────────────
 const SAMPLE_RETIRO = [
-  { id:1, tipo:'Afore',            nombre:'Afore Profuturo Siefore Básica',   institucion:'Profuturo',  subcuenta:'Retiro',           saldo:320000, aportacionYTD:48000, aportacionPatronal:24000, rendimiento:8.2,  proyeccion:4200000, fechaCompra:'2018-01-15' },
-  { id:2, tipo:'PPR',              nombre:'PPR GBM Crecimiento',              institucion:'GBM',        subcuenta:'Voluntario',        saldo:185000, aportacionYTD:60000, aportacionPatronal:0,     rendimiento:9.5,  proyeccion:2800000, fechaCompra:'2021-03-10' },
-  { id:3, tipo:'PPR',              nombre:'PPR BBVA Patrimonial',             institucion:'BBVA',       subcuenta:'Voluntario',        saldo:95000,  aportacionYTD:36000, aportacionPatronal:0,     rendimiento:10.1, proyeccion:1500000, fechaCompra:'2022-07-01' },
-  { id:4, tipo:'Plan Empresarial', nombre:'Plan de Pensiones Empresarial',    institucion:'Banamex',    subcuenta:'Empresarial',       saldo:210000, aportacionYTD:72000, aportacionPatronal:72000, rendimiento:7.8,  proyeccion:3100000, fechaCompra:'2019-09-20' },
-  { id:5, tipo:'Afore',            nombre:'Afore Profuturo Cesantía',         institucion:'Profuturo',  subcuenta:'Cesantía y Vejez',  saldo:145000, aportacionYTD:22000, aportacionPatronal:11000, rendimiento:8.0,  proyeccion:1900000, fechaCompra:'2018-01-15' },
+  { id:1, tipo:'Afore',            nombre:'Afore Profuturo Siefore Básica',   institucion:'Profuturo',  subcuenta:'Retiro',          saldo:320000, aportacionYTD:4000, rendimiento:8.2,  proyeccion:4200000, fechaRetiro:'2045-01-01', fechaCompra:'2018-01-15' },
+  { id:2, tipo:'PPR',              nombre:'PPR GBM Crecimiento',              institucion:'GBM',        subcuenta:'Voluntario',       saldo:185000, aportacionYTD:5000, rendimiento:9.5,  proyeccion:2800000, fechaRetiro:'2045-01-01', fechaCompra:'2021-03-10' },
+  { id:3, tipo:'PPR',              nombre:'PPR BBVA Patrimonial',             institucion:'BBVA',       subcuenta:'Voluntario',       saldo:95000,  aportacionYTD:3000, rendimiento:10.1, proyeccion:1500000, fechaRetiro:'2045-01-01', fechaCompra:'2022-07-01' },
+  { id:4, tipo:'Plan Empresarial', nombre:'Plan de Pensiones Empresarial',    institucion:'Banamex',    subcuenta:'Empresarial',      saldo:210000, aportacionYTD:6000, rendimiento:7.8,  proyeccion:3100000, fechaRetiro:'2045-01-01', fechaCompra:'2019-09-20' },
+  { id:5, tipo:'Afore',            nombre:'Afore Profuturo Cesantía',         institucion:'Profuturo',  subcuenta:'Cesantía y Vejez', saldo:145000, aportacionYTD:2000, rendimiento:8.0,  proyeccion:1900000, fechaRetiro:'2045-01-01', fechaCompra:'2018-01-15' },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -2199,7 +2199,6 @@ function getRetiroSortValue(r, col) {
     case 'subcuenta':          return r.subcuenta;
     case 'saldo':              return r.saldo;
     case 'aportacionYTD':      return r.aportacionYTD;
-    case 'aportacionPatronal': return r.aportacionPatronal;
     case 'rendimiento':        return r.rendimiento;
     case 'proyeccion':         return r.proyeccion;
     default:                   return 0;
@@ -2268,7 +2267,7 @@ function renderRetiroTable(filter = '') {
     `${retiro.length} posición${retiro.length !== 1 ? 'es' : ''}`;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="table__empty">Sin posiciones de retiro aún.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="table__empty">Sin posiciones de retiro aún.</td></tr>`;
     return;
   }
 
@@ -2284,7 +2283,6 @@ function renderRetiroTable(filter = '') {
       <td>${r.subcuenta}</td>
       <td>${fmt(r.saldo)}</td>
       <td>${fmt(r.aportacionYTD || 0)}</td>
-      <td>${fmt(r.aportacionPatronal || 0)}</td>
       <td>${r.rendimiento.toFixed(2)}%</td>
       <td>${fmt(r.proyeccion || 0)}</td>
       <td>
@@ -2300,46 +2298,113 @@ function renderRetiroTable(filter = '') {
 function filterRetiroTable(v) { renderRetiroTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
-function getRetiroPortfolioHistory(n) {
-  const total = retiro.reduce((s, r) => s + r.saldo, 0);
-  const fake  = _genFake('retiro', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+function buildRetiroLineData() {
+  if (!retiro.length) return null;
+  const today = new Date(); today.setDate(1);
+  const todayYM = today.getFullYear() * 12 + today.getMonth();
+
+  const starts = retiro.filter(r => r.fechaCompra).map(r => { const d = new Date(r.fechaCompra + 'T00:00:00'); d.setDate(1); return d; });
+  const ends   = retiro.filter(r => r.fechaRetiro).map(r => { const d = new Date(r.fechaRetiro  + 'T00:00:00'); d.setDate(1); return d; });
+  if (!starts.length) return null;
+
+  const minStart = new Date(Math.min(...starts.map(d => d.getTime())));
+  const maxEnd   = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : today;
+
+  const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const labels = [], pastPts = [], futurePts = [];
+  const cur = new Date(minStart);
+
+  while (cur <= maxEnd) {
+    const dYM  = cur.getFullYear() * 12 + cur.getMonth();
+    const mft  = dYM - todayYM; // months from today (negative = past)
+    labels.push(`${MONTHS_ES[cur.getMonth()]} ${cur.getFullYear()}`);
+
+    let val = 0;
+    for (const r of retiro) {
+      if (!r.fechaCompra) continue;
+      const startD = new Date(r.fechaCompra + 'T00:00:00'); startD.setDate(1);
+      if (dYM < startD.getFullYear() * 12 + startD.getMonth()) continue;
+      const mr  = (r.rendimiento || 0) / 100 / 12;
+      const pmt = r.aportacionYTD || 0;
+      if (mft <= 0) {
+        val += r.saldo * Math.pow(1 + mr, mft); // back-project from current saldo
+      } else {
+        val += mr === 0
+          ? r.saldo + pmt * mft
+          : r.saldo * Math.pow(1 + mr, mft) + pmt * (Math.pow(1 + mr, mft) - 1) / mr;
+      }
+    }
+    val = Math.max(0, parseFloat(val.toFixed(2)));
+
+    if (mft <= 0) {
+      pastPts.push(val);
+      futurePts.push(mft === 0 ? val : null); // bridge point at today
+    } else {
+      pastPts.push(null);
+      futurePts.push(val);
+    }
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
+  return { labels, pastPts, futurePts, hasProjection: ends.length > 0 };
+}
+
+function _retiroYTick(v) {
+  if (v >= 1e6)  return '$' + (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1000) return '$' + (v / 1000).toFixed(0) + 'k';
+  return '$' + v.toFixed(0);
 }
 
 function initRetiroCharts() {
-  const pts    = getRetiroPortfolioHistory(retiroLineRangeDays);
-  const dates  = getDateLabels(retiroLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
-  const lc     = lineUp ? '#6366f1' : '#f87171';
+  const ld = buildRetiroLineData() || { labels: [], pastPts: [], futurePts: [], hasProjection: false };
 
-  // Line chart
   retiroLineChart = new Chart(document.getElementById('chart-retiro-line'), {
     type: 'line',
     data: {
-      labels: dates,
-      datasets: [{
-        data: pts, borderColor: lc, borderWidth: 2, fill: true,
-        backgroundColor(ctx) {
-          const { chart } = ctx; const { ctx: c, chartArea } = chart;
-          if (!chartArea) return 'transparent';
-          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          g.addColorStop(0, lineUp ? 'rgba(99,102,241,0.22)' : 'rgba(248,113,113,0.22)');
-          g.addColorStop(1, 'rgba(0,0,0,0)'); return g;
+      labels: ld.labels,
+      datasets: [
+        {
+          label: 'Saldo histórico',
+          data: ld.pastPts, spanGaps: false,
+          borderColor: '#6366f1', borderWidth: 2, fill: true,
+          backgroundColor(ctx) {
+            const { chart } = ctx; const { ctx: c, chartArea } = chart;
+            if (!chartArea) return 'transparent';
+            const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            g.addColorStop(0, 'rgba(99,102,241,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)'); return g;
+          },
+          tension: 0.35, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#6366f1', pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
         },
-        tension: 0.45, pointRadius: 0, pointHoverRadius: 5,
-        pointHoverBackgroundColor: lc, pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
-      }]
+        {
+          label: 'Proyección',
+          data: ld.futurePts, spanGaps: false,
+          borderColor: 'rgba(99,102,241,0.5)', borderWidth: 2, borderDash: [6, 4],
+          fill: false, tension: 0.35, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#6366f1', pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
+        }
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor:'#111525', borderColor:'#1e2640', borderWidth:1, titleColor:'#8892a4', bodyColor:'#eef0ff', padding:10, callbacks:{ label: ctx => '  ' + fmt(ctx.raw) } }
+        tooltip: {
+          backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1,
+          titleColor: '#8892a4', bodyColor: '#eef0ff', padding: 10,
+          callbacks: {
+            label(ctx) {
+              if (ctx.raw === null) return null;
+              const prefix = ctx.datasetIndex === 1 ? '  Proyección: ' : '  Saldo: ';
+              return prefix + fmt(ctx.raw);
+            }
+          }
+        }
       },
       scales: {
-        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:7, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
-        y: { position:'right', grid:{ color:'#1a2138', tickLength:0 }, ticks:{ color:'#3d4a63', padding:8, callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, border:{ color:'transparent' } }
+        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:10, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
+        y: { position:'right', grid:{ color:'#1a2138', tickLength:0 }, ticks:{ color:'#3d4a63', padding:8, callback: _retiroYTick }, border:{ color:'transparent' } }
       }
     }
   });
@@ -2392,14 +2457,10 @@ function initRetiroCharts() {
 
 function updateRetiroCharts() {
   if (!retiroLineChart) return;
-  const pts    = getRetiroPortfolioHistory(retiroLineRangeDays);
-  const dates  = getDateLabels(retiroLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
-  const lc     = lineUp ? '#6366f1' : '#f87171';
-
-  retiroLineChart.data.labels = dates;
-  retiroLineChart.data.datasets[0].data = pts;
-  retiroLineChart.data.datasets[0].borderColor = lc;
+  const ld = buildRetiroLineData() || { labels: [], pastPts: [], futurePts: [] };
+  retiroLineChart.data.labels                   = ld.labels;
+  retiroLineChart.data.datasets[0].data         = ld.pastPts;
+  retiroLineChart.data.datasets[1].data         = ld.futurePts;
   retiroLineChart.update();
 
   const grouped = {};
@@ -2417,13 +2478,6 @@ function updateRetiroCharts() {
   retiroBarChart.update();
 }
 
-function setRetiroLineRange(days, btn) {
-  retiroLineRangeDays = days;
-  document.querySelectorAll('#retiro-line-range .tab').forEach(t => t.classList.remove('tab--active'));
-  btn.classList.add('tab--active');
-  updateRetiroCharts();
-}
-
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openRetiroModal(id = null) {
   editingRetiroId = id;
@@ -2437,12 +2491,11 @@ function openRetiroModal(id = null) {
     document.getElementById('ri-subcuenta').value      = r.subcuenta;
     document.getElementById('ri-saldo').value          = r.saldo;
     document.getElementById('ri-aportacion-ytd').value = r.aportacionYTD || 0;
-    document.getElementById('ri-patronal').value       = r.aportacionPatronal || 0;
     document.getElementById('ri-rendimiento').value    = r.rendimiento;
-    document.getElementById('ri-proyeccion').value     = r.proyeccion || 0;
+    document.getElementById('ri-fecha-retiro').value   = r.fechaRetiro || '';
     document.getElementById('ri-fecha').value          = r.fechaCompra || '';
   } else {
-    ['ri-nombre','ri-institucion','ri-saldo','ri-aportacion-ytd','ri-patronal','ri-rendimiento','ri-proyeccion','ri-fecha']
+    ['ri-nombre','ri-institucion','ri-saldo','ri-aportacion-ytd','ri-rendimiento','ri-fecha-retiro','ri-fecha']
       .forEach(fid => { document.getElementById(fid).value = ''; });
     document.getElementById('ri-tipo').value      = 'PPR';
     document.getElementById('ri-subcuenta').value = 'Voluntario';
@@ -2463,11 +2516,21 @@ async function saveRetiro() {
   const institucion        = document.getElementById('ri-institucion').value.trim();
   const subcuenta          = document.getElementById('ri-subcuenta').value;
   const saldo              = parseFloat(document.getElementById('ri-saldo').value);
-  const aportacionYTD      = parseFloat(document.getElementById('ri-aportacion-ytd').value) || 0;
-  const aportacionPatronal = parseFloat(document.getElementById('ri-patronal').value) || 0;
-  const rendimiento        = parseFloat(document.getElementById('ri-rendimiento').value);
-  const proyeccion         = parseFloat(document.getElementById('ri-proyeccion').value) || 0;
-  const fechaCompra        = document.getElementById('ri-fecha').value || null;
+  const aportacionYTD = parseFloat(document.getElementById('ri-aportacion-ytd').value) || 0;
+  const rendimiento   = parseFloat(document.getElementById('ri-rendimiento').value);
+  const fechaRetiro   = document.getElementById('ri-fecha-retiro').value || null;
+  const fechaCompra   = document.getElementById('ri-fecha').value || null;
+
+  const proyeccion = (() => {
+    if (!fechaRetiro) return 0;
+    const today  = new Date();
+    const retEnd = new Date(fechaRetiro);
+    const n      = Math.max(0, (retEnd.getFullYear() - today.getFullYear()) * 12 + (retEnd.getMonth() - today.getMonth()));
+    if (n === 0) return saldo;
+    const r = rendimiento / 100 / 12;
+    if (r === 0) return saldo + aportacionYTD * n;
+    return saldo * Math.pow(1 + r, n) + aportacionYTD * (Math.pow(1 + r, n) - 1) / r;
+  })();
 
   if (!nombre || !institucion || isNaN(saldo) || isNaN(rendimiento)) {
     alert('Por favor completa todos los campos obligatorios.');
@@ -2480,11 +2543,11 @@ async function saveRetiro() {
   if (editId) {
     const r = retiro.find(x => x.id === editId);
     backup = { ...r };
-    if (r) Object.assign(r, { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra });
+    if (r) Object.assign(r, { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, rendimiento, proyeccion, fechaRetiro, fechaCompra });
     apiAction = 'update'; targetId = editId;
   } else {
     targetId = Date.now();
-    retiro.push({ id: targetId, tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion, fechaCompra, history: generateHistory(saldo) });
+    retiro.push({ id: targetId, tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, rendimiento, proyeccion, fechaRetiro, fechaCompra, history: generateHistory(saldo) });
   }
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏦', title: `${editId ? 'Updated' : 'Added'} Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });

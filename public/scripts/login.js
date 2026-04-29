@@ -25,6 +25,9 @@
       document.getElementById('auth-firstname').required          = isSignup;
       document.getElementById('auth-lastname').required           = isSignup;
 
+      // Date of birth field
+      document.getElementById('field-dob').style.display          = isSignup ? 'block' : 'none';
+
       // Confirm password field
       document.getElementById('field-confirm').style.display      = isSignup ? 'block' : 'none';
       document.getElementById('auth-confirm').required            = isSignup;
@@ -33,6 +36,7 @@
       document.getElementById('auth-confirm').value  = '';
       document.getElementById('auth-firstname').value = '';
       document.getElementById('auth-lastname').value  = '';
+      document.getElementById('auth-dob').value       = '';
       document.getElementById('auth-confirm').classList.remove('auth-input--error');
       hideBanner();
     }
@@ -107,7 +111,8 @@
         } else {
           const firstName = document.getElementById('auth-firstname').value.trim();
           const lastName  = document.getElementById('auth-lastname').value.trim();
-          await WOS_API.auth.signup(email, password, firstName, lastName);
+          const dob       = document.getElementById('auth-dob').value || null;
+          await WOS_API.auth.signup(email, password, firstName, lastName, dob);
           // Show the confirmation screen
           document.getElementById('confirm-email').textContent       = email;
           document.getElementById('auth-form').style.display         = 'none';

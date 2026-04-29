@@ -48,6 +48,15 @@
           </div>
         </div>
 
+        <!-- Date of birth — only shown on Sign Up tab -->
+        <div class="auth-field" id="field-dob" style="display:none">
+          <label class="auth-label">Fecha de Nacimiento</label>
+          <div class="datepicker">
+            <input class="auth-input datepicker__input" id="auth-dob" type="text" readonly placeholder="Selecciona fecha…" autocomplete="bday" />
+            <div class="datepicker__popup" hidden></div>
+          </div>
+        </div>
+
         <!-- Confirm password — only shown on Sign Up tab -->
         <div class="auth-field" id="field-confirm">
           <label class="auth-label">Confirmar Contraseña</label>
@@ -79,6 +88,7 @@
   </div>
 
   <script src="scripts/api.js"></script>
+  <script src="scripts/datepicker.js"></script>
   <script src="scripts/login.js"></script>
 
 </body>

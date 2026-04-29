@@ -5,14 +5,15 @@ const { supabase } = require('../services/supabaseClient');
 // POST /api/auth/signup
 async function signup(req, res, next) {
   try {
-    const { email, password, first_name, last_name } = req.body;
+    const { email, password, first_name, last_name, date_of_birth } = req.body;
+
+    const meta = { first_name: (first_name || '').trim(), last_name: (last_name || '').trim() };
+    if (date_of_birth) meta.date_of_birth = date_of_birth;
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { first_name: (first_name || '').trim(), last_name: (last_name || '').trim() },
-      },
+      options: { data: meta },
     });
     if (error) return res.status(400).json({ success: false, message: error.message });
 

@@ -684,6 +684,74 @@ function renderCashFlowChart() {
     ? allDatasets.filter(d => d.id === cashflowView)
     : allDatasets;
 
+  let yMax;
+  if (!cashflowView) {
+    const stackedPeak = buckets.reduce((max, _, i) => {
+      const inflow  = allDatasets[0].data[i] || 0;
+      const outflow = (allDatasets[1].data[i] || 0) + (allDatasets[2].data[i] || 0);
+      return Math.max(max, inflow, outflow);
+    }, 0);
+    if (stackedPeak > 0) yMax = stackedPeak * 1.22;
+  }
+
+  const netPlugin = {
+    id: 'netFlowLabels',
+    afterDraw(chart) {
+      if (cashflowView !== null) return;
+      const { ctx: c, scales, data } = chart;
+      const ds     = data.datasets;
+      const inIdx  = ds.findIndex(d => d.id === 'in');
+      const outIdx = ds.findIndex(d => d.id === 'out');
+      const invIdx = ds.findIndex(d => d.id === 'invested');
+      if (inIdx === -1) return;
+
+      const inMeta  = chart.getDatasetMeta(inIdx);
+      const outMeta = outIdx !== -1 ? chart.getDatasetMeta(outIdx) : null;
+      const invMeta = invIdx !== -1 ? chart.getDatasetMeta(invIdx) : null;
+      const zero    = scales.y.getPixelForValue(0);
+      const floor   = chart.chartArea.top + 4;
+
+      ds[inIdx].data.forEach((inVal, i) => {
+        const outVal = outIdx !== -1 ? (ds[outIdx].data[i] || 0) : 0;
+        const invVal = invIdx !== -1 ? (ds[invIdx].data[i] || 0) : 0;
+        if (inVal === 0 && outVal === 0 && invVal === 0) return;
+
+        const net     = inVal - (outVal + invVal);
+        const inTopY  = inVal > 0 ? inMeta.data[i].y : zero;
+        const outTopY = invMeta ? invMeta.data[i].y : (outMeta ? outMeta.data[i].y : zero);
+        const highY   = Math.min(inTopY, outTopY);
+
+        const inX  = inMeta.data[i].x;
+        const outX = invMeta ? invMeta.data[i].x : (outMeta ? outMeta.data[i].x : inX);
+        const x    = (inX + outX) / 2;
+
+        const abs   = Math.abs(net);
+        const sign  = net >= 0 ? '+' : '−';
+        const label = abs >= 1e6 ? `${sign}${(abs / 1e6).toFixed(1)}M`
+                    : abs >= 1e3 ? `${sign}${(abs / 1e3).toFixed(1)}k`
+                    :              `${sign}${Math.round(abs)}`;
+
+        const color = net >= 0 ? '#34d399' : '#f87171';
+        const lineY = Math.max(highY - 10, floor);
+
+        c.save();
+        c.beginPath();
+        c.strokeStyle = color + '60';
+        c.lineWidth   = 1.5;
+        c.moveTo(x - 14, lineY);
+        c.lineTo(x + 14, lineY);
+        c.stroke();
+
+        c.font         = "500 9.5px 'DM Mono', monospace";
+        c.fillStyle    = color + 'cc';
+        c.textAlign    = 'center';
+        c.textBaseline = 'bottom';
+        c.fillText(label, x, lineY - 2);
+        c.restore();
+      });
+    },
+  };
+
   const ctx = document.getElementById('chart-cashflow').getContext('2d');
   if (chartCashflow) chartCashflow.destroy();
 
@@ -693,12 +761,13 @@ function renderCashFlowChart() {
       labels: buckets.map(b => b.label),
       datasets
     },
+    plugins: [netPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top',
+          position: 'bottom',
           labels: {
             color: '#8892a4',
             font: { family: "'DM Mono'", size: 11 },
@@ -730,6 +799,7 @@ function renderCashFlowChart() {
         },
         y: {
           stacked: true,
+          max: yMax,
           grid:  { color: 'rgba(255,255,255,0.04)' },
           border: { dash: [3, 3] },
           ticks: {
