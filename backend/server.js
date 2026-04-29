@@ -132,6 +132,25 @@ if (config.nodeEnv !== 'test') {
   console.log('[WealthOS API] Daily snapshot cron scheduled: 23:00 UTC Mon–Fri');
 }
 
+// ─── Daily account balance snapshot cron ─────────────────────────────────────
+// Runs at midnight UTC every day (all days — account balances don't follow
+// market hours). Captures every user's account balance for trend tracking.
+if (config.nodeEnv !== 'test') {
+  const { snapshotAllAccounts } = require('./src/services/accountSnapshotService');
+
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[cron] Starting daily account balance snapshot...');
+    try {
+      const result = await snapshotAllAccounts();
+      console.log(`[cron] Account snapshot complete — ${result.count} account(s) for ${result.date}`);
+    } catch (err) {
+      console.error('[cron] Account snapshot failed:', err.message);
+    }
+  }, { timezone: 'UTC' });
+
+  console.log('[WealthOS API] Daily account balance snapshot cron scheduled: 00:00 UTC daily');
+}
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(config.port, () => {
   console.log(`[WealthOS API] Running in ${config.nodeEnv} mode on port ${config.port}`);

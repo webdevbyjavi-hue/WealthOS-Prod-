@@ -99,33 +99,19 @@
       </div>
     </section>
 
-    <!-- FILTERS BAR -->
-    <div class="filters-bar">
-      <div class="filter-pills" role="group" aria-label="Date range">
-        <button class="filter-pill" data-period="1m"     onclick="setPeriod('1m')">Current Month</button>
-        <button class="filter-pill" data-period="ytd"    onclick="setPeriod('ytd')">YTD</button>
-        <button class="filter-pill" data-period="custom" onclick="setPeriod('custom')">Custom Range</button>
-      </div>
-      <div class="filter-custom-range filter-custom-range--disabled" id="filter-date-range">
-        <div class="datepicker">
-          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-from" placeholder="From…" autocomplete="off" onchange="applyCustomRange()" />
-          <div class="datepicker__popup" hidden></div>
-        </div>
-        <span class="filter-date-sep">→</span>
-        <div class="datepicker">
-          <input class="filter-date-input datepicker__input" type="text" readonly id="filter-date-to" placeholder="To…" autocomplete="off" onchange="applyCustomRange()" />
-          <div class="datepicker__popup" hidden></div>
-        </div>
-      </div>
-      <div class="filters-bar__divider"></div>
-      <div class="filter-pills" role="group" aria-label="Transaction type">
-        <button class="filter-pill" data-flow="in"       onclick="setFlowFilter('in')">Cash In</button>
-        <button class="filter-pill" data-flow="out"      onclick="setFlowFilter('out')">Cash Out</button>
-        <button class="filter-pill" data-flow="invested" onclick="setFlowFilter('invested')">Invested</button>
-      </div>
-      <input class="search-input filter-search" type="text" id="filter-search"
-             placeholder="Search description or account…"
-             oninput="filterTable(this.value)" />
+    <!-- DATE FILTER -->
+    <div class="tab-group">
+      <button class="tab" onclick="setRange('1w', this)">1W</button>
+      <button class="tab" onclick="setRange('1m', this)">1M</button>
+      <button class="tab" onclick="setRange('3m', this)">3M</button>
+      <button class="tab tab--active" onclick="setRange('ytd', this)">YTD</button>
+      <button class="tab" onclick="setRange('custom', this)">Custom</button>
+    </div>
+    <div class="date-range-row" id="date-range-row">
+      <input type="date" id="date-start" class="date-input" />
+      <span class="date-range-sep">→</span>
+      <input type="date" id="date-end" class="date-input" />
+      <button class="btn btn--ghost date-range-apply" onclick="applyCustomRange()">Apply</button>
     </div>
 
     <!-- KPI GRID -->
@@ -179,6 +165,7 @@
         <div class="panel-title-group">
           <span class="panel__title">All Transactions</span>
           <span class="accounts-count" id="table-count">0 transactions</span>
+          <button id="bar-filter-chip" class="bar-filter-chip" onclick="clearBarFilter()" style="display:none"></button>
         </div>
       </div>
       <div class="table-wrapper" id="txn-table-wrapper">

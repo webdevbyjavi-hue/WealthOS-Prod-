@@ -6,11 +6,11 @@ const STORAGE_KEY  = 'wealthos_accounts';
 const CASHFLOW_KEY = 'wealthos_transactions';
 
 /* ─── State ──────────────────────────────────────────────────── */
-let accounts      = [];
-let transactions  = [];
-let editingId     = null;
-let cashflowView  = null; // null = all, 'in', 'out', 'invested'
-let sortCol       = 'name';
+let accounts         = [];
+let transactions     = [];
+let accountSnapshots = [];
+let editingId        = null;
+let sortCol          = 'name';
 let sortDir       = 1;
 let filterText     = '';
 let filterCurrency = '';
@@ -20,7 +20,7 @@ let filterDateTo   = '';
 
 /* ─── Chart instances ─────────────────────────────────────────── */
 let chartCurrency = null;
-let chartCashflow = null;
+let chartTrend    = null;
 
 /* ─── Palette ────────────────────────────────────────────────── */
 const PALETTE = [
@@ -51,14 +51,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     accounts = await WOS_API.accounts.list();
     if (accounts.length > 0) {
-      const txArrays = await Promise.all(
-        accounts.map(a => WOS_API.accounts.listTransactions(a.id).catch(() => []))
-      );
-      transactions = txArrays.flat();
+      const [txArrays, snaps] = await Promise.all([
+        Promise.all(accounts.map(a => WOS_API.accounts.listTransactions(a.id).catch(() => []))),
+        WOS_API.accounts.listSnapshots().catch(() => []),
+      ]);
+      transactions     = txArrays.flat();
+      accountSnapshots = snaps;
+      // Silently capture today's balances (upserts — safe to call every load)
+      WOS_API.accounts.takeSnapshot().catch(() => {});
     }
   } catch (_) {
-    accounts = [];
-    transactions = [];
+    accounts         = [];
+    transactions     = [];
+    accountSnapshots = [];
   }
 
   const saved = WOS_FILTERS.restoreUI('fp-', 'filter-custom-range', 'filter-date-from', 'filter-date-to');
@@ -159,6 +164,9 @@ async function saveAccount() {
       render();
       logEvent({ type: 'account_updated', category: 'Account', icon: '🏦', title: `Updated Account: ${name}`, detail: `${bank} · ${currency} · Balance ${currency} ${balance.toLocaleString()}`, amount: balance * fxRate });
       toast(typeof t === 'function' ? t('toast_account_updated') : 'Account updated.', 'success');
+      WOS_API.accounts.takeSnapshot().then(() =>
+        WOS_API.accounts.listSnapshots().then(snaps => { accountSnapshots = snaps; renderBalanceTrendChart(); }).catch(() => {})
+      ).catch(() => {});
     } catch (_) {
       accounts[idx] = backup;
       render();
@@ -175,6 +183,9 @@ async function saveAccount() {
       render();
       logEvent({ type: 'account_added', category: 'Account', icon: '🏦', title: `Added Account: ${name}`, detail: `${bank} · ${type} · ${currency} · ${country}`, amount: balance * fxRate });
       toast(typeof t === 'function' ? t('toast_account_added') : 'Account added.', 'success');
+      WOS_API.accounts.takeSnapshot().then(() =>
+        WOS_API.accounts.listSnapshots().then(snaps => { accountSnapshots = snaps; renderBalanceTrendChart(); }).catch(() => {})
+      ).catch(() => {});
     } catch (_) {
       accounts = accounts.filter(a => a.id !== tempId);
       render();
@@ -257,7 +268,6 @@ async function saveTransaction() {
   const txnData = { accountId, type, amount, fxRate, amountMXN: amount * fxRate, date, description, category };
 
   transactions.push({ id: tempId, ...txnData });
-  renderCashFlowChart();
   document.getElementById('txn-modal-overlay').classList.remove('modal-overlay--visible');
 
   try {
@@ -277,7 +287,6 @@ async function saveTransaction() {
     toast(typeof t === 'function' ? t('toast_transaction_saved') : 'Transaction saved.', 'success');
   } catch (_) {
     transactions = transactions.filter(t => t.id !== tempId);
-    renderCashFlowChart();
     toast('Failed to save transaction. Please try again.', 'error');
   }
 }
@@ -371,7 +380,7 @@ function setDateFilter(period) {
   const customRange = document.getElementById('filter-custom-range');
   if (customRange) customRange.classList.toggle('filter-custom-range--disabled', period !== 'custom');
   updateSummary();
-  renderCashFlowChart();
+  renderBalanceTrendChart();
 }
 
 function applyCustomRange() {
@@ -379,7 +388,7 @@ function applyCustomRange() {
   filterDateTo   = document.getElementById('filter-date-to').value;
   WOS_FILTERS.save('custom', filterDateFrom, filterDateTo);
   updateSummary();
-  renderCashFlowChart();
+  renderBalanceTrendChart();
 }
 
 function updateSummary() {
@@ -496,20 +505,10 @@ function totalMXN() {
   return accounts.reduce((s, a) => s + (a.balanceMXN || 0), 0);
 }
 
-/* ─── Cash Flow Filter ───────────────────────────────────────── */
-function setCashflowView(view) {
-  cashflowView = cashflowView === view ? null : view;
-  ['in','out','invested'].forEach(v => {
-    const btn = document.getElementById(`cf-btn-${v}`);
-    if (btn) btn.classList.toggle('cf-filter__btn--active', cashflowView === v);
-  });
-  renderCashFlowChart();
-}
-
 /* ─── Charts ─────────────────────────────────────────────────── */
 function renderCharts() {
   renderCurrencyChart();
-  renderCashFlowChart();
+  renderBalanceTrendChart();
 }
 
 function buildDonut(canvasId, labels, data, instance) {
@@ -578,234 +577,107 @@ function renderCurrencyChart() {
   chartCurrency = buildDonut('chart-currency', labels, data, chartCurrency);
 }
 
-function renderCashFlowChart() {
-  const { period, from, to } = WOS_FILTERS.getDateRange();
-  const now    = new Date();
-  const buckets = [];
+function renderBalanceTrendChart() {
+  const { from, to } = getPeriodDateRange();
+  const today   = new Date().toISOString().slice(0, 10);
+  const fromStr = from ? from.toISOString().slice(0, 10) : null;
+  const toStr   = to   ? to.toISOString().slice(0, 10)   : today;
 
-  if (period === 'week') {
-    const day      = now.getDay();
-    const daysToMon = day === 0 ? 6 : day - 1;
-    for (let i = daysToMon; i >= 0; i--) {
-      const d  = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
-      const da = String(d.getDate()).padStart(2, '0');
-      buckets.push({ label: d.toLocaleDateString('en-US', { weekday: 'short' }), key: `${d.getFullYear()}-${mo}-${da}` });
-    }
-  } else if (period === 'month') {
-    for (let i = 1; i <= now.getDate(); i++) {
-      const d  = new Date(now.getFullYear(), now.getMonth(), i);
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
-      const da = String(i).padStart(2, '0');
-      buckets.push({ label: String(i), key: `${d.getFullYear()}-${mo}-${da}` });
-    }
-  } else if (period === 'ytd') {
-    for (let m = 0; m <= now.getMonth(); m++) {
-      const d = new Date(now.getFullYear(), m, 1);
-      buckets.push({
-        label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-        key:   `${d.getFullYear()}-${String(m + 1).padStart(2, '0')}`,
-      });
-    }
-  } else {
-    if (!from) {
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        buckets.push({
-          label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-          key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        });
-      }
-    } else {
-      const diffDays = Math.ceil((to - from) / 86400000);
-      if (diffDays <= 31) {
-        for (let cur = new Date(from); cur <= to; cur = new Date(cur.getTime() + 86400000)) {
-          const mo = String(cur.getMonth() + 1).padStart(2, '0');
-          const da = String(cur.getDate()).padStart(2, '0');
-          buckets.push({ label: cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), key: `${cur.getFullYear()}-${mo}-${da}` });
-        }
-      } else {
-        let cur = new Date(from.getFullYear(), from.getMonth(), 1);
-        const toMo = new Date(to.getFullYear(), to.getMonth(), 1);
-        while (cur <= toMo) {
-          buckets.push({
-            label: cur.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-            key:   `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`,
-          });
-          cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-        }
-      }
-    }
-  }
-
-  const isDay = period === 'week' || period === 'month' || (period === 'custom' && from && Math.ceil((to - from) / 86400000) <= 31);
-  const sumType = (type, b) => transactions
-    .filter(t => t.type === type && t.date && (isDay ? t.date === b.key : t.date.startsWith(b.key)))
-    .reduce((s, t) => s + (t.amountMXN || 0), 0);
-
-  const inData       = buckets.map(b => sumType('in', b));
-  const outData      = buckets.map(b => sumType('out', b));
-  const investedData = buckets.map(b => sumType('invested', b));
-
-  const allDatasets = [
-    {
-      id: 'in',
-      label: 'Cash In',
-      data: inData,
-      backgroundColor: 'rgba(52, 211, 153, 0.65)',
-      borderColor: '#34d399',
-      borderWidth: 1,
-      borderRadius: 4,
-      stack: 'inflow',
-    },
-    {
-      id: 'out',
-      label: 'Cash Out',
-      data: outData,
-      backgroundColor: 'rgba(248, 113, 113, 0.65)',
-      borderColor: '#f87171',
-      borderWidth: 1,
-      borderRadius: 4,
-      stack: 'outflow',
-    },
-    {
-      id: 'invested',
-      label: 'Invested',
-      data: investedData,
-      backgroundColor: 'rgba(99, 102, 241, 0.65)',
-      borderColor: '#6366f1',
-      borderWidth: 1,
-      borderRadius: 4,
-      stack: 'outflow',
-    }
-  ];
-
-  const datasets = cashflowView
-    ? allDatasets.filter(d => d.id === cashflowView)
-    : allDatasets;
-
-  let yMax;
-  if (!cashflowView) {
-    const stackedPeak = buckets.reduce((max, _, i) => {
-      const inflow  = allDatasets[0].data[i] || 0;
-      const outflow = (allDatasets[1].data[i] || 0) + (allDatasets[2].data[i] || 0);
-      return Math.max(max, inflow, outflow);
-    }, 0);
-    if (stackedPeak > 0) yMax = stackedPeak * 1.22;
-  }
-
-  const netPlugin = {
-    id: 'netFlowLabels',
-    afterDraw(chart) {
-      if (cashflowView !== null) return;
-      const { ctx: c, scales, data } = chart;
-      const ds     = data.datasets;
-      const inIdx  = ds.findIndex(d => d.id === 'in');
-      const outIdx = ds.findIndex(d => d.id === 'out');
-      const invIdx = ds.findIndex(d => d.id === 'invested');
-      if (inIdx === -1) return;
-
-      const inMeta  = chart.getDatasetMeta(inIdx);
-      const outMeta = outIdx !== -1 ? chart.getDatasetMeta(outIdx) : null;
-      const invMeta = invIdx !== -1 ? chart.getDatasetMeta(invIdx) : null;
-      const zero    = scales.y.getPixelForValue(0);
-      const floor   = chart.chartArea.top + 4;
-
-      ds[inIdx].data.forEach((inVal, i) => {
-        const outVal = outIdx !== -1 ? (ds[outIdx].data[i] || 0) : 0;
-        const invVal = invIdx !== -1 ? (ds[invIdx].data[i] || 0) : 0;
-        if (inVal === 0 && outVal === 0 && invVal === 0) return;
-
-        const net     = inVal - (outVal + invVal);
-        const inTopY  = inVal > 0 ? inMeta.data[i].y : zero;
-        const outTopY = invMeta ? invMeta.data[i].y : (outMeta ? outMeta.data[i].y : zero);
-        const highY   = Math.min(inTopY, outTopY);
-
-        const inX  = inMeta.data[i].x;
-        const outX = invMeta ? invMeta.data[i].x : (outMeta ? outMeta.data[i].x : inX);
-        const x    = (inX + outX) / 2;
-
-        const abs   = Math.abs(net);
-        const sign  = net >= 0 ? '+' : '−';
-        const label = abs >= 1e6 ? `${sign}${(abs / 1e6).toFixed(1)}M`
-                    : abs >= 1e3 ? `${sign}${(abs / 1e3).toFixed(1)}k`
-                    :              `${sign}${Math.round(abs)}`;
-
-        const color = net >= 0 ? '#34d399' : '#f87171';
-        const lineY = Math.max(highY - 10, floor);
-
-        c.save();
-        c.beginPath();
-        c.strokeStyle = color + '60';
-        c.lineWidth   = 1.5;
-        c.moveTo(x - 14, lineY);
-        c.lineTo(x + 14, lineY);
-        c.stroke();
-
-        c.font         = "500 9.5px 'DM Mono', monospace";
-        c.fillStyle    = color + 'cc';
-        c.textAlign    = 'center';
-        c.textBaseline = 'bottom';
-        c.fillText(label, x, lineY - 2);
-        c.restore();
-      });
-    },
-  };
+  // Collect all snapshot dates within the period
+  const dateSet = new Set();
+  accountSnapshots.forEach(s => {
+    if ((!fromStr || s.date >= fromStr) && s.date <= toStr) dateSet.add(s.date);
+  });
+  // Always anchor today so current balances are visible even before first cron
+  if (!fromStr || today >= fromStr) dateSet.add(today);
+  const dates = [...dateSet].sort();
 
   const ctx = document.getElementById('chart-cashflow').getContext('2d');
-  if (chartCashflow) chartCashflow.destroy();
+  if (chartTrend) { chartTrend.destroy(); chartTrend = null; }
 
-  chartCashflow = new Chart(ctx, {
-    type: 'bar',
+  if (accounts.length === 0) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    return;
+  }
+
+  const datasets = accounts.map((acct, i) => {
+    const color = PALETTE[i % PALETTE.length];
+
+    // Build date → balance_mxn map for this account
+    const snapMap = {};
+    accountSnapshots.forEach(s => {
+      if (s.accountId === acct.id) snapMap[s.date] = s.balanceMxn;
+    });
+    // Inject today's live balance (always the freshest point)
+    snapMap[today] = acct.balanceMXN;
+
+    return {
+      label:               acct.name,
+      data:                dates.map(d => snapMap[d] !== undefined ? snapMap[d] : null),
+      borderColor:         color,
+      backgroundColor:     color + '18',
+      pointBackgroundColor: color,
+      pointBorderColor:    'transparent',
+      pointRadius:         dates.length <= 31 ? 3 : 2,
+      pointHoverRadius:    5,
+      borderWidth:         2,
+      tension:             0.35,
+      fill:                false,
+      spanGaps:            true,
+    };
+  });
+
+  chartTrend = new Chart(ctx, {
+    type: 'line',
     data: {
-      labels: buckets.map(b => b.label),
-      datasets
+      labels: dates.map(d => {
+        const dt = new Date(d + 'T00:00:00');
+        return dt.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+      }),
+      datasets,
     },
-    plugins: [netPlugin],
     options: {
-      responsive: true,
+      responsive:          true,
       maintainAspectRatio: false,
+      interaction:         { mode: 'index', intersect: false },
       plugins: {
         legend: {
           position: 'bottom',
           labels: {
             color: '#8892a4',
-            font: { family: "'DM Mono'", size: 11 },
+            font:  { family: "'DM Mono'", size: 11 },
             usePointStyle: true,
-            pointStyle: 'circle',
-            boxWidth: 8,
-            boxHeight: 8,
-            padding: 16,
+            pointStyle:    'circle',
+            boxWidth:      8,
+            boxHeight:     8,
+            padding:       16,
           }
         },
         tooltip: {
           backgroundColor: '#111525',
-          borderColor: '#1e2640',
-          borderWidth: 1,
-          titleColor: '#eef0ff',
-          bodyColor: '#8892a4',
-          titleFont: { family: "'DM Sans'", size: 13 },
-          bodyFont:  { family: "'DM Mono'",  size: 11 },
+          borderColor:     '#1e2640',
+          borderWidth:     1,
+          titleColor:      '#eef0ff',
+          bodyColor:       '#8892a4',
+          titleFont:       { family: "'DM Sans'", size: 13 },
+          bodyFont:        { family: "'DM Mono'", size: 11 },
           callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}`
+            label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}`,
           }
         }
       },
       scales: {
         x: {
-          stacked: true,
           grid:  { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 } }
+          ticks: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, maxTicksLimit: 12 }
         },
         y: {
-          stacked: true,
-          max: yMax,
-          grid:  { color: 'rgba(255,255,255,0.04)' },
+          grid:   { color: 'rgba(255,255,255,0.04)' },
           border: { dash: [3, 3] },
           ticks: {
             color: '#8892a4',
             font:  { family: "'DM Mono'", size: 10 },
-            callback: v => v === 0 ? '0' : fmtMXN(v)
+            callback: v => v === 0 ? '0' : fmtMXN(v),
           }
         }
       }

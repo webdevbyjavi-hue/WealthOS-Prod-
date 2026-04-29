@@ -12,7 +12,7 @@ let accounts     = [];
 let transactions = [];
 let editingTxnId = null;
 let flowView        = null; // null = all, 'in', 'out', 'invested'
-let timeframeFilter = 'all'; // 'all' | '1m' | '3m' | 'ytd' | '1y'
+let timeframeFilter = 'ytd'; // 'all' | '1w' | '1m' | '3m' | 'ytd' | 'custom'
 let sortCol      = 'date';
 let sortDir      = -1;
 let filterText     = '';
@@ -24,6 +24,8 @@ let catFilterYear  = '';
 let catFilterMonth = '';
 let currentPage    = 1;
 const PAGE_SIZE    = 10;
+let chartBarFilter = null; // { key: string, type: string } | null
+let flowMonths     = [];
 
 /* ─── Chart instances ─────────────────────────────────────────── */
 let chartFlow     = null;
@@ -283,6 +285,12 @@ function txnsInTimeframe(txns) {
   const now = new Date();
   const yr  = now.getFullYear();
   const mo  = now.getMonth();
+  if (timeframeFilter === '1w') {
+    const cutoff7 = new Date(now);
+    cutoff7.setDate(cutoff7.getDate() - 7);
+    const cutoff7Str = cutoff7.toISOString().slice(0, 10);
+    return txns.filter(t => (t.date || '') >= cutoff7Str);
+  }
   if (timeframeFilter === '1m') {
     const prefix = `${yr}-${String(mo + 1).padStart(2, '0')}`;
     return txns.filter(t => (t.date || '').startsWith(prefix));
@@ -308,7 +316,9 @@ function getFlowMonths() {
     });
   }
 
-  if (timeframeFilter === 'ytd') {
+  if (timeframeFilter === '1w') {
+    pushMonth(new Date(yr, mo, 1));
+  } else if (timeframeFilter === 'ytd') {
     for (let m = 0; m <= mo; m++) pushMonth(new Date(yr, m, 1));
   } else if (timeframeFilter === '1m') {
     pushMonth(new Date(yr, mo, 1));
@@ -354,6 +364,7 @@ function getFlowMonths() {
 
 function setTimeframe(tf) {
   timeframeFilter = tf;
+  chartBarFilter  = null;
   currentPage     = 1;
   document.querySelectorAll('.tf-filter__btn').forEach(btn => {
     btn.classList.toggle('tf-filter__btn--active', btn.dataset.tf === tf);
@@ -361,42 +372,30 @@ function setTimeframe(tf) {
   render();
 }
 
-/* ─── Filter Bar controls ────────────────────────────────────── */
-function setPeriod(period) {
-  const pills      = document.querySelectorAll('.filter-pill[data-period]');
-  const dateRange  = document.getElementById('filter-date-range');
-  const activeBtn  = document.querySelector(`.filter-pill[data-period="${period}"]`);
-  const isActive   = activeBtn && activeBtn.classList.contains('filter-pill--active');
+/* ─── Date filter (tab-group) ────────────────────────────────── */
+function setRange(range, btn) {
+  document.querySelectorAll('.tab-group .tab').forEach(t => t.classList.remove('tab--active'));
+  if (btn) btn.classList.add('tab--active');
 
-  pills.forEach(b => b.classList.remove('filter-pill--active'));
-
-  if (period === 'custom') {
-    if (isActive) {
-      dateRange.classList.add('filter-custom-range--disabled');
-      timeframeFilter  = 'all';
-    } else {
-      activeBtn.classList.add('filter-pill--active');
-      dateRange.classList.remove('filter-custom-range--disabled');
-      timeframeFilter  = 'custom';
-    }
+  const row = document.getElementById('date-range-row');
+  if (range === 'custom') {
+    row.classList.add('date-range-row--visible');
+    timeframeFilter = 'custom';
   } else {
-    dateRange.classList.add('filter-custom-range--disabled');
-    if (isActive) {
-      timeframeFilter = 'all';
-    } else {
-      activeBtn.classList.add('filter-pill--active');
-      timeframeFilter = period;
-    }
+    row.classList.remove('date-range-row--visible');
+    timeframeFilter = range;
   }
 
-  currentPage = 1;
+  currentPage    = 1;
+  chartBarFilter = null;
   render();
 }
 
 function setFlowFilter(type) {
-  filterType = filterType === type ? '' : type;
-  flowView   = filterType || null;
-  currentPage = 1;
+  filterType     = filterType === type ? '' : type;
+  flowView       = filterType || null;
+  chartBarFilter = null;
+  currentPage    = 1;
 
   document.querySelectorAll('.filter-pill[data-flow]').forEach(btn => {
     btn.classList.toggle('filter-pill--active', btn.dataset.flow === filterType);
@@ -410,8 +409,8 @@ function setFlowFilter(type) {
 }
 
 function applyCustomRange() {
-  filterDateFrom  = document.getElementById('filter-date-from').value;
-  filterDateTo    = document.getElementById('filter-date-to').value;
+  filterDateFrom  = document.getElementById('date-start').value;
+  filterDateTo    = document.getElementById('date-end').value;
   timeframeFilter = 'custom';
   currentPage     = 1;
   render();
@@ -446,8 +445,16 @@ function getFiltered() {
       (t.type         || '').toLowerCase().includes(filterText) ||
       catLabel(t.category).toLowerCase().includes(filterText);
     const matchType = !filterType || t.type === filterType;
-    return matchText && matchType;
+    const matchBar  = !chartBarFilter ||
+      (t.type === chartBarFilter.type && (t.date || '').startsWith(chartBarFilter.key));
+    return matchText && matchType && matchBar;
   });
+}
+
+function clearBarFilter() {
+  chartBarFilter = null;
+  currentPage    = 1;
+  renderTable();
 }
 
 function getSorted(list) {
@@ -532,6 +539,17 @@ function renderTable() {
   const pageItems = list.slice(start, start + PAGE_SIZE);
 
   counter.textContent = `${total} transaction${total !== 1 ? 's' : ''}`;
+
+  const chip = document.getElementById('bar-filter-chip');
+  if (chip) {
+    if (chartBarFilter) {
+      const typeLabels = { in: 'Cash In', out: 'Cash Out', invested: 'Invested' };
+      chip.textContent = `${typeLabels[chartBarFilter.type]} · ${chartBarFilter.key} ×`;
+      chip.style.display = '';
+    } else {
+      chip.style.display = 'none';
+    }
+  }
 
   if (total === 0) {
     const msg = transactions.length === 0
@@ -689,6 +707,7 @@ function renderCharts() {
 
 function renderFlowChart() {
   const months = getFlowMonths();
+  flowMonths = months;
 
   const sumType = (type, key) => transactions
     .filter(t => t.type === type && (t.date || '').startsWith(key))
@@ -784,6 +803,26 @@ function renderFlowChart() {
     plugins: [netPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+      onClick(event, elements, chart) {
+        if (!elements.length) {
+          chartBarFilter = null;
+          currentPage    = 1;
+          renderTable();
+          return;
+        }
+        const el   = elements[0];
+        const type = chart.data.datasets[el.datasetIndex].id;
+        const key  = flowMonths[el.index]?.key;
+        if (!type || !key) return;
+        if (chartBarFilter && chartBarFilter.key === key && chartBarFilter.type === type) {
+          chartBarFilter = null;
+        } else {
+          chartBarFilter = { key, type };
+        }
+        currentPage = 1;
+        renderTable();
+      },
       plugins: {
         legend: { position: 'bottom', labels: { color: '#8892a4', font: { family: "'DM Mono'", size: 11 }, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
         tooltip: { backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1, titleColor: '#eef0ff', bodyColor: '#8892a4', titleFont: { family: "'DM Sans'", size: 13 }, bodyFont: { family: "'DM Mono'", size: 11 }, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtMXN(ctx.parsed.y)}` } },

@@ -12,6 +12,8 @@ const {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  listAccountSnapshots,
+  snapshotAccounts,
 } = require('../controllers/accountsController');
 
 const router = Router();
@@ -34,6 +36,10 @@ const transactionRules = [
     'stocks','bonds','funds','fibras','retirement','real_estate','crypto','other_inv',
   ]).withMessage('invalid category.'),
 ];
+
+// Balance snapshots — must be BEFORE /:id routes (avoids UUID validation on "snapshots" string)
+router.get('/snapshots',  listAccountSnapshots);
+router.post('/snapshots', snapshotAccounts);
 
 // Accounts
 router.get('/', listAccounts);

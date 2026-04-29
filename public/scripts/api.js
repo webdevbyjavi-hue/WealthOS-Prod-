@@ -71,6 +71,9 @@
       toApi:   t => ({ type: t.type, amount: t.amount, fx_rate: t.fxRate || 1, description: t.description || null, date: t.date, currency: t.currency || null, category: t.category || null }),
       fromApi: t => ({ id: t.id, accountId: t.account_id, type: t.type, amount: parseFloat(t.amount), fxRate: parseFloat(t.fx_rate) || 1, amountMXN: parseFloat(t.amount) * (parseFloat(t.fx_rate) || 1), date: t.date, description: t.description || '', currency: t.currency || null, category: t.category || null }),
     },
+    accountSnapshots: {
+      fromApi: s => ({ id: s.id, accountId: s.account_id, date: s.date, balance: parseFloat(s.balance), balanceMxn: parseFloat(s.balance_mxn), fxRate: parseFloat(s.fx_rate) }),
+    },
   };
 
   // Generate placeholder history for charts (91 pts ending at current price)
@@ -119,6 +122,8 @@
       createTransaction: (id, d)     => request('POST',   `/api/accounts/${id}/transactions`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
       updateTransaction: (aid, tid, d) => request('PUT',  `/api/accounts/${aid}/transactions/${tid}`, mappers.transactions.toApi(d)).then(r => mappers.transactions.fromApi(r.data)),
       deleteTransaction: (aid, tid)  => request('DELETE', `/api/accounts/${aid}/transactions/${tid}`),
+      listSnapshots:     ()          => request('GET',    '/api/accounts/snapshots').then(r => r.data.map(mappers.accountSnapshots.fromApi)),
+      takeSnapshot:      ()          => request('POST',   '/api/accounts/snapshots'),
     },
 
     // ── History ───────────────────────────────────────────────────────────────

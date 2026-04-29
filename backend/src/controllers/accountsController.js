@@ -196,6 +196,64 @@ async function deleteTransaction(req, res, next) {
   }
 }
 
+// ─── Account Balance Snapshots ────────────────────────────────────────────────
+
+// GET /api/accounts/snapshots
+// Returns all snapshots for this user from the past year, oldest first.
+async function listAccountSnapshots(req, res, next) {
+  try {
+    const yearAgo = new Date();
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+    const fromStr = yearAgo.toISOString().slice(0, 10);
+
+    const { data, error } = await supabase
+      .from('account_balance_snapshots')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .gte('date', fromStr)
+      .order('date', { ascending: true });
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/accounts/snapshots
+// Upserts today's balance for every account belonging to this user.
+async function snapshotAccounts(req, res, next) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { data: accounts, error } = await supabase
+      .from('accounts')
+      .select('id, balance, fx_rate')
+      .eq('user_id', req.user.id);
+
+    if (error) throw error;
+    if (!accounts?.length) return res.json({ success: true, data: { count: 0, date: today } });
+
+    const rows = accounts.map(a => ({
+      user_id:     req.user.id,
+      account_id:  a.id,
+      date:        today,
+      balance:     parseFloat(a.balance)   || 0,
+      balance_mxn: (parseFloat(a.balance) || 0) * (parseFloat(a.fx_rate) || 1),
+      fx_rate:     parseFloat(a.fx_rate)   || 1,
+    }));
+
+    const { error: upsertErr } = await supabase
+      .from('account_balance_snapshots')
+      .upsert(rows, { onConflict: 'account_id,date' });
+
+    if (upsertErr) throw upsertErr;
+    res.json({ success: true, data: { count: rows.length, date: today } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listAccounts,
   createAccount,
@@ -205,4 +263,6 @@ module.exports = {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  listAccountSnapshots,
+  snapshotAccounts,
 };
