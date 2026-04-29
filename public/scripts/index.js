@@ -51,9 +51,42 @@ const COLORS = [
 document.getElementById('current-date').textContent =
   new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
+// ─── Modal ───────────────────────────────────────────────────────────────────
+function openModal(){
+  resetModal();
+  document.getElementById('modal-overlay').classList.add('modal-overlay--visible');
+}
+function closeModal(e){
+  if(!e || e.target === document.getElementById('modal-overlay') || !e.target.closest){
+    document.getElementById('modal-overlay').classList.remove('modal-overlay--visible');
+    resetModal();
+  }
+}
+function resetModal(){
+  const typeEl = document.getElementById('m-asset-type');
+  if(typeEl) typeEl.value = '';
+  document.querySelectorAll('.asset-fields').forEach(el => el.style.display = 'none');
+  const actionsEl = document.getElementById('modal-actions');
+  if(actionsEl) actionsEl.style.display = 'none';
+  document.querySelectorAll('#modal-overlay input').forEach(el => el.value = '');
+  document.querySelectorAll('#modal-overlay select').forEach(el => el.selectedIndex = 0);
+}
+function onAssetTypeChange(val){
+  document.querySelectorAll('.asset-fields').forEach(el => el.style.display = 'none');
+  document.getElementById('modal-actions').style.display = 'none';
+  if(!val) return;
+  const section = document.getElementById('fields-' + val);
+  if(section){
+    section.style.display = 'flex';
+    section.style.flexDirection = 'column';
+    section.style.gap = '16px';
+    document.getElementById('modal-actions').style.display = 'flex';
+  }
+}
+
 // ─── Add Asset (routes to the right API category) ────────────────────────────
-// Save dispatch — registered as the page callback for the shared modal.
-window._wosAddAsset = function(type) {
+function addAsset(){
+  const type = document.getElementById('m-asset-type').value;
   const handlers = {
     stocks: addAsset_stocks,
     bonos:  addAsset_bonos,
@@ -64,14 +97,14 @@ window._wosAddAsset = function(type) {
     bienes: addAsset_bienes,
   };
   if(handlers[type]) handlers[type]();
-};
+}
 
 // Helper: optimistic add to cache → close modal → render → POST to API
 async function _apiAdd(cat, data, cacheKey, logPayload) {
   const tempId = Date.now();
   _wosRaw[cacheKey].push({ id: tempId, ...data, history: generateHistory(data._chartVal || 0) });
   delete _wosRaw[cacheKey][_wosRaw[cacheKey].length - 1].history; // remove temp chart val
-  closeAssetModal(); render();
+  closeModal(); render();
   try {
     const created = await WOS_API.holdings.create(cat, data);
     const idx = _wosRaw[cacheKey].findIndex(x => x.id === tempId);
@@ -85,18 +118,17 @@ async function _apiAdd(cat, data, cacheKey, logPayload) {
 }
 
 async function addAsset_stocks(){
-  const ticker      = document.getElementById('si-ticker').value.trim().toUpperCase();
-  const name        = document.getElementById('si-name').value.trim();
-  const shares      = parseFloat(document.getElementById('si-shares').value);
-  const cost        = parseFloat(document.getElementById('si-cost').value);
-  const price       = parseFloat(document.getElementById('si-price').value);
-  const fechaCompra = document.getElementById('si-fecha').value || null;
+  const ticker = document.getElementById('m-s-ticker').value.trim().toUpperCase();
+  const name   = document.getElementById('m-s-name').value.trim();
+  const shares = parseFloat(document.getElementById('m-s-shares').value);
+  const cost   = parseFloat(document.getElementById('m-s-cost').value);
+  const price  = parseFloat(document.getElementById('m-s-price').value);
   if(!ticker || !name || isNaN(shares) || isNaN(cost) || isNaN(price)){
     alert('Please fill in all fields.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('stocks', { ticker, name, shares, avgCost: cost, currentPrice: price, fechaCompra });
+    const created = await WOS_API.holdings.create('stocks', { ticker, name, shares, avgCost: cost, currentPrice: price });
     _wosRaw.stocks.push(created);
     render();
     logEvent({ type: 'investment_added', category: 'Investment', icon: '📈', title: `Added Stock: ${ticker}`, detail: `${shares} shares @ $${cost} · ${name}`, amount: shares * price });
@@ -104,41 +136,42 @@ async function addAsset_stocks(){
 }
 
 async function addAsset_bonos(){
-  const tipo         = document.getElementById('bi-tipo').value;
-  const plazo        = document.getElementById('bi-plazo').value;
-  const tasaCompra   = parseFloat(document.getElementById('bi-tasa').value);
-  const monto        = parseFloat(document.getElementById('bi-monto').value);
-  const purchaseDate = document.getElementById('bi-fecha').value || null;
-  const descripcion  = document.getElementById('bi-descripcion').value || '';
-  const serieBanxico = document.getElementById('bi-serie-banxico').value || '';
-  if(!tipo || isNaN(monto)){
-    alert('Por favor completa los campos obligatorios.'); return;
+  const instrumento  = document.getElementById('m-b-instrumento').value;
+  const serie        = document.getElementById('m-b-serie').value.trim().toUpperCase();
+  const titulos      = parseInt(document.getElementById('m-b-titulos').value);
+  const valorNominal = parseFloat(document.getElementById('m-b-nominal').value);
+  const precioCompra = parseFloat(document.getElementById('m-b-compra').value);
+  const precioActual = parseFloat(document.getElementById('m-b-actual').value);
+  const tasaCupon    = parseFloat(document.getElementById('m-b-cupon').value) || 0;
+  const rendimiento  = parseFloat(document.getElementById('m-b-rendimiento').value);
+  const vencimiento  = document.getElementById('m-b-vencimiento').value;
+  if(!serie || isNaN(titulos) || isNaN(valorNominal) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(rendimiento) || !vencimiento){
+    alert('Por favor completa todos los campos.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('bonos', { tipo, plazo, tasaCompra, monto, purchaseDate, descripcion, serieBanxico });
+    const created = await WOS_API.holdings.create('bonos', { instrumento, serie, titulos, valorNominal, precioCompra, precioActual, tasaCupon, rendimiento, vencimiento });
     _wosRaw.bonos.push(created);
     render();
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏛️', title: `Added Bono: ${tipo} ${plazo}`, detail: `Tasa: ${tasaCompra}% · Monto: $${monto.toLocaleString()}`, amount: monto });
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏛️', title: `Added Bono: ${instrumento} ${serie}`, detail: `${titulos} títulos @ $${precioCompra} · Vence ${vencimiento}`, amount: precioActual * titulos });
   } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
 async function addAsset_fondos(){
-  const clave        = document.getElementById('fi-clave').value.trim().toUpperCase();
-  const nombre       = document.getElementById('fi-nombre').value.trim();
-  const operadora    = document.getElementById('fi-operadora').value.trim();
-  const tipo         = document.getElementById('fi-tipo').value;
-  const unidades     = parseFloat(document.getElementById('fi-unidades').value);
-  const precioCompra = parseFloat(document.getElementById('fi-compra').value);
-  const navActual    = parseFloat(document.getElementById('fi-nav').value);
-  const rendimiento  = parseFloat(document.getElementById('fi-rendimiento').value);
-  const fechaCompra  = document.getElementById('fi-fecha').value || null;
+  const clave        = document.getElementById('m-f-clave').value.trim().toUpperCase();
+  const nombre       = document.getElementById('m-f-nombre').value.trim();
+  const operadora    = document.getElementById('m-f-operadora').value.trim();
+  const tipo         = document.getElementById('m-f-tipo').value;
+  const unidades     = parseFloat(document.getElementById('m-f-unidades').value);
+  const precioCompra = parseFloat(document.getElementById('m-f-compra').value);
+  const navActual    = parseFloat(document.getElementById('m-f-nav').value);
+  const rendimiento  = parseFloat(document.getElementById('m-f-rendimiento').value);
   if(!clave || !nombre || !operadora || isNaN(unidades) || isNaN(precioCompra) || isNaN(navActual) || isNaN(rendimiento)){
     alert('Por favor completa todos los campos.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('fondos', { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento, fechaCompra });
+    const created = await WOS_API.holdings.create('fondos', { clave, nombre, operadora, tipo, unidades, precioCompra, navActual, rendimiento });
     _wosRaw.fondos.push(created);
     render();
     logEvent({ type: 'investment_added', category: 'Investment', icon: '📊', title: `Added Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
@@ -146,21 +179,20 @@ async function addAsset_fondos(){
 }
 
 async function addAsset_fibras(){
-  const ticker       = document.getElementById('fbi-ticker').value.trim().toUpperCase();
-  const nombre       = document.getElementById('fbi-nombre').value.trim();
-  const sector       = document.getElementById('fbi-sector').value;
-  const certificados = parseInt(document.getElementById('fbi-certificados').value);
-  const precioCompra = parseFloat(document.getElementById('fbi-compra').value);
-  const precioActual = parseFloat(document.getElementById('fbi-actual').value);
-  const distribucion = parseFloat(document.getElementById('fbi-distribucion').value);
-  const rendimiento  = parseFloat(document.getElementById('fbi-rendimiento').value);
-  const fechaCompra  = document.getElementById('fbi-fecha').value || null;
+  const ticker       = document.getElementById('m-fb-ticker').value.trim().toUpperCase();
+  const nombre       = document.getElementById('m-fb-nombre').value.trim();
+  const sector       = document.getElementById('m-fb-sector').value;
+  const certificados = parseInt(document.getElementById('m-fb-certificados').value);
+  const precioCompra = parseFloat(document.getElementById('m-fb-compra').value);
+  const precioActual = parseFloat(document.getElementById('m-fb-actual').value);
+  const distribucion = parseFloat(document.getElementById('m-fb-distribucion').value);
+  const rendimiento  = parseFloat(document.getElementById('m-fb-rendimiento').value);
   if(!ticker || !nombre || isNaN(certificados) || isNaN(precioCompra) || isNaN(precioActual) || isNaN(distribucion) || isNaN(rendimiento)){
     alert('Por favor completa todos los campos.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('fibras', { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento, fechaCompra });
+    const created = await WOS_API.holdings.create('fibras', { ticker, nombre, sector, certificados, precioCompra, precioActual, distribucion, rendimiento });
     _wosRaw.fibras.push(created);
     render();
     logEvent({ type: 'investment_added', category: 'Investment', icon: '🏢', title: `Added Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
@@ -168,21 +200,21 @@ async function addAsset_fibras(){
 }
 
 async function addAsset_retiro(){
-  const tipo         = document.getElementById('ri-tipo').value;
-  const nombre       = document.getElementById('ri-nombre').value.trim();
-  const institucion  = document.getElementById('ri-institucion').value.trim();
-  const subcuenta    = document.getElementById('ri-subcuenta').value;
-  const saldo        = parseFloat(document.getElementById('ri-saldo').value);
-  const aportacionYTD = parseFloat(document.getElementById('ri-aportacion-ytd').value) || 0;
-  const rendimiento  = parseFloat(document.getElementById('ri-rendimiento').value);
-  const fechaRetiro  = document.getElementById('ri-fecha-retiro').value || null;
-  const fechaCompra  = document.getElementById('ri-fecha').value || null;
+  const tipo               = document.getElementById('m-r-tipo').value;
+  const nombre             = document.getElementById('m-r-nombre').value.trim();
+  const institucion        = document.getElementById('m-r-institucion').value.trim();
+  const subcuenta          = document.getElementById('m-r-subcuenta').value;
+  const saldo              = parseFloat(document.getElementById('m-r-saldo').value);
+  const aportacionYTD      = parseFloat(document.getElementById('m-r-aportacion').value) || 0;
+  const aportacionPatronal = parseFloat(document.getElementById('m-r-patronal').value) || 0;
+  const rendimiento        = parseFloat(document.getElementById('m-r-rendimiento').value);
+  const proyeccion         = parseFloat(document.getElementById('m-r-proyeccion').value) || 0;
   if(!nombre || !institucion || isNaN(saldo) || isNaN(rendimiento)){
     alert('Por favor completa los campos obligatorios.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('retiro', { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, rendimiento, fechaRetiro, fechaCompra });
+    const created = await WOS_API.holdings.create('retiro', { tipo, nombre, institucion, subcuenta, saldo, aportacionYTD, aportacionPatronal, rendimiento, proyeccion });
     _wosRaw.retiro.push(created);
     render();
     logEvent({ type: 'investment_added', category: 'Investment', icon: '🏦', title: `Added Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
@@ -190,49 +222,44 @@ async function addAsset_retiro(){
 }
 
 async function addAsset_crypto(){
-  const symbol      = document.getElementById('ci-symbol').value.trim().toUpperCase();
-  const name        = document.getElementById('ci-name').value.trim();
-  const priceMxn    = parseFloat(document.getElementById('ci-price').value);
-  let   amount      = parseFloat(document.getElementById('ci-amount').value);
-  const purchaseAmt = parseFloat(document.getElementById('ci-purchase-amount').value);
-  const fechaCompra = document.getElementById('ci-fecha').value || null;
-  if(!isNaN(purchaseAmt) && !isNaN(priceMxn) && priceMxn > 0 && isNaN(amount)){
-    amount = purchaseAmt / priceMxn;
-  }
-  if(!symbol || !name || isNaN(amount) || isNaN(priceMxn)){
+  const symbol       = document.getElementById('m-c-symbol').value.trim().toUpperCase();
+  const name         = document.getElementById('m-c-name').value.trim();
+  const amount       = parseFloat(document.getElementById('m-c-amount').value);
+  const avgCost      = parseFloat(document.getElementById('m-c-cost').value);
+  const currentPrice = parseFloat(document.getElementById('m-c-price').value);
+  if(!symbol || !name || isNaN(amount) || isNaN(avgCost) || isNaN(currentPrice)){
     alert('Please fill in all required fields.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('crypto', { symbol, name, amount, avgCost: priceMxn, currentPrice: priceMxn, fechaCompra });
+    const created = await WOS_API.holdings.create('crypto', { symbol, name, amount, avgCost, currentPrice });
     _wosRaw.crypto.push(created);
     render();
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🪙', title: `Added Crypto: ${symbol}`, detail: `${amount} tokens @ $${priceMxn} · ${name}`, amount: priceMxn * amount });
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🪙', title: `Added Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} · ${name}`, amount: currentPrice * amount });
   } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
 async function addAsset_bienes(){
-  const nombre              = document.getElementById('bri-nombre').value.trim();
-  const tipo                = document.getElementById('bri-tipo').value;
-  const ubicacion           = document.getElementById('bri-ubicacion').value.trim();
-  const precioCompra        = parseFloat(document.getElementById('bri-precio').value);
-  const fechaCompra         = document.getElementById('bri-fecha').value || null;
-  const plusvaliaAnual      = parseFloat(document.getElementById('bri-plusvalia').value) || 0;
-  const gastosNotariales    = parseFloat(document.getElementById('bri-notariales').value) || 0;
-  const escrituracion       = parseFloat(document.getElementById('bri-escrituracion').value) || 0;
-  const impuestoAdquisicion = parseFloat(document.getElementById('bri-isabi').value) || 0;
-  const otrosGastos         = parseFloat(document.getElementById('bri-otros').value) || 0;
-  const saldoHipoteca       = parseFloat(document.getElementById('bri-hipoteca').value) || 0;
-  const rentaMensual        = parseFloat(document.getElementById('bri-renta').value) || 0;
-  if(!nombre || !ubicacion || isNaN(precioCompra)){
-    alert('Por favor completa: Nombre, Ubicación y Precio de Compra.'); return;
+  const nombre              = document.getElementById('m-br-nombre').value.trim();
+  const tipo                = document.getElementById('m-br-tipo').value;
+  const ubicacion           = document.getElementById('m-br-ubicacion').value.trim();
+  const precioCompra        = parseFloat(document.getElementById('m-br-precio').value);
+  const valorActual         = parseFloat(document.getElementById('m-br-valor').value);
+  const gastosNotariales    = parseFloat(document.getElementById('m-br-notariales').value) || 0;
+  const escrituracion       = parseFloat(document.getElementById('m-br-escrituracion').value) || 0;
+  const impuestoAdquisicion = parseFloat(document.getElementById('m-br-isabi').value) || 0;
+  const otrosGastos         = parseFloat(document.getElementById('m-br-otros').value) || 0;
+  const saldoHipoteca       = parseFloat(document.getElementById('m-br-hipoteca').value) || 0;
+  const rentaMensual        = parseFloat(document.getElementById('m-br-renta').value) || 0;
+  if(!nombre || !ubicacion || isNaN(precioCompra) || isNaN(valorActual)){
+    alert('Por favor completa: Nombre, Ubicación, Precio de Compra y Valor Actual.'); return;
   }
-  closeAssetModal();
+  closeModal();
   try {
-    const created = await WOS_API.holdings.create('bienes', { nombre, tipo, ubicacion, precioCompra, fechaCompra, plusvaliaAnual, gastosNotariales, escrituracion, impuestoAdquisicion, otrosGastos, saldoHipoteca, rentaMensual });
+    const created = await WOS_API.holdings.create('bienes', { nombre, tipo, ubicacion, precioCompra, plusvaliaAnual: 0, gastosNotariales, escrituracion, impuestoAdquisicion, otrosGastos, saldoHipoteca, rentaMensual });
     _wosRaw.bienes.push(created);
     render();
-    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion}`, amount: precioCompra });
+    logEvent({ type: 'investment_added', category: 'Investment', icon: '🏠', title: `Added Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Valor $${valorActual.toLocaleString()}`, amount: valorActual });
   } catch(_) { showToast('Failed to save. Please try again.', 'error'); }
 }
 
@@ -485,20 +512,20 @@ let lineChart = null;
 
 function setRange(r, btn) {
   currentRange = r;
-  document.querySelectorAll('.filter-pill').forEach(t => t.classList.remove('filter-pill--active'));
-  btn.classList.add('filter-pill--active');
-  const customRange = document.getElementById('dash-filter-custom-range');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab--active'));
+  btn.classList.add('tab--active');
+  const dateRow = document.getElementById('date-range-row');
   if (r === 'custom') {
-    if (customRange) customRange.classList.remove('filter-custom-range--disabled');
-    return; // wait for date selection
+    dateRow.classList.add('date-range-row--visible');
+    return; // wait for Apply
   }
-  if (customRange) customRange.classList.add('filter-custom-range--disabled');
+  dateRow.classList.remove('date-range-row--visible');
   renderLine(r);
 }
 
 function applyCustomRange() {
-  const startStr = document.getElementById('dash-filter-date-from').value;
-  const endStr   = document.getElementById('dash-filter-date-to').value;
+  const startStr = document.getElementById('date-start').value;
+  const endStr   = document.getElementById('date-end').value;
   if (!startStr || !endStr || endStr < startStr) return;
 
   if (_portfolioHistoryData && _portfolioHistoryData.length > 0) {

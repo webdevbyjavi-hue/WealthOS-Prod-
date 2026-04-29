@@ -93,12 +93,6 @@ function switchTab(name, btn) {
 // ─── Add Position (topbar button) ────────────────────────────────────────────
 function openAddModal() {
   const activeTab = (document.querySelector('.cat-tab--active') || {}).dataset?.tab || 'stocks';
-  openAssetModal(activeTab);
-}
-
-// ─── Shared modal callbacks (registered in add-asset-modal.js) ───────────────
-
-window._openTypeModal = function (type, editId) {
   const dispatch = {
     stocks: openStockModal,
     bonos:  openBonoModal,
@@ -108,32 +102,9 @@ window._openTypeModal = function (type, editId) {
     crypto: openCryptoModal,
     bienes: openBienesModal,
   };
-  const fn = dispatch[type];
-  if (fn) fn(editId || null);
-};
-
-window._wosAddAsset = function (type) {
-  const dispatch = {
-    stocks: saveStock,
-    bonos:  saveBono,
-    fondos: saveFondo,
-    fibras: saveFibra,
-    retiro: saveRetiro,
-    crypto: saveCrypto,
-    bienes: saveBien,
-  };
-  const fn = dispatch[type];
+  const fn = dispatch[activeTab];
   if (fn) fn();
-};
-
-window._onAssetModalClose = function () {
-  editingStockId = editingBonoId = editingFondoId =
-  editingFibraId = editingRetiroId = editingBienId = editingCryptoId = null;
-};
-
-window._onAssetTypeSelected = function (type) {
-  if (type === 'bonos') _populateBonoTipos();
-};
+}
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 document.getElementById('export-btn').addEventListener('click', () => {
@@ -469,7 +440,7 @@ function renderTable(filter = '') {
       <td class="${up ? 'td--up' : 'td--down'}">${fmtPct(ret)}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('stocks', '${h.id}')" title="Edit">✎</button>
+          <button class="s-btn-edit" onclick="openStockModal('${h.id}')" title="Edit">✎</button>
           <button class="btn-remove" onclick="removeStock('${h.id}')" title="Remove">✕</button>
         </div>
       </td>`;
@@ -831,6 +802,8 @@ function setLineRange(days, btn) {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openStockModal(id = null) {
   editingStockId = id;
+  document.getElementById('stock-modal-title').textContent = id ? 'Edit Stock' : 'Add Stock';
+  // Add mode: auto-lookup handles it — no button. Edit mode: show "Refresh Prices" button.
   const lookupWrapper = document.getElementById('si-lookup-wrapper');
   if (lookupWrapper) lookupWrapper.style.display = id ? '' : 'none';
   if (id) {
@@ -840,21 +813,28 @@ function openStockModal(id = null) {
     document.getElementById('si-ticker').value = s.ticker;
     document.getElementById('si-name').value   = s.name;
     document.getElementById('si-shares').value = s.shares;
+    // si-cost always shows USD (what the user originally paid per share)
     document.getElementById('si-cost').value   = s.avgCostUsd != null ? s.avgCostUsd.toFixed(4) : s.avgCost.toFixed(4);
+    // si-price shows MXN; dataset.usd holds the raw USD for the backend payload
     priceEl.dataset.usd = s.currentPriceUsd != null ? s.currentPriceUsd : s.currentPrice;
     priceEl.value       = s.currentPrice != null ? s.currentPrice.toFixed(2) : '';
     document.getElementById('si-fecha').value  = s.fechaCompra || '';
   } else {
     const priceEl = document.getElementById('si-price');
     ['si-ticker','si-name','si-shares','si-cost','si-fecha']
-      .forEach(eid => { document.getElementById(eid).value = ''; });
-    priceEl.value = '';
+      .forEach(id => { document.getElementById(id).value = ''; });
+    priceEl.value       = '';
     delete priceEl.dataset.usd;
   }
-  _openAssetModalRaw('stocks', !!id);
+  document.getElementById('stock-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeStockModal(e) { closeAssetModal(e); }
+function closeStockModal(e) {
+  if (!e || e.target === document.getElementById('stock-modal-overlay')) {
+    document.getElementById('stock-modal-overlay').classList.remove('modal-overlay--visible');
+    editingStockId = null;
+  }
+}
 
 async function saveStock() {
   const ticker      = document.getElementById('si-ticker').value.trim().toUpperCase();
@@ -902,7 +882,7 @@ async function saveStock() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '📈', title: `${editId ? 'Updated' : 'Added'} Stock: ${ticker}`, detail: `${shares} shares @ $${cost} avg cost · ${name}`, amount: shares * price });
   renderAll();
-  closeAssetModal();
+  closeStockModal();
 
   try {
     const item = stocks.find(h => h.id === targetId);
@@ -1083,7 +1063,7 @@ function renderBonosTable(filter = '') {
       <td>${dateStr}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('bonos', '${b.id}')" title="Editar">✎</button>
+          <button class="s-btn-edit" onclick="openBonoModal('${b.id}')" title="Editar">✎</button>
           <button class="btn-remove" onclick="removeBono('${b.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
@@ -1288,7 +1268,10 @@ async function lookupBonoTasa() {
 // ─── Open / Close Modal ───────────────────────────────────────────────────────
 async function openBonoModal(id = null) {
   editingBonoId = id;
+  document.getElementById('bono-modal-title').textContent =
+    id ? 'Editar Bono Gubernamental' : 'Agregar Bono Gubernamental';
 
+  // Load catalog once
   if (!bonosCatalog) {
     try {
       bonosCatalog = await WOS_API.bonos.getCatalog();
@@ -1322,13 +1305,19 @@ async function openBonoModal(id = null) {
     document.getElementById('bi-tasa').value  = '';
     document.getElementById('bi-monto').value = '';
     document.getElementById('bi-fecha').value = '';
+    // Auto-fetch the live rate for the default selection
     if (firstTipo && firstPlazo) lookupBonoTasa();
   }
 
-  _openAssetModalRaw('bonos', !!id);
+  document.getElementById('bono-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeBonoModal(e) { closeAssetModal(e); }
+function closeBonoModal(e) {
+  if (!e || e.target === document.getElementById('bono-modal-overlay')) {
+    document.getElementById('bono-modal-overlay').classList.remove('modal-overlay--visible');
+    editingBonoId = null;
+  }
+}
 
 async function saveBono() {
   const tipo         = document.getElementById('bi-tipo').value;
@@ -1359,7 +1348,7 @@ async function saveBono() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏛️', title: `${editId ? 'Updated' : 'Added'} Bono: ${tipo} ${plazo}`, detail: `Tasa: ${tasaCompra}% · Monto: ${fmt(monto)}`, amount: monto });
   renderAllBonos();
-  closeAssetModal();
+  closeBonoModal();
 
   try {
     const item = bonos.find(x => x.id === targetId);
@@ -1533,7 +1522,7 @@ function renderFondosTable(filter = '') {
       <td>${x.rendimiento.toFixed(2)}%</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('fondos', '${x.id}')" title="Editar">✎</button>
+          <button class="s-btn-edit" onclick="openFondoModal('${x.id}')" title="Editar">✎</button>
           <button class="btn-remove" onclick="removeFondo('${x.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
@@ -1671,6 +1660,7 @@ function setFondosLineRange(days, btn) {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openFondoModal(id = null) {
   editingFondoId = id;
+  document.getElementById('fondo-modal-title').textContent = id ? 'Editar Fondo' : 'Agregar Fondo';
   if (id) {
     const x = fondos.find(f => f.id === id);
     if (!x) return;
@@ -1685,13 +1675,18 @@ function openFondoModal(id = null) {
     document.getElementById('fi-fecha').value       = x.fechaCompra || '';
   } else {
     ['fi-clave','fi-nombre','fi-operadora','fi-unidades','fi-compra','fi-nav','fi-rendimiento','fi-fecha']
-      .forEach(eid => { document.getElementById(eid).value = ''; });
+      .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('fi-tipo').value = 'Renta Variable';
   }
-  _openAssetModalRaw('fondos', !!id);
+  document.getElementById('fondo-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeFondoModal(e) { closeAssetModal(e); }
+function closeFondoModal(e) {
+  if (!e || e.target === document.getElementById('fondo-modal-overlay')) {
+    document.getElementById('fondo-modal-overlay').classList.remove('modal-overlay--visible');
+    editingFondoId = null;
+  }
+}
 
 async function saveFondo() {
   const clave        = document.getElementById('fi-clave').value.trim().toUpperCase();
@@ -1735,7 +1730,7 @@ async function saveFondo() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '📊', title: `${editId ? 'Updated' : 'Added'} Fondo: ${clave}`, detail: `${unidades} unidades · ${nombre} (${operadora})`, amount: navActual * unidades });
   renderAllFondos();
-  closeAssetModal();
+  closeFondoModal();
 
   try {
     const item = fondos.find(f => f.id === targetId);
@@ -1911,7 +1906,7 @@ function renderFibrasTable(filter = '') {
       <td>${divYield.toFixed(2)}%</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('fibras', '${x.id}')" title="Editar">✎</button>
+          <button class="s-btn-edit" onclick="openFibraModal('${x.id}')" title="Editar">✎</button>
           <button class="btn-remove" onclick="removeFibra('${x.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
@@ -2053,6 +2048,7 @@ function setFibrasLineRange(days, btn) {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openFibraModal(id = null) {
   editingFibraId = id;
+  document.getElementById('fibra-modal-title').textContent = id ? 'Editar Fibra' : 'Agregar Fibra';
   if (id) {
     const x = fibras.find(f => f.id === id);
     if (!x) return;
@@ -2067,13 +2063,18 @@ function openFibraModal(id = null) {
     document.getElementById('fbi-fecha').value        = x.fechaCompra || '';
   } else {
     ['fbi-ticker','fbi-nombre','fbi-certificados','fbi-compra','fbi-actual','fbi-distribucion','fbi-rendimiento','fbi-fecha']
-      .forEach(eid => { document.getElementById(eid).value = ''; });
+      .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('fbi-sector').value = 'Diversificado';
   }
-  _openAssetModalRaw('fibras', !!id);
+  document.getElementById('fibra-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeFibraModal(e) { closeAssetModal(e); }
+function closeFibraModal(e) {
+  if (!e || e.target === document.getElementById('fibra-modal-overlay')) {
+    document.getElementById('fibra-modal-overlay').classList.remove('modal-overlay--visible');
+    editingFibraId = null;
+  }
+}
 
 async function saveFibra() {
   const ticker       = document.getElementById('fbi-ticker').value.trim().toUpperCase();
@@ -2117,7 +2118,7 @@ async function saveFibra() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏢', title: `${editId ? 'Updated' : 'Added'} Fibra: ${ticker}`, detail: `${certificados} certificados @ $${precioCompra} · ${nombre}`, amount: precioActual * certificados });
   renderAllFibras();
-  closeAssetModal();
+  closeFibraModal();
 
   try {
     const item = fibras.find(f => f.id === targetId);
@@ -2286,7 +2287,7 @@ function renderRetiroTable(filter = '') {
       <td>${fmt(r.proyeccion || 0)}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('retiro', '${r.id}')" title="Editar">✎</button>
+          <button class="s-btn-edit" onclick="openRetiroModal('${r.id}')" title="Editar">✎</button>
           <button class="btn-remove" onclick="removeRetiro('${r.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
@@ -2304,8 +2305,7 @@ function buildRetiroLineData() {
 
   const starts = retiro.filter(r => r.fechaCompra).map(r => { const d = new Date(r.fechaCompra + 'T00:00:00'); d.setDate(1); return d; });
   const ends   = retiro.filter(r => r.fechaRetiro).map(r => { const d = new Date(r.fechaRetiro  + 'T00:00:00'); d.setDate(1); return d; });
-  // Fall back to 1 year ago if no record has fechaCompra yet
-  if (!starts.length) { const fallback = new Date(today); fallback.setFullYear(fallback.getFullYear() - 1); starts.push(fallback); }
+  if (!starts.length) return null;
 
   const minStart = new Date(Math.min(...starts.map(d => d.getTime())));
   const maxEnd   = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : today;
@@ -2481,6 +2481,7 @@ function updateRetiroCharts() {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openRetiroModal(id = null) {
   editingRetiroId = id;
+  document.getElementById('retiro-modal-title').textContent = id ? 'Editar Fondo de Retiro' : 'Agregar Fondo de Retiro';
   if (id) {
     const r = retiro.find(x => x.id === id);
     if (!r) return;
@@ -2499,10 +2500,15 @@ function openRetiroModal(id = null) {
     document.getElementById('ri-tipo').value      = 'PPR';
     document.getElementById('ri-subcuenta').value = 'Voluntario';
   }
-  _openAssetModalRaw('retiro', !!id);
+  document.getElementById('retiro-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeRetiroModal(e) { closeAssetModal(e); }
+function closeRetiroModal(e) {
+  if (!e || e.target === document.getElementById('retiro-modal-overlay')) {
+    document.getElementById('retiro-modal-overlay').classList.remove('modal-overlay--visible');
+    editingRetiroId = null;
+  }
+}
 
 async function saveRetiro() {
   const tipo               = document.getElementById('ri-tipo').value;
@@ -2546,7 +2552,7 @@ async function saveRetiro() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏦', title: `${editId ? 'Updated' : 'Added'} Retiro: ${nombre}`, detail: `Saldo $${saldo.toLocaleString()} · ${tipo} (${institucion})`, amount: saldo });
   renderAllRetiro();
-  closeAssetModal();
+  closeRetiroModal();
 
   try {
     const item = retiro.find(x => x.id === targetId);
@@ -2782,7 +2788,7 @@ function renderBienesTable(filter = '') {
       <td>${b.rentaMensual ? fmt(b.rentaMensual) : '<span style="color:var(--text-tertiary)">—</span>'}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('bienes', '${b.id}')" title="Editar">✎</button>
+          <button class="s-btn-edit" onclick="openBienesModal('${b.id}')" title="Editar">✎</button>
           <button class="btn-remove" onclick="removeBien('${b.id}')" title="Eliminar">✕</button>
         </div>
       </td>`;
@@ -2986,6 +2992,7 @@ function setBienesLineRange(days, btn) {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 function openBienesModal(id = null) {
   editingBienId = id;
+  document.getElementById('bienes-modal-title').textContent = id ? 'Editar Propiedad' : 'Agregar Propiedad';
   if (id) {
     const b = bienes.find(x => x.id === id);
     if (!b) return;
@@ -3008,10 +3015,15 @@ function openBienesModal(id = null) {
       .forEach(fid => { document.getElementById(fid).value = ''; });
     document.getElementById('bri-tipo').value = 'Casa';
   }
-  _openAssetModalRaw('bienes', !!id);
+  document.getElementById('bienes-modal-overlay').classList.add('modal-overlay--visible');
 }
 
-function closeBienesModal(e) { closeAssetModal(e); }
+function closeBienesModal(e) {
+  if (!e || e.target === document.getElementById('bienes-modal-overlay')) {
+    document.getElementById('bienes-modal-overlay').classList.remove('modal-overlay--visible');
+    editingBienId = null;
+  }
+}
 
 async function saveBien() {
   const nombre              = document.getElementById('bri-nombre').value.trim();
@@ -3055,7 +3067,7 @@ async function saveBien() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🏠', title: `${editId ? 'Updated' : 'Added'} Propiedad: ${nombre}`, detail: `${tipo} · ${ubicacion} · Plusvalía ${plusvaliaAnual}%/yr`, amount: valorActualComputed });
   renderAllBienes();
-  closeAssetModal();
+  closeBienesModal();
 
   try {
     const item = bienes.find(x => x.id === targetId);
@@ -3250,7 +3262,7 @@ function renderCryptoTable(filter = '') {
       <td class="${up ? 'td--up' : 'td--down'}">${fmtPct(ret)}</td>
       <td>
         <div class="s-row-actions">
-          <button class="s-btn-edit" onclick="openAssetModal('crypto', '${c.id}')" title="Edit">✎</button>
+          <button class="s-btn-edit" onclick="openCryptoModal('${c.id}')" title="Edit">✎</button>
           <button class="btn-remove" onclick="removeCrypto('${c.id}')" title="Remove">✕</button>
         </div>
       </td>`;
@@ -3428,6 +3440,8 @@ function setCryptoLineRange(days, btn) {
 // ─── Add / Edit Modal ─────────────────────────────────────────────────────────
 async function openCryptoModal(id = null) {
   editingCryptoId = id;
+  document.getElementById('crypto-modal-title').textContent = id ? 'Edit Coin' : 'Add Coin';
+
   if (!_cryptoFxRate) {
     try { const fx = await WOS_API.exchangeRate.getUsdMxn(); _cryptoFxRate = fx.rate; } catch (_) {}
   }
@@ -3457,7 +3471,7 @@ async function openCryptoModal(id = null) {
     delete priceEl.dataset.usd;
   }
   _updateCryptoFxHint();
-  _openAssetModalRaw('crypto', !!id);
+  document.getElementById('crypto-modal-overlay').classList.add('modal-overlay--visible');
 }
 
 function onCryptoAmountInput() {
@@ -3495,7 +3509,12 @@ function onCryptoPriceInput() {
   }
 }
 
-function closeCryptoModal(e) { closeAssetModal(e); }
+function closeCryptoModal(e) {
+  if (!e || e.target === document.getElementById('crypto-modal-overlay')) {
+    document.getElementById('crypto-modal-overlay').classList.remove('modal-overlay--visible');
+    editingCryptoId = null;
+  }
+}
 
 async function saveCrypto() {
   const symbol       = document.getElementById('ci-symbol').value.trim().toUpperCase();
@@ -3539,7 +3558,7 @@ async function saveCrypto() {
 
   logEvent({ type: editId ? 'investment_updated' : 'investment_added', category: 'Investment', icon: '🪙', title: `${editId ? 'Updated' : 'Added'} Crypto: ${symbol}`, detail: `${amount} tokens @ $${avgCost} avg cost · ${name}`, amount: currentPrice * amount });
   renderAllCrypto();
-  closeAssetModal();
+  closeCryptoModal();
 
   try {
     const item = cryptos.find(x => x.id === targetId);

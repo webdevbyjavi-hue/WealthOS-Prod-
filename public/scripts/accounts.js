@@ -214,7 +214,7 @@ async function deleteAccount(id) {
 function openAddTransactionModal() {
   if (accounts.length === 0) { toast(typeof t === 'function' ? t('err_add_account_first') : 'Add at least one account first.', 'warning'); return; }
   const sel = document.getElementById('ti-account');
-  sel.innerHTML = '<option value="">— Select account —</option>' + accounts.map(a =>
+  sel.innerHTML = accounts.map(a =>
     `<option value="${escHtml(a.id)}">${escHtml(a.name)} (${escHtml(a.currency)})</option>`
   ).join('');
   document.getElementById('ti-type').value = 'in';
@@ -274,20 +274,6 @@ async function saveTransaction() {
     const created = await WOS_API.accounts.createTransaction(accountId, txnData);
     const idx = transactions.findIndex(t => t.id === tempId);
     if (idx !== -1) transactions[idx] = created;
-
-    // Apply balance delta to the linked account
-    const localDelta = type === 'in' ? amount : -amount;
-    const acctIdx    = accounts.findIndex(a => a.id === accountId);
-    if (acctIdx !== -1) {
-      const a          = accounts[acctIdx];
-      const newBalance = (a.balance || 0) + localDelta;
-      accounts[acctIdx] = { ...a, balance: newBalance, balanceMXN: newBalance * (a.fxRate || 1) };
-      render();
-      WOS_API.accounts.update(accountId, { ...a, balance: newBalance }).catch(() => {});
-      WOS_API.accounts.takeSnapshot().then(() =>
-        WOS_API.accounts.listSnapshots().then(snaps => { accountSnapshots = snaps; renderBalanceTrendChart(); }).catch(() => {})
-      ).catch(() => {});
-    }
 
     const acctName = acct ? acct.name : accountId;
     const currency = acct ? acct.currency : '';
