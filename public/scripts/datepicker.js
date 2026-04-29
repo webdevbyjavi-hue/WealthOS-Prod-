@@ -29,8 +29,9 @@
   }
 
   function init(wrapper) {
-    const input = wrapper.querySelector('.datepicker__input');
-    const popup = wrapper.querySelector('.datepicker__popup');
+    const input       = wrapper.querySelector('.datepicker__input');
+    const popup       = wrapper.querySelector('.datepicker__popup');
+    const allowFuture = wrapper.hasAttribute('data-allow-future');
 
     const nativeDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
     const nativeSet  = nativeDesc.set;
@@ -61,12 +62,13 @@
       for (let i = 0; i < first; i++) grid += '<span></span>';
       for (let d = 1; d <= dim; d++) {
         const ymd = toYMD(vy, vm, d);
-        const isFuture = ymd > todayYMD;
+        const isFuture    = ymd > todayYMD;
+        const isDisabled  = isFuture && !allowFuture;
         let cls = 'dp__day';
         if (ymd === todayYMD) cls += ' dp__day--today';
         if (ymd === selYMD)   cls += ' dp__day--selected';
-        if (isFuture)         cls += ' dp__day--future';
-        grid += `<span class="${cls}"${isFuture ? '' : ` data-ymd="${ymd}"`}>${d}</span>`;
+        if (isDisabled)       cls += ' dp__day--future';
+        grid += `<span class="${cls}"${isDisabled ? '' : ` data-ymd="${ymd}"`}>${d}</span>`;
       }
 
       popup.innerHTML = `
