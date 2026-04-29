@@ -84,7 +84,7 @@ function _setModalMode(mode) {
 
 function _fillModalFromTxn(txn) {
   const sel = document.getElementById('ti-account');
-  sel.innerHTML = accounts.map(a =>
+  sel.innerHTML = '<option value="">— Select account —</option>' + accounts.map(a =>
     `<option value="${escHtml(a.id)}">${escHtml(a.name)} (${escHtml(a.currency)})</option>`
   ).join('');
   sel.value = txn.accountId;
@@ -111,7 +111,7 @@ function openAddTransactionModal() {
   }
   _resetModal();
   const sel = document.getElementById('ti-account');
-  sel.innerHTML = accounts.map(a =>
+  sel.innerHTML = '<option value="">— Select account —</option>' + accounts.map(a =>
     `<option value="${escHtml(a.id)}">${escHtml(a.name)} (${escHtml(a.currency)})</option>`
   ).join('');
 
@@ -195,6 +195,16 @@ async function _createTransaction({ accountId, type, amount, date, description, 
         currency:    created.currency || (acct ? acct.currency : 'MXN'),
       };
     }
+    // Apply balance delta to the linked account
+    const localDelta = type === 'in' ? amount : -amount;
+    const acctIdx    = accounts.findIndex(a => a.id === accountId);
+    if (acctIdx !== -1) {
+      const a          = accounts[acctIdx];
+      const newBalance = (a.balance || 0) + localDelta;
+      accounts[acctIdx] = { ...a, balance: newBalance, balanceMXN: newBalance * (a.fxRate || 1) };
+      WOS_API.accounts.update(accountId, { ...a, balance: newBalance }).catch(() => {});
+    }
+
     if (typeof logEvent === 'function') {
       const cur = acct ? acct.currency : '';
       logEvent({
@@ -258,14 +268,29 @@ async function _updateTransaction(txnId, { type, amount, date, description, cate
 async function deleteTxn(txnId) {
   const txn = transactions.find(t => t.id === txnId);
   if (!txn) return;
-  const backup = [...transactions];
+  const backup         = [...transactions];
+  const backupAccounts = accounts.map(a => ({ ...a }));
   transactions = transactions.filter(t => t.id !== txnId);
+
+  // Optimistically reverse balance delta
+  const localDelta = txn.type === 'in' ? -txn.amount : txn.amount;
+  const acctIdx    = accounts.findIndex(a => a.id === txn.accountId);
+  if (acctIdx !== -1) {
+    const a          = accounts[acctIdx];
+    const newBalance = (a.balance || 0) + localDelta;
+    accounts[acctIdx] = { ...a, balance: newBalance, balanceMXN: newBalance * (a.fxRate || 1) };
+  }
   render();
+
   try {
     await WOS_API.accounts.deleteTransaction(txn.accountId, txnId);
+    if (acctIdx !== -1) {
+      WOS_API.accounts.update(txn.accountId, { ...accounts[acctIdx] }).catch(() => {});
+    }
     toast('Transaction removed.', 'warning');
   } catch (_) {
     transactions = backup;
+    accounts.splice(0, accounts.length, ...backupAccounts);
     render();
     toast('Failed to remove transaction. Please try again.', 'error');
   }
