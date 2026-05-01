@@ -57,8 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       ]);
       transactions     = txArrays.flat();
       accountSnapshots = snaps;
-      // Silently capture today's balances (upserts — safe to call every load)
-      WOS_API.accounts.takeSnapshot().catch(() => {});
     }
   } catch (_) {
     accounts         = [];

@@ -106,6 +106,8 @@
         localStorage.setItem('wos_user_initials', initials);
         updateSidebarName(fullName, initials);
       }
+      // Capture today's account balances on every login (upsert — safe to call repeatedly)
+      WOS_API.accounts.takeSnapshot().catch(() => {});
     })
     .catch(err => {
       if (err.status === 401) WOS_AUTH.signout();

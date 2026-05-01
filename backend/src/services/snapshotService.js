@@ -24,9 +24,9 @@
  *   • The manual trigger endpoint POST /api/snapshots/run.
  */
 
-const { supabaseAdmin }                          = require('./supabaseClient');
-const { fetchBatchQuote, normalizeSymbol }       = require('./priceService');
-const { enqueue }                                = require('./requestQueue');
+const { supabaseAdmin }                                               = require('./supabaseClient');
+const { fetchBatchQuote, fetchHistoricalTimeSeries, normalizeSymbol } = require('./priceService');
+const { enqueue }                                                     = require('./requestQueue');
 
 const BATCH_SIZE = parseInt(process.env.SNAPSHOT_BATCH_SIZE || '8', 10);
 
@@ -221,4 +221,139 @@ async function savePortfolioSnapshots(date) {
   console.log(`[snapshotService] Saved portfolio snapshots for ${rows.length} user(s) on ${date} (rate: ${fxRate}).`);
 }
 
-module.exports = { runSnapshots, savePortfolioSnapshots };
+/**
+ * Catch up on any trading days missed while the server was offline.
+ *
+ * Called once at server startup (fire-and-forget). Finds the most recent date
+ * in stocks_snapshot, then fetches the full missing range for every held symbol
+ * via /time_series — one API call per symbol covers ALL missing days, so this
+ * is very credit-efficient (10 symbols × 1 credit each, regardless of gap size).
+ *
+ * Uses 'normal' priority so it never starves the nightly cron job.
+ * Does nothing if snapshots are already up to date.
+ */
+async function backfillSnapshots() {
+  // 1. Find the most recent snapshot date across all symbols
+  const { data: lastRow, error: lastErr } = await supabaseAdmin
+    .from('stocks_snapshot')
+    .select('date')
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lastErr) {
+    console.warn(`[snapshotService] Backfill: could not query last date — ${lastErr.message}`);
+    return;
+  }
+  if (!lastRow) {
+    console.log('[snapshotService] Backfill: no existing snapshots — skipping (seed with POST /api/snapshots/run).');
+    return;
+  }
+
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+  if (lastRow.date >= yesterdayStr) {
+    console.log(`[snapshotService] Backfill: up to date (last snapshot: ${lastRow.date}).`);
+    return;
+  }
+
+  const startDate = new Date(lastRow.date + 'T00:00:00Z');
+  startDate.setUTCDate(startDate.getUTCDate() + 1);
+  const startStr = startDate.toISOString().slice(0, 10);
+
+  console.log(`[snapshotService] Backfill: gap detected — fetching ${startStr} → ${yesterdayStr}`);
+
+  // 2. Collect every held symbol (same logic as runSnapshots)
+  const [stocksRes, fibrasRes, cryptoRes] = await Promise.all([
+    supabaseAdmin.from('stocks').select('ticker'),
+    supabaseAdmin.from('fibras').select('ticker'),
+    supabaseAdmin.from('crypto').select('symbol'),
+  ]);
+
+  if (stocksRes.error || fibrasRes.error || cryptoRes.error) {
+    console.warn('[snapshotService] Backfill: failed to load holdings — aborting.');
+    return;
+  }
+
+  // Map tdSymbol → { rawTicker, assetType } so we can call fetchHistoricalTimeSeries
+  const symbolMap = new Map();
+  for (const row of (stocksRes.data || [])) {
+    const tdSym = normalizeSymbol(row.ticker, 'stock');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, { rawTicker: row.ticker, assetType: 'stock' });
+  }
+  for (const row of (fibrasRes.data || [])) {
+    const tdSym = normalizeSymbol(row.ticker, 'reit');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, { rawTicker: row.ticker, assetType: 'reit' });
+  }
+  for (const row of (cryptoRes.data || [])) {
+    const tdSym = normalizeSymbol(row.symbol, 'crypto');
+    if (!symbolMap.has(tdSym)) symbolMap.set(tdSym, { rawTicker: row.symbol, assetType: 'crypto' });
+  }
+
+  if (symbolMap.size === 0) {
+    console.log('[snapshotService] Backfill: no holdings found — nothing to backfill.');
+    return;
+  }
+
+  // 3. One /time_series call per symbol covers the entire missing date range
+  const coveredDates = new Set();
+  let totalBars = 0;
+
+  for (const [tdSymbol, { rawTicker, assetType }] of symbolMap.entries()) {
+    try {
+      const bars = await enqueue(
+        () => fetchHistoricalTimeSeries(rawTicker, assetType, startStr, yesterdayStr),
+        { priority: 'normal', creditCost: 1 }
+      );
+
+      if (!bars.length) {
+        console.log(`[snapshotService] Backfill: ${tdSymbol} — no data for range (market closed?)`);
+        continue;
+      }
+
+      const rows = bars.map(b => ({
+        symbol: tdSymbol,
+        date:   b.date,
+        open:   b.open,
+        high:   b.high,
+        low:    b.low,
+        close:  b.close,
+        volume: b.volume,
+      }));
+
+      const { error: upsertErr } = await supabaseAdmin
+        .from('stocks_snapshot')
+        .upsert(rows, { onConflict: 'symbol,date', ignoreDuplicates: true });
+
+      if (upsertErr) {
+        console.warn(`[snapshotService] Backfill: upsert error for ${tdSymbol} — ${upsertErr.message}`);
+        continue;
+      }
+
+      bars.forEach(b => coveredDates.add(b.date));
+      totalBars += bars.length;
+      console.log(`[snapshotService] Backfill: ✓ ${tdSymbol} — ${bars.length} bar(s)`);
+    } catch (err) {
+      console.warn(`[snapshotService] Backfill: ✗ ${tdSymbol} — ${err.message}`);
+    }
+  }
+
+  if (totalBars === 0) {
+    console.log('[snapshotService] Backfill: no new bars written (all dates may be non-trading days).');
+    return;
+  }
+
+  // 4. Rebuild portfolio snapshots for every newly covered date
+  const sortedDates = [...coveredDates].sort();
+  for (const date of sortedDates) {
+    await savePortfolioSnapshots(date).catch(err =>
+      console.warn(`[snapshotService] Backfill: portfolio snapshot failed for ${date} — ${err.message}`)
+    );
+  }
+
+  console.log(`[snapshotService] Backfill complete — ${totalBars} bar(s) across ${coveredDates.size} trading day(s).`);
+}
+
+module.exports = { runSnapshots, savePortfolioSnapshots, backfillSnapshots };

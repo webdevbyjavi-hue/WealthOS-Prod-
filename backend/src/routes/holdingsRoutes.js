@@ -86,6 +86,8 @@ const retiroRules = [
   body('nombre').trim().notEmpty().withMessage('nombre is required.'),
   body('institucion').trim().notEmpty().withMessage('institucion is required.'),
   positiveNumber('saldo'),
+  body('fecha_compra').optional({ nullable: true }).isISO8601().withMessage('fecha_compra must be YYYY-MM-DD.'),
+  body('fecha_retiro').optional({ nullable: true }).isISO8601().withMessage('fecha_retiro must be YYYY-MM-DD.'),
 ];
 
 // ─── Bienes  { nombre, tipo, ubicacion, precio_compra, gastos_notariales,

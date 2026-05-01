@@ -154,6 +154,16 @@ if (config.nodeEnv !== 'test') {
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(config.port, () => {
   console.log(`[WealthOS API] Running in ${config.nodeEnv} mode on port ${config.port}`);
+
+  // Catch up on any snapshot days missed while the server was offline (e.g. Render
+  // free-tier spin-down). Fire-and-forget — never blocks the server from accepting
+  // requests, and uses 'normal' priority so it won't starve the nightly cron.
+  if (config.nodeEnv !== 'test') {
+    const { backfillSnapshots } = require('./src/services/snapshotService');
+    backfillSnapshots().catch(err =>
+      console.error('[startup] Snapshot backfill failed:', err.message)
+    );
+  }
 });
 
 module.exports = app; // export for testing

@@ -532,21 +532,25 @@ async function loadRealHistory() {
   const today = new Date().toISOString().slice(0, 10);
   const from  = (() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); })();
 
+  // Fetch a live USD/MXN rate once; used as fallback when a holding has no stored tipoDeCambio.
+  let usdMxn = 1;
+  try { const fx = await WOS_API.exchangeRate.getUsdMxn(); usdMxn = fx.rate || 1; } catch (_) {}
+
   /**
    * Build a date→value Map by fetching close prices from stocks_snapshot
-   * for each holding and multiplying by its quantity.
-   * Values are in the currency of the stocks_snapshot symbol (USD for stocks
-   * and crypto, MXN for fibras .MX). MXN conversion for crypto/stocks happens
-   * at chart-render time via _cryptoFxRate.
+   * for each holding and multiplying by quantity × fxFn(holding).
+   * fxFn converts the snapshot currency to MXN: pass a function for USD
+   * symbols, omit (defaults to 1) for symbols already priced in MXN.
    */
-  async function buildMap(holdings, tickerKey, quantityKey, symbolFn) {
+  async function buildMap(holdings, tickerKey, quantityKey, symbolFn, fxFn) {
     const map = new Map();
     await Promise.all(holdings.map(async (h) => {
       const symbol = symbolFn(h[tickerKey]);
+      const fx     = fxFn ? (fxFn(h) || 1) : 1;
       try {
         const priceHistory = await WOS_API.prices.history(symbol, from, today);
         priceHistory.forEach(p => {
-          map.set(p.date, (map.get(p.date) || 0) + p.close * parseFloat(h[quantityKey]));
+          map.set(p.date, (map.get(p.date) || 0) + p.close * parseFloat(h[quantityKey]) * fx);
         });
       } catch (_) {}
     }));
@@ -554,8 +558,8 @@ async function loadRealHistory() {
   }
 
   const [sm, cm, fm] = await Promise.all([
-    buildMap(stocks,  'ticker', 'shares',       t => t),
-    buildMap(cryptos, 'symbol', 'amount',        t => `${t}/USD`),
+    buildMap(stocks,  'ticker', 'shares',       t => t,          h => h.tipoDeCambio || usdMxn),
+    buildMap(cryptos, 'symbol', 'amount',        t => `${t}/USD`, () => _cryptoFxRate || usdMxn),
     buildMap(fibras,  'ticker', 'certificados',  t => `${t}.MX`),
   ]);
 

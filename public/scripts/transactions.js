@@ -372,19 +372,17 @@ function setTimeframe(tf) {
   render();
 }
 
-/* ─── Date filter (tab-group) ────────────────────────────────── */
-function setRange(range, btn) {
-  document.querySelectorAll('.tab-group .tab').forEach(t => t.classList.remove('tab--active'));
-  if (btn) btn.classList.add('tab--active');
+/* ─── Date filter (filter-pills) ────────────────────────────────── */
+function setDateFilter(period) {
+  const map = { week: '1w', month: '1m', ytd: 'ytd', custom: 'custom' };
+  timeframeFilter = map[period] || 'ytd';
 
-  const row = document.getElementById('date-range-row');
-  if (range === 'custom') {
-    row.classList.add('date-range-row--visible');
-    timeframeFilter = 'custom';
-  } else {
-    row.classList.remove('date-range-row--visible');
-    timeframeFilter = range;
-  }
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+  const btn = document.getElementById('fp-' + period);
+  if (btn) btn.classList.add('filter-pill--active');
+
+  const customRange = document.getElementById('filter-custom-range');
+  if (customRange) customRange.classList.toggle('filter-custom-range--disabled', period !== 'custom');
 
   currentPage    = 1;
   chartBarFilter = null;
@@ -409,8 +407,8 @@ function setFlowFilter(type) {
 }
 
 function applyCustomRange() {
-  filterDateFrom  = document.getElementById('date-start').value;
-  filterDateTo    = document.getElementById('date-end').value;
+  filterDateFrom  = document.getElementById('filter-date-from').value;
+  filterDateTo    = document.getElementById('filter-date-to').value;
   timeframeFilter = 'custom';
   currentPage     = 1;
   render();
@@ -520,7 +518,7 @@ function updateKPIs() {
   netEl.textContent = fmtMXN(netFlow);
   netEl.style.color = netFlow >= 0 ? 'var(--up)' : 'var(--down)';
 
-  const tfLabels = { all: 'All Time', '1m': 'This Month', '3m': 'Last 3M', ytd: 'YTD', '1y': 'Last 12M' };
+  const tfLabels = { all: 'All Time', '1w': 'This Week', '1m': 'This Month', '3m': 'Last 3M', ytd: 'YTD', '1y': 'Last 12M' };
   const labelEl  = document.getElementById('k-net-flow-label');
   if (labelEl) labelEl.textContent = `Net Flow (${tfLabels[timeframeFilter] || 'All Time'})`;
 }

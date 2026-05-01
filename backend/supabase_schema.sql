@@ -221,6 +221,8 @@ CREATE TABLE IF NOT EXISTS retiro (
   aportacion_patronal   NUMERIC(18,2) DEFAULT 0,
   rendimiento           NUMERIC(8,4),
   proyeccion            NUMERIC(18,2),
+  fecha_compra          DATE,
+  fecha_retiro          DATE,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
