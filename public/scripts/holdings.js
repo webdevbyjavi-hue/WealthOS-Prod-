@@ -2313,7 +2313,13 @@ function buildRetiroLineData() {
   // Fall back to today when no entry has an enrollment date so the chart
   // still renders the current balance + forward projection instead of blank.
   const minStart = starts.length ? new Date(Math.min(...starts.map(d => d.getTime()))) : new Date(today);
-  const maxEnd   = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : today;
+
+  // Without a fechaRetiro, default to 25 years from now so the projection
+  // line has a meaningful horizon to draw instead of collapsing to a single
+  // invisible dot (pointRadius is 0 on this chart).
+  const defaultEnd = new Date(today);
+  defaultEnd.setFullYear(defaultEnd.getFullYear() + 25);
+  const maxEnd = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : defaultEnd;
 
   const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const labels = [], pastPts = [], futurePts = [];
