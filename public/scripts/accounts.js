@@ -404,10 +404,14 @@ function updateSummary() {
     })
     .reduce((s, t) => s + (t.amountMXN || 0), 0);
 
-  document.getElementById('sum-total').textContent         = fmtMXN(total);
-  document.getElementById('sum-cash-in-ytd').textContent  = fmtMXN(periodSum('in'));
-  document.getElementById('sum-cash-out-ytd').textContent = fmtMXN(periodSum('out'));
-  document.getElementById('sum-invested-ytd').textContent = fmtMXN(periodSum('invested'));
+  const sumTotal  = document.getElementById('sum-total');
+  const sumInYtd  = document.getElementById('sum-cash-in-ytd');
+  const sumOutYtd = document.getElementById('sum-cash-out-ytd');
+  const sumInvYtd = document.getElementById('sum-invested-ytd');
+  if (sumTotal)  sumTotal.textContent  = fmtMXN(total);
+  if (sumInYtd)  sumInYtd.textContent  = fmtMXN(periodSum('in'));
+  if (sumOutYtd) sumOutYtd.textContent = fmtMXN(periodSum('out'));
+  if (sumInvYtd) sumInvYtd.textContent = fmtMXN(periodSum('invested'));
 
   const label = getPeriodLabel();
   const inLbl       = document.getElementById('sum-cash-in-label');

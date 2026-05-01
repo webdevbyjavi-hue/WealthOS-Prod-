@@ -2309,9 +2309,10 @@ function buildRetiroLineData() {
 
   const starts = retiro.filter(r => r.fechaCompra).map(r => { const d = new Date(r.fechaCompra + 'T00:00:00'); d.setDate(1); return d; });
   const ends   = retiro.filter(r => r.fechaRetiro).map(r => { const d = new Date(r.fechaRetiro  + 'T00:00:00'); d.setDate(1); return d; });
-  if (!starts.length) return null;
 
-  const minStart = new Date(Math.min(...starts.map(d => d.getTime())));
+  // Fall back to today when no entry has an enrollment date so the chart
+  // still renders the current balance + forward projection instead of blank.
+  const minStart = starts.length ? new Date(Math.min(...starts.map(d => d.getTime()))) : new Date(today);
   const maxEnd   = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : today;
 
   const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -2325,8 +2326,10 @@ function buildRetiroLineData() {
 
     let val = 0;
     for (const r of retiro) {
-      if (!r.fechaCompra) continue;
-      const startD = new Date(r.fechaCompra + 'T00:00:00'); startD.setDate(1);
+      // Entries without fechaCompra are treated as starting from today
+      const startD = r.fechaCompra
+        ? (() => { const d = new Date(r.fechaCompra + 'T00:00:00'); d.setDate(1); return d; })()
+        : new Date(today);
       if (dYM < startD.getFullYear() * 12 + startD.getMonth()) continue;
       const mr  = (r.rendimiento || 0) / 100 / 12;
       const pmt = r.aportacionYTD || 0;
@@ -3288,7 +3291,8 @@ function getCryptoChartData(n) {
   const fx = _cryptoFxRate || 1;
   const series = _sliceHistory(_cryptoHistory, n);
   if (series) {
-    return { pts: series.map(([, v]) => v * fx), dates: series.map(([d]) => fmtDate(d)) };
+    // FX already applied in loadRealHistory buildMap — no second conversion here
+    return { pts: series.map(([, v]) => v), dates: series.map(([d]) => fmtDate(d)) };
   }
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
   const days  = _daysSincePurchase(cryptos, 'purchaseDate');
@@ -3306,7 +3310,7 @@ function getCryptoPortfolioHistory(n) {
     return sliced.map(([, v]) => v);
   }
   const series = _sliceHistory(_cryptoHistory, n);
-  if (series) return series.map(([, v]) => v * fx);
+  if (series) return series.map(([, v]) => v); // FX already applied in loadRealHistory buildMap
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
   const days  = _daysSincePurchase(cryptos, 'purchaseDate');
   const clamp = days ? Math.min(n, days) : n;

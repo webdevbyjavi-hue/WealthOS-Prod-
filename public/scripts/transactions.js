@@ -483,13 +483,14 @@ function updateSummary() {
   const invYTD  = ytd('invested');
   const netFlow = inYTD - outYTD;
 
-  document.getElementById('sum-cash-in').textContent  = fmtMXN(inYTD);
-  document.getElementById('sum-cash-out').textContent = fmtMXN(outYTD);
-  document.getElementById('sum-invested').textContent = fmtMXN(invYTD);
-
-  const netEl = document.getElementById('sum-net-flow');
-  netEl.textContent = fmtMXN(netFlow);
-  netEl.style.color = netFlow >= 0 ? 'var(--up)' : 'var(--down)';
+  const sumIn  = document.getElementById('sum-cash-in');
+  const sumOut = document.getElementById('sum-cash-out');
+  const sumInv = document.getElementById('sum-invested');
+  const netEl  = document.getElementById('sum-net-flow');
+  if (sumIn)  sumIn.textContent  = fmtMXN(inYTD);
+  if (sumOut) sumOut.textContent = fmtMXN(outYTD);
+  if (sumInv) sumInv.textContent = fmtMXN(invYTD);
+  if (netEl)  { netEl.textContent = fmtMXN(netFlow); netEl.style.color = netFlow >= 0 ? 'var(--up)' : 'var(--down)'; }
 }
 
 function updateKPIs() {
