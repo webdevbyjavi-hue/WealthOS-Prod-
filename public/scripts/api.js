@@ -183,6 +183,7 @@
 
     // ── Portfolio (total value trendline) ─────────────────────────────────────
     portfolio: {
+      snapshot: () => request('POST', '/api/portfolio/snapshot'),
       history: (from, to) => {
         const p = new URLSearchParams();
         if (from) p.set('from', from);

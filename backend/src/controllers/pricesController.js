@@ -150,4 +150,24 @@ async function getPortfolioHistoryMxn(req, res, next) {
   }
 }
 
-module.exports = { getPriceHistory, getPortfolioHistory, getPortfolioHistoryMxn };
+// ─── POST /api/portfolio/snapshot ─────────────────────────────────────────────
+
+/**
+ * @auth   Required — Bearer JWT
+ * @returns 200 { success: true }
+ *
+ * Called on every login. Checks whether today's snapshot already exists for
+ * this user and skips if so, making it safe to call on every page load.
+ */
+async function snapshotMyPortfolio(req, res, next) {
+  try {
+    const { saveUserPortfolioSnapshot } = require('../services/snapshotService');
+    const today = _todayUTC();
+    await saveUserPortfolioSnapshot(req.user.id, today);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getPriceHistory, getPortfolioHistory, getPortfolioHistoryMxn, snapshotMyPortfolio };

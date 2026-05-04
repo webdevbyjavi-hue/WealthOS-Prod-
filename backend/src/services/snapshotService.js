@@ -454,4 +454,109 @@ async function backfillSnapshots() {
   console.log(`[snapshotService] Backfill complete — ${totalBars} bar(s) across ${coveredDates.size} trading day(s).`);
 }
 
-module.exports = { runSnapshots, savePortfolioSnapshots, backfillSnapshots };
+/**
+ * Compute and save today's portfolio snapshot for a single user.
+ * Skips silently if a row for this user+date already exists.
+ * Safe to call on every login — the early-exit check is cheap.
+ *
+ * @param {string} userId
+ * @param {string} date — YYYY-MM-DD
+ */
+async function saveUserPortfolioSnapshot(userId, date) {
+  // Skip if already snapshotted today
+  const { data: existing } = await supabaseAdmin
+    .from('portfolio_value_snapshots')
+    .select('date')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle();
+  if (existing) return;
+
+  // 1. FX rate (most recent at or before date)
+  const { data: fxRow, error: fxErr } = await supabaseAdmin
+    .from('exchange_rates')
+    .select('rate')
+    .eq('pair', 'USD/MXN')
+    .lte('date', date)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fxErr) throw new Error(`[snapshotService] FX rate lookup failed: ${fxErr.message}`);
+  if (!fxRow) {
+    console.warn(`[snapshotService] No USD/MXN rate for ${date} — skipping user snapshot.`);
+    return;
+  }
+  const fxRate = parseFloat(fxRow.rate);
+
+  // 2. Market assets — prefer portfolio_daily_value view; fall back to stored current_price
+  const { data: marketRow } = await supabaseAdmin
+    .from('portfolio_daily_value')
+    .select('total_value')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle();
+
+  let market_mxn = 0;
+  if (marketRow) {
+    market_mxn = parseFloat(marketRow.total_value || 0) * fxRate;
+  } else {
+    const [stocksRes, fibrasRes, cryptoRes] = await Promise.all([
+      supabaseAdmin.from('stocks').select('shares, current_price').eq('user_id', userId),
+      supabaseAdmin.from('fibras').select('certificados, precio_actual').eq('user_id', userId),
+      supabaseAdmin.from('crypto').select('amount, current_price').eq('user_id', userId),
+    ]);
+    for (const s of (stocksRes.data || []))
+      market_mxn += parseFloat(s.shares || 0) * parseFloat(s.current_price || 0) * fxRate;
+    for (const f of (fibrasRes.data || []))
+      market_mxn += parseInt(f.certificados || 0) * parseFloat(f.precio_actual || 0);
+    for (const c of (cryptoRes.data || []))
+      market_mxn += parseFloat(c.amount || 0) * parseFloat(c.current_price || 0) * fxRate;
+  }
+
+  // 3. Manual assets + accounts in parallel
+  const [bonosRes, fondosRes, retiroRes, bienesRes, acctSnapRes, acctRes] = await Promise.all([
+    supabaseAdmin.from('bonos').select('monto').eq('user_id', userId),
+    supabaseAdmin.from('fondos').select('nav_actual, unidades').eq('user_id', userId),
+    supabaseAdmin.from('retiro').select('saldo').eq('user_id', userId),
+    supabaseAdmin.from('bienes').select('valor_actual, saldo_hipoteca').eq('user_id', userId),
+    supabaseAdmin.from('account_balance_snapshots').select('balance_mxn').eq('user_id', userId).eq('date', date),
+    supabaseAdmin.from('accounts').select('balance, fx_rate').eq('user_id', userId),
+  ]);
+
+  let manual_mxn = 0;
+  for (const b of (bonosRes.data || []))
+    manual_mxn += parseFloat(b.monto || 0);
+  for (const f of (fondosRes.data || []))
+    manual_mxn += parseFloat(f.nav_actual || 0) * parseFloat(f.unidades || 0);
+  for (const r of (retiroRes.data || []))
+    manual_mxn += parseFloat(r.saldo || 0);
+  for (const b of (bienesRes.data || []))
+    manual_mxn += Math.max(0, parseFloat(b.valor_actual || 0) - parseFloat(b.saldo_hipoteca || 0));
+
+  let accounts_mxn = 0;
+  const acctSnaps = acctSnapRes.data || [];
+  if (acctSnaps.length > 0) {
+    for (const a of acctSnaps) accounts_mxn += parseFloat(a.balance_mxn || 0);
+  } else {
+    for (const a of (acctRes.data || []))
+      accounts_mxn += parseFloat(a.balance || 0) * parseFloat(a.fx_rate || 1);
+  }
+
+  // 4. Upsert
+  const value_mxn = market_mxn + manual_mxn + accounts_mxn;
+  const { error: upsertErr } = await supabaseAdmin
+    .from('portfolio_value_snapshots')
+    .upsert({
+      user_id:   userId,
+      date,
+      value_usd: parseFloat((value_mxn / fxRate).toFixed(2)),
+      value_mxn: parseFloat(value_mxn.toFixed(2)),
+      fx_rate:   fxRate,
+    }, { onConflict: 'user_id,date' });
+
+  if (upsertErr) throw new Error(`[snapshotService] User portfolio snapshot upsert failed: ${upsertErr.message}`);
+  console.log(`[snapshotService] Saved portfolio snapshot for user ${userId} on ${date} (MXN ${value_mxn.toFixed(2)})`);
+}
+
+module.exports = { runSnapshots, savePortfolioSnapshots, backfillSnapshots, saveUserPortfolioSnapshot };

@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const { query }  = require('express-validator');
 const validate   = require('../middlewares/validate');
-const { getPriceHistory, getPortfolioHistory, getPortfolioHistoryMxn } = require('../controllers/pricesController');
+const { getPriceHistory, getPortfolioHistory, getPortfolioHistoryMxn, snapshotMyPortfolio } = require('../controllers/pricesController');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -34,5 +34,8 @@ portfolioRouter.get('/history', dateRange, getPortfolioHistory);
 
 // GET /api/portfolio/history/mxn?from=&to=
 portfolioRouter.get('/history/mxn', dateRange, getPortfolioHistoryMxn);
+
+// POST /api/portfolio/snapshot — capture today's value on login (skips if already exists)
+portfolioRouter.post('/snapshot', snapshotMyPortfolio);
 
 module.exports = { pricesRouter, portfolioRouter };

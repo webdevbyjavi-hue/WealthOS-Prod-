@@ -106,8 +106,9 @@
         localStorage.setItem('wos_user_initials', initials);
         updateSidebarName(fullName, initials);
       }
-      // Capture today's account balances on every login (upsert — safe to call repeatedly)
+      // Capture today's account balances and portfolio value on every login (both are idempotent)
       WOS_API.accounts.takeSnapshot().catch(() => {});
+      WOS_API.portfolio.snapshot().catch(() => {});
     })
     .catch(err => {
       if (err.status === 401) WOS_AUTH.signout();
