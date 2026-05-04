@@ -78,8 +78,9 @@ async function getPriceHistory(req, res, next) {
  * @query  to    End date YYYY-MM-DD, default today
  * @returns 200 { success: true, data: [{ date, total_value }] }
  *
- * total_value = SUM(shares × close) across all stocks + fibras + crypto for
- * the authenticated user, computed at read time by the portfolio_daily_value view.
+ * total_value is in MXN and covers ALL asset types: stocks, fibras, crypto,
+ * bonos, fondos, retiro, bienes, and bank accounts — matching the KPI cards.
+ * Reads from portfolio_value_snapshots (pre-computed daily by the snapshot job).
  */
 async function getPortfolioHistory(req, res, next) {
   try {
@@ -88,8 +89,8 @@ async function getPortfolioHistory(req, res, next) {
     const userId = req.user.id;
 
     const { data, error } = await supabase
-      .from('portfolio_daily_value')
-      .select('date, total_value')
+      .from('portfolio_value_snapshots')
+      .select('date, value_mxn')
       .eq('user_id', userId)
       .gte('date', from)
       .lte('date', to)
@@ -99,7 +100,7 @@ async function getPortfolioHistory(req, res, next) {
 
     const history = (data || []).map((r) => ({
       date:        r.date,
-      total_value: parseFloat(r.total_value),
+      total_value: parseFloat(r.value_mxn),
     }));
 
     res.json({ success: true, data: history });

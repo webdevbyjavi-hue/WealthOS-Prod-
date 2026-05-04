@@ -536,6 +536,17 @@ function applyCustomRange() {
         const d = new Date(r.date + 'T12:00:00Z');
         return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
       });
+      // Append today's live value if the range includes today and it's not yet snapshotted
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (endStr >= todayStr && (slice.length === 0 || slice[slice.length - 1].date !== todayStr)) {
+        const { totalValue: investVal } = loadWosPortfolio();
+        const todayTotal = investVal + _cashTotal;
+        if (todayTotal > 0) {
+          const todayLabel = new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
+          pts.push(todayTotal);
+          dates.push(todayLabel);
+        }
+      }
       drawLineChart(pts, dates);
       return;
     }
@@ -589,6 +600,20 @@ function renderLine(range) {
       const d = new Date(r.date + 'T12:00:00Z');
       return d.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
     });
+
+    // Append today's live value if today isn't already the last snapshot
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const lastDate = slice.length > 0 ? slice[slice.length - 1].date : null;
+    if (lastDate !== todayStr) {
+      const { totalValue: investVal } = loadWosPortfolio();
+      const todayTotal = investVal + _cashTotal;
+      if (todayTotal > 0) {
+        const todayLabel = new Date().toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' });
+        pts.push(todayTotal);
+        dates.push(todayLabel);
+      }
+    }
+
     drawLineChart(pts, dates);
     return;
   }

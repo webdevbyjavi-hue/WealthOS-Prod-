@@ -48,6 +48,11 @@ const WOS_FILTERS = (() => {
     return Math.max(1, Math.ceil((to - from) / 86400000));
   }
 
+  function getFromDateStr() {
+    const { from } = getDateRange();
+    return from ? from.toISOString().slice(0, 10) : null;
+  }
+
   function restoreUI(pillPrefix, customRangeId, dateFromId, dateToId) {
     const { period, dateFrom, dateTo } = get();
     document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
@@ -64,5 +69,5 @@ const WOS_FILTERS = (() => {
     return { period, dateFrom, dateTo };
   }
 
-  return { get, save, getDateRange, getDays, restoreUI };
+  return { get, save, getDateRange, getDays, getFromDateStr, restoreUI };
 })();

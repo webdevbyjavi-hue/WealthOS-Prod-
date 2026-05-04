@@ -132,34 +132,52 @@ if (config.nodeEnv !== 'test') {
   console.log('[WealthOS API] Daily snapshot cron scheduled: 23:00 UTC Mon–Fri');
 }
 
-// ─── Daily account balance snapshot cron ─────────────────────────────────────
-// Runs at midnight UTC every day (all days — account balances don't follow
-// market hours). Captures every user's account balance for trend tracking.
+// ─── Daily account balance + portfolio snapshot cron ─────────────────────────
+// Runs at midnight UTC every day (all days — covers weekends and non-trading
+// days for assets that don't follow market hours: bonos, fondos, retiro,
+// bienes, and accounts). Account balances are snapped first so the portfolio
+// snapshot can include today's account total.
 if (config.nodeEnv !== 'test') {
   const { snapshotAllAccounts } = require('./src/services/accountSnapshotService');
+  const { savePortfolioSnapshots } = require('./src/services/snapshotService');
 
   cron.schedule('0 0 * * *', async () => {
     console.log('[cron] Starting daily account balance snapshot...');
     try {
       const result = await snapshotAllAccounts();
       console.log(`[cron] Account snapshot complete — ${result.count} account(s) for ${result.date}`);
+      // Save full portfolio snapshot immediately after so accounts are included
+      await savePortfolioSnapshots(result.date);
+      console.log(`[cron] Portfolio snapshot complete for ${result.date}`);
     } catch (err) {
-      console.error('[cron] Account snapshot failed:', err.message);
+      console.error('[cron] Daily snapshot failed:', err.message);
     }
   }, { timezone: 'UTC' });
 
-  console.log('[WealthOS API] Daily account balance snapshot cron scheduled: 00:00 UTC daily');
+  console.log('[WealthOS API] Daily account + portfolio snapshot cron scheduled: 00:00 UTC daily');
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(config.port, () => {
   console.log(`[WealthOS API] Running in ${config.nodeEnv} mode on port ${config.port}`);
 
-  // Catch up on any snapshot days missed while the server was offline (e.g. Render
-  // free-tier spin-down). Fire-and-forget — never blocks the server from accepting
-  // requests, and uses 'normal' priority so it won't starve the nightly cron.
   if (config.nodeEnv !== 'test') {
-    const { backfillSnapshots } = require('./src/services/snapshotService');
+    const { backfillSnapshots, savePortfolioSnapshots } = require('./src/services/snapshotService');
+    const { snapshotAllAccounts } = require('./src/services/accountSnapshotService');
+
+    // Seed today's snapshot on startup so the chart has at least one real data
+    // point immediately. Runs after a short delay to let the DB pool warm up.
+    setTimeout(async () => {
+      try {
+        const { date } = await snapshotAllAccounts();
+        await savePortfolioSnapshots(date);
+        console.log(`[startup] Portfolio snapshot seeded for ${date}`);
+      } catch (err) {
+        console.error('[startup] Portfolio seed failed:', err.message);
+      }
+    }, 5000);
+
+    // Catch up on any market snapshot days missed while the server was offline.
     backfillSnapshots().catch(err =>
       console.error('[startup] Snapshot backfill failed:', err.message)
     );

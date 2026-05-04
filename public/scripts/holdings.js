@@ -484,9 +484,13 @@ function getDateLabels(n) {
  */
 function _sliceHistory(histMap, n) {
   if (!histMap || histMap.size === 0) return null;
-  return [...histMap.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-n);
+  const sorted = [...histMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const fromDate = WOS_FILTERS.getFromDateStr();
+  if (fromDate) {
+    const filtered = sorted.filter(([date]) => date >= fromDate);
+    return filtered.length > 0 ? filtered : null;
+  }
+  return sorted.slice(-n);
 }
 
 /**
@@ -566,16 +570,6 @@ async function loadRealHistory() {
   _stocksHistory = sm;
   _cryptoHistory = cm;
   _fibrasHistory = fm;
-
-  // Load stored MXN portfolio value history for the portfolio-value chart
-  try {
-    const mxnHistory = await WOS_API.portfolio.historyMxn(from, today);
-    if (mxnHistory && mxnHistory.length > 0) {
-      const mxnMap = new Map(mxnHistory.map(r => [r.date, r.value_mxn]));
-      // Expose as a sorted array of [date, value] pairs for chart consumption
-      window._portfolioMxnHistory = [...mxnMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    }
-  } catch (_) {}
 }
 
 Chart.defaults.color         = '#8892a4';
@@ -1078,45 +1072,118 @@ function renderBonosTable(filter = '') {
 function filterBonosTable(v) { renderBonosTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
-function getBonosPortfolioHistory(n) {
-  const total = bonos.reduce((s, b) => s + b.monto, 0);
-  const fake  = _genFake('bonos', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+function _plazoDays(plazo) {
+  const m = plazo && plazo.match(/^(\d+)\s*(días?|años?)$/i);
+  if (!m) return 1;
+  const n = parseInt(m[1], 10);
+  return m[2].toLowerCase().startsWith('día') ? n : n * 365;
+}
+
+function buildBonosLineData() {
+  const activeBonos = bonos.filter(b => b.purchaseDate && b.plazo);
+  if (!activeBonos.length) return null;
+
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const todayYM = today.getFullYear() * 12 + today.getMonth();
+
+  const starts = activeBonos.map(b => new Date(b.purchaseDate + 'T00:00:00'));
+  const maturityDates = activeBonos.map(b => {
+    const d = new Date(b.purchaseDate + 'T00:00:00');
+    d.setDate(d.getDate() + _plazoDays(b.plazo));
+    return d;
+  });
+
+  const minStart = new Date(Math.min(...starts.map(d => d.getTime())));
+  const maxEnd   = new Date(Math.max(...maturityDates.map(d => d.getTime())));
+
+  const totalDays  = Math.ceil((maxEnd - minStart) / 86400000);
+  const useMonthly = totalDays > 365;
+
+  const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const labels = [], pastPts = [], futurePts = [];
+  const cur = new Date(minStart);
+  if (useMonthly) cur.setDate(1);
+
+  while (cur <= maxEnd) {
+    const curYM   = cur.getFullYear() * 12 + cur.getMonth();
+    const isPast  = useMonthly ? curYM <= todayYM : cur <= today;
+    const isToday = useMonthly ? curYM === todayYM
+                               : cur.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+
+    labels.push(useMonthly
+      ? `${MONTHS_ES[cur.getMonth()]} ${cur.getFullYear()}`
+      : cur.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' }));
+
+    let val = 0;
+    activeBonos.forEach((b, i) => {
+      const start    = starts[i];
+      const maturity = maturityDates[i];
+      if (cur < start || cur > maturity) return;
+      const daysElapsed = Math.max(0, (cur - start) / 86400000);
+      val += b.monto * Math.pow(1 + b.tasaCompra / 100, daysElapsed / 365);
+    });
+    val = Math.max(0, parseFloat(val.toFixed(2)));
+
+    pastPts.push(isPast ? val : null);
+    futurePts.push((isToday || !isPast) ? val : null);
+
+    if (useMonthly) cur.setMonth(cur.getMonth() + 1);
+    else cur.setDate(cur.getDate() + 1);
+  }
+
+  return { labels, pastPts, futurePts };
 }
 
 function initBonosCharts() {
-  const pts   = getBonosPortfolioHistory(bonosLineRangeDays);
-  const dates = getDateLabels(bonosLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
-  const lc = lineUp ? '#6366f1' : '#f87171';
+  const ld = buildBonosLineData() || { labels: [], pastPts: [], futurePts: [] };
 
-  // Line chart
+  // Line chart — solid past + dashed future projection
   bonosLineChart = new Chart(document.getElementById('chart-bonos-line'), {
     type: 'line',
     data: {
-      labels: dates,
-      datasets: [{
-        data: pts, borderColor: lc, borderWidth: 2, fill: true,
-        backgroundColor(ctx) {
-          const { chart } = ctx; const { ctx: c, chartArea } = chart;
-          if (!chartArea) return 'transparent';
-          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          g.addColorStop(0, lineUp ? 'rgba(99,102,241,0.22)' : 'rgba(248,113,113,0.22)');
-          g.addColorStop(1, 'rgba(0,0,0,0)'); return g;
+      labels: ld.labels,
+      datasets: [
+        {
+          label: 'Valor acumulado',
+          data: ld.pastPts, spanGaps: false,
+          borderColor: '#6366f1', borderWidth: 2, fill: true,
+          backgroundColor(ctx) {
+            const { chart } = ctx; const { ctx: c, chartArea } = chart;
+            if (!chartArea) return 'transparent';
+            const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            g.addColorStop(0, 'rgba(99,102,241,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)'); return g;
+          },
+          tension: 0.35, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#6366f1', pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
         },
-        tension: 0.45, pointRadius: 0, pointHoverRadius: 5,
-        pointHoverBackgroundColor: lc, pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
-      }]
+        {
+          label: 'Proyección',
+          data: ld.futurePts, spanGaps: false,
+          borderColor: 'rgba(99,102,241,0.5)', borderWidth: 2, borderDash: [6, 4],
+          fill: false, tension: 0.35, pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#6366f1', pointHoverBorderColor: '#111525', pointHoverBorderWidth: 2,
+        }
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { backgroundColor:'#111525', borderColor:'#1e2640', borderWidth:1, titleColor:'#8892a4', bodyColor:'#eef0ff', padding:10, callbacks:{ label: ctx => '  ' + fmt(ctx.raw) } }
+        tooltip: {
+          backgroundColor: '#111525', borderColor: '#1e2640', borderWidth: 1,
+          titleColor: '#8892a4', bodyColor: '#eef0ff', padding: 10,
+          callbacks: {
+            label(ctx) {
+              if (ctx.raw === null) return null;
+              const prefix = ctx.datasetIndex === 1 ? '  Proyección: ' : '  Valor: ';
+              return prefix + fmt(ctx.raw);
+            }
+          }
+        }
       },
       scales: {
-        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:7, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
+        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:10, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
         y: { position:'right', grid:{ color:'#1a2138', tickLength:0 }, ticks:{ color:'#3d4a63', padding:8, callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, border:{ color:'transparent' } }
       }
     }
@@ -1170,14 +1237,10 @@ function initBonosCharts() {
 
 function updateBonosCharts() {
   if (!bonosLineChart) return;
-  const pts   = getBonosPortfolioHistory(bonosLineRangeDays);
-  const dates = getDateLabels(bonosLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
-  const lc = lineUp ? '#6366f1' : '#f87171';
-
-  bonosLineChart.data.labels = dates;
-  bonosLineChart.data.datasets[0].data = pts;
-  bonosLineChart.data.datasets[0].borderColor = lc;
+  const ld = buildBonosLineData() || { labels: [], pastPts: [], futurePts: [] };
+  bonosLineChart.data.labels           = ld.labels;
+  bonosLineChart.data.datasets[0].data = ld.pastPts;
+  bonosLineChart.data.datasets[1].data = ld.futurePts;
   bonosLineChart.update();
 
   const grouped = {};
@@ -1236,36 +1299,32 @@ function onBonoTipoChange(tipo) {
   onBonoPlazoChange(document.getElementById('bi-plazo').value);
 }
 
-// Called when plazo dropdown changes — fills description + serie read-only fields
+// Called when plazo dropdown changes — fills description + serie, then auto-fetches tasa
 function onBonoPlazoChange(plazo) {
   const tipo  = document.getElementById('bi-tipo').value;
   const entry = _resolveBonoEntry(tipo, plazo);
   if (!entry) return;
   document.getElementById('bi-descripcion').value   = entry.descripcion || '';
   document.getElementById('bi-serie-banxico').value = entry.serie_banxico;
+  if (tipo && plazo) lookupBonoTasa();
 }
 
-// ─── Lookup button ────────────────────────────────────────────────────────────
 async function lookupBonoTasa() {
   const serieBanxico = document.getElementById('bi-serie-banxico').value.trim();
-  if (!serieBanxico) { showToast('Selecciona un instrumento y plazo primero.'); return; }
+  if (!serieBanxico) return;
 
-  const btn = document.getElementById('bi-lookup-btn');
-  btn.disabled = true;
-  btn.textContent = 'Buscando…';
+  const refEl = document.getElementById('bi-tasa-ref');
+  document.getElementById('bi-tasa').value = '';
+  refEl.textContent   = 'Consultando Banxico…';
+  refEl.style.display = 'block';
 
   try {
     const data = await WOS_API.bonos.getTasa(serieBanxico);
     document.getElementById('bi-tasa').value = data.tasa;
-    const refEl = document.getElementById('bi-tasa-ref');
-    refEl.textContent  = `Banxico · ${data.fecha} · ${data.serie_banxico}`;
-    refEl.style.display = 'block';
-    showToast(`Tasa: ${data.tasa}% al ${data.fecha}`);
+    refEl.textContent = `Banxico · ${data.fecha} · ${data.serie_banxico}`;
   } catch (err) {
-    showToast(err.message || 'Error al consultar Banxico. Ingresa la tasa manualmente.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Lookup';
+    refEl.textContent = 'No se pudo obtener la tasa. Ingrésala manualmente.';
+    showToast(err.message || 'Error al consultar Banxico.');
   }
 }
 
@@ -1306,11 +1365,8 @@ async function openBonoModal(id = null) {
     _populateBonoPlazo(firstTipo);
     const firstPlazo = document.getElementById('bi-plazo').value;
     onBonoPlazoChange(firstPlazo);
-    document.getElementById('bi-tasa').value  = '';
     document.getElementById('bi-monto').value = '';
     document.getElementById('bi-fecha').value = '';
-    // Auto-fetch the live rate for the default selection
-    if (firstTipo && firstPlazo) lookupBonoTasa();
   }
 
   document.getElementById('bono-modal-overlay').classList.add('modal-overlay--visible');
@@ -1537,25 +1593,53 @@ function renderFondosTable(filter = '') {
 function filterFondosTable(v) { renderFondosTable(v); }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
-function getFondosPortfolioHistory(n) {
-  const total = fondos.reduce((s, f) => s + f.navActual * f.unidades, 0);
-  const fake  = _genFake('fondos', total);
-  return fake ? fake.slice(-n) : Array(n).fill(0);
+function buildFondosLineData() {
+  const activeFondos = fondos.filter(f => f.fechaCompra);
+  if (!activeFondos.length) return null;
+
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const starts = activeFondos.map(f => new Date(f.fechaCompra + 'T00:00:00'));
+  const minStart = new Date(Math.min(...starts.map(d => d.getTime())));
+  const totalDays = Math.ceil((today - minStart) / 86400000);
+  const useMonthly = totalDays > 365;
+
+  const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const labels = [], pts = [];
+  const cur = new Date(minStart);
+  if (useMonthly) cur.setDate(1);
+
+  while (cur <= today) {
+    labels.push(useMonthly
+      ? `${MONTHS_ES[cur.getMonth()]} ${cur.getFullYear()}`
+      : cur.toLocaleDateString(window.WOS_LOCALE || 'en-US', { month: 'short', day: 'numeric' }));
+
+    let val = 0;
+    activeFondos.forEach((f, i) => {
+      if (cur < starts[i]) return;
+      const daysElapsed = Math.max(0, (cur - starts[i]) / 86400000);
+      val += f.precioCompra * f.unidades * Math.pow(1 + f.rendimiento / 100, daysElapsed / 365);
+    });
+    pts.push(Math.max(0, parseFloat(val.toFixed(2))));
+
+    if (useMonthly) cur.setMonth(cur.getMonth() + 1);
+    else cur.setDate(cur.getDate() + 1);
+  }
+
+  return { labels, pts };
 }
 
 function initFondosCharts() {
-  const pts    = getFondosPortfolioHistory(fondosLineRangeDays);
-  const dates  = getDateLabels(fondosLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const ld     = buildFondosLineData() || { labels: [], pts: [] };
+  const lineUp = ld.pts.length > 1 && ld.pts[ld.pts.length - 1] >= ld.pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
   // Line chart
   fondosLineChart = new Chart(document.getElementById('chart-fondos-line'), {
     type: 'line',
     data: {
-      labels: dates,
+      labels: ld.labels,
       datasets: [{
-        data: pts, borderColor: lc, borderWidth: 2, fill: true,
+        data: ld.pts, borderColor: lc, borderWidth: 2, fill: true,
         backgroundColor(ctx) {
           const { chart } = ctx; const { ctx: c, chartArea } = chart;
           if (!chartArea) return 'transparent';
@@ -1575,7 +1659,7 @@ function initFondosCharts() {
         tooltip: { backgroundColor:'#111525', borderColor:'#1e2640', borderWidth:1, titleColor:'#8892a4', bodyColor:'#eef0ff', padding:10, callbacks:{ label: ctx => '  ' + fmt(ctx.raw) } }
       },
       scales: {
-        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:7, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
+        x: { grid:{ color:'#1e2640', tickLength:0 }, ticks:{ maxTicksLimit:10, color:'#3d4a63', padding:6 }, border:{ color:'#1e2640' } },
         y: { position:'right', grid:{ color:'#1a2138', tickLength:0 }, ticks:{ color:'#3d4a63', padding:8, callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v.toFixed(0)) }, border:{ color:'transparent' } }
       }
     }
@@ -1629,13 +1713,12 @@ function initFondosCharts() {
 
 function updateFondosCharts() {
   if (!fondosLineChart) return;
-  const pts    = getFondosPortfolioHistory(fondosLineRangeDays);
-  const dates  = getDateLabels(fondosLineRangeDays);
-  const lineUp = pts[pts.length - 1] >= pts[0];
+  const ld     = buildFondosLineData() || { labels: [], pts: [] };
+  const lineUp = ld.pts.length > 1 && ld.pts[ld.pts.length - 1] >= ld.pts[0];
   const lc     = lineUp ? '#6366f1' : '#f87171';
 
-  fondosLineChart.data.labels = dates;
-  fondosLineChart.data.datasets[0].data = pts;
+  fondosLineChart.data.labels = ld.labels;
+  fondosLineChart.data.datasets[0].data = ld.pts;
   fondosLineChart.data.datasets[0].borderColor = lc;
   fondosLineChart.update();
 
@@ -3290,16 +3373,11 @@ function getCryptoChartData(n) {
   const locale = window.WOS_LOCALE || 'en-US';
   const fmtDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
-  if (window._portfolioMxnHistory && window._portfolioMxnHistory.length > 0) {
-    const sliced = window._portfolioMxnHistory.slice(-n);
-    return { pts: sliced.map(([, v]) => v), dates: sliced.map(([d]) => fmtDate(d)) };
-  }
-  const fx = _cryptoFxRate || 1;
   const series = _sliceHistory(_cryptoHistory, n);
   if (series) {
-    // FX already applied in loadRealHistory buildMap — no second conversion here
     return { pts: series.map(([, v]) => v), dates: series.map(([d]) => fmtDate(d)) };
   }
+  const fx    = _cryptoFxRate || 1;
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
   const days  = _daysSincePurchase(cryptos, 'purchaseDate');
   const clamp = days ? Math.min(n, days) : n;
@@ -3310,13 +3388,8 @@ function getCryptoChartData(n) {
 
 function getCryptoPortfolioHistory(n) {
   const fx     = _cryptoFxRate || 1;
-  // Prefer stored MXN history (historically accurate exchange rates)
-  if (window._portfolioMxnHistory && window._portfolioMxnHistory.length > 0) {
-    const sliced = window._portfolioMxnHistory.slice(-n);
-    return sliced.map(([, v]) => v);
-  }
   const series = _sliceHistory(_cryptoHistory, n);
-  if (series) return series.map(([, v]) => v); // FX already applied in loadRealHistory buildMap
+  if (series) return series.map(([, v]) => v);
   const total = cryptos.reduce((s, c) => s + c.currentPrice * c.amount, 0) * fx;
   const days  = _daysSincePurchase(cryptos, 'purchaseDate');
   const clamp = days ? Math.min(n, days) : n;

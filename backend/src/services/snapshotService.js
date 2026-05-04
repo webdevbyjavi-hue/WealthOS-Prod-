@@ -156,20 +156,28 @@ async function runSnapshots() {
     `out of ${symbols.length} unique symbol(s).`
   );
 
-  // ── 4. Persist per-user portfolio values in MXN ───────────────────────────
-  if (succeeded > 0) {
-    await savePortfolioSnapshots(runDate).catch((err) =>
-      console.error('[snapshotService] Portfolio snapshot failed:', err.message)
-    );
-  }
+  // ── 4. Persist per-user portfolio values in MXN (all asset types + accounts)
+  await savePortfolioSnapshots(runDate).catch((err) =>
+    console.error('[snapshotService] Portfolio snapshot failed:', err.message)
+  );
 
   return { date: runDate, total: symbols.length, succeeded, failed, results };
 }
 
 /**
- * Compute each user's total portfolio value (stocks + fibras + crypto) for
- * `date`, apply that day's USD/MXN rate, and upsert into
- * portfolio_value_snapshots. Idempotent — safe to re-run for the same date.
+ * Compute each user's TOTAL portfolio value across ALL asset types for `date`
+ * and upsert into portfolio_value_snapshots. Idempotent — safe to re-run.
+ *
+ * Market assets (stocks, fibras, crypto):
+ *   - On trading days: uses portfolio_daily_value view (accurate close prices).
+ *   - On non-trading days (weekends/holidays): falls back to stored current
+ *     prices in the holdings tables (market was closed, prices unchanged).
+ *
+ * Manual assets (bonos, fondos, retiro, bienes): always uses current DB values.
+ * Accounts: uses account_balance_snapshots for `date` if already snapped,
+ *   otherwise falls back to the live accounts table.
+ *
+ * All values are summed in MXN using the day's USD/MXN exchange rate.
  *
  * @param {string} date — YYYY-MM-DD
  */
@@ -191,26 +199,113 @@ async function savePortfolioSnapshots(date) {
   }
   const fxRate = parseFloat(fxRow.rate);
 
-  // 2. Query the portfolio_daily_value view for this date (all users)
-  const { data: rows, error: viewErr } = await supabaseAdmin
+  // 2. Query market-priced assets from portfolio_daily_value (trading days only)
+  const { data: marketRows, error: viewErr } = await supabaseAdmin
     .from('portfolio_daily_value')
     .select('user_id, total_value')
     .eq('date', date);
 
   if (viewErr) throw new Error(`[snapshotService] Portfolio view query failed: ${viewErr.message}`);
-  if (!rows || rows.length === 0) {
-    console.log(`[snapshotService] No portfolio values found for ${date}.`);
+
+  // 3. Query every holdings table and accounts in parallel
+  const [bonosRes, fondosRes, retiroRes, bienesRes, acctSnapRes, acctRes, stocksRes, fibrasRes, cryptoRes] =
+    await Promise.all([
+      supabaseAdmin.from('bonos').select('user_id, monto'),
+      supabaseAdmin.from('fondos').select('user_id, nav_actual, unidades'),
+      supabaseAdmin.from('retiro').select('user_id, saldo'),
+      supabaseAdmin.from('bienes').select('user_id, valor_actual, saldo_hipoteca'),
+      supabaseAdmin.from('account_balance_snapshots').select('user_id, balance_mxn').eq('date', date),
+      supabaseAdmin.from('accounts').select('user_id, balance, fx_rate'),
+      supabaseAdmin.from('stocks').select('user_id, shares, current_price'),
+      supabaseAdmin.from('fibras').select('user_id, certificados, precio_actual'),
+      supabaseAdmin.from('crypto').select('user_id, amount, current_price'),
+    ]);
+
+  // 4. Accumulate per-user totals in MXN
+  const byUser = new Map(); // user_id → { market_mxn, manual_mxn, accounts_mxn }
+  const ensure = (uid) => {
+    if (!byUser.has(uid)) byUser.set(uid, { market_mxn: 0, manual_mxn: 0, accounts_mxn: 0 });
+  };
+
+  // Market assets — prefer accurate close prices from the VIEW on trading days;
+  // fall back to stored current_price values on weekends/holidays.
+  if (marketRows && marketRows.length > 0) {
+    for (const r of marketRows) {
+      ensure(r.user_id);
+      // portfolio_daily_value.total_value is in USD — convert to MXN
+      byUser.get(r.user_id).market_mxn += parseFloat(r.total_value || 0) * fxRate;
+    }
+  } else {
+    // Non-trading day: compute from current prices stored in holdings tables
+    for (const s of (stocksRes.data || [])) {
+      ensure(s.user_id);
+      byUser.get(s.user_id).market_mxn +=
+        parseFloat(s.shares || 0) * parseFloat(s.current_price || 0) * fxRate;
+    }
+    for (const f of (fibrasRes.data || [])) {
+      ensure(f.user_id);
+      byUser.get(f.user_id).market_mxn +=
+        parseInt(f.certificados || 0) * parseFloat(f.precio_actual || 0);
+    }
+    for (const c of (cryptoRes.data || [])) {
+      ensure(c.user_id);
+      byUser.get(c.user_id).market_mxn +=
+        parseFloat(c.amount || 0) * parseFloat(c.current_price || 0) * fxRate;
+    }
+  }
+
+  // Manual assets — always current DB values (all in MXN)
+  for (const b of (bonosRes.data || [])) {
+    ensure(b.user_id);
+    byUser.get(b.user_id).manual_mxn += parseFloat(b.monto || 0);
+  }
+  for (const f of (fondosRes.data || [])) {
+    ensure(f.user_id);
+    byUser.get(f.user_id).manual_mxn +=
+      parseFloat(f.nav_actual || 0) * parseFloat(f.unidades || 0);
+  }
+  for (const r of (retiroRes.data || [])) {
+    ensure(r.user_id);
+    byUser.get(r.user_id).manual_mxn += parseFloat(r.saldo || 0);
+  }
+  for (const b of (bienesRes.data || [])) {
+    ensure(b.user_id);
+    byUser.get(b.user_id).manual_mxn +=
+      Math.max(0, parseFloat(b.valor_actual || 0) - parseFloat(b.saldo_hipoteca || 0));
+  }
+
+  // Accounts — use today's snapshot if available, otherwise live balances
+  const acctSnaps = acctSnapRes.data || [];
+  if (acctSnaps.length > 0) {
+    for (const a of acctSnaps) {
+      ensure(a.user_id);
+      byUser.get(a.user_id).accounts_mxn += parseFloat(a.balance_mxn || 0);
+    }
+  } else {
+    for (const a of (acctRes.data || [])) {
+      ensure(a.user_id);
+      byUser.get(a.user_id).accounts_mxn +=
+        parseFloat(a.balance || 0) * parseFloat(a.fx_rate || 1);
+    }
+  }
+
+  if (byUser.size === 0) {
+    console.log(`[snapshotService] No user data found for ${date} — skipping.`);
     return;
   }
 
-  // 3. Build upsert payload
-  const snapshots = rows.map((r) => ({
-    user_id:   r.user_id,
-    date,
-    value_usd: parseFloat(r.total_value),
-    value_mxn: parseFloat(r.total_value) * fxRate,
-    fx_rate:   fxRate,
-  }));
+  // 5. Build upsert payload
+  const snapshots = [];
+  for (const [uid, { market_mxn, manual_mxn, accounts_mxn }] of byUser.entries()) {
+    const value_mxn = market_mxn + manual_mxn + accounts_mxn;
+    snapshots.push({
+      user_id:   uid,
+      date,
+      value_usd: parseFloat((value_mxn / fxRate).toFixed(2)),
+      value_mxn: parseFloat(value_mxn.toFixed(2)),
+      fx_rate:   fxRate,
+    });
+  }
 
   const { error: upsertErr } = await supabaseAdmin
     .from('portfolio_value_snapshots')
@@ -218,7 +313,10 @@ async function savePortfolioSnapshots(date) {
 
   if (upsertErr) throw new Error(`[snapshotService] Portfolio snapshot upsert failed: ${upsertErr.message}`);
 
-  console.log(`[snapshotService] Saved portfolio snapshots for ${rows.length} user(s) on ${date} (rate: ${fxRate}).`);
+  console.log(
+    `[snapshotService] Saved portfolio snapshots for ${snapshots.length} user(s) on ${date}` +
+    ` (rate: ${fxRate}, market rows: ${marketRows?.length ?? 0}).`
+  );
 }
 
 /**
